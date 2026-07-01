@@ -1,13 +1,14 @@
 :root {
   --bg: #020307;
+
+  --red: #ff3428;
+  --orange: #ff7a2f;
   --amber: #ffb45c;
-  --amber-hot: #ffd6a0;
-  --red: #ff4d3f;
+  --cream: #ffe8c6;
   --cyan: #70f6ff;
-  --dim: rgba(255, 180, 92, 0.32);
-  --panel: rgba(18, 10, 6, 0.42);
-  --line: rgba(255, 180, 92, 0.36);
-  --text: #ffe8c6;
+
+  --panel: rgba(18, 8, 5, 0.42);
+  --text: var(--amber);
 }
 
 * {
@@ -37,8 +38,8 @@ button {
   height: 100vh;
   padding: 18px;
   background:
-    radial-gradient(circle at 50% 40%, rgba(255, 120, 50, 0.08), transparent 38%),
-    radial-gradient(circle at 20% 20%, rgba(112, 246, 255, 0.05), transparent 30%),
+    radial-gradient(circle at 50% 40%, rgba(255, 60, 30, 0.12), transparent 38%),
+    radial-gradient(circle at 20% 20%, rgba(255, 180, 92, 0.06), transparent 30%),
     linear-gradient(145deg, #020307, #070403 70%, #100305);
 }
 
@@ -46,17 +47,17 @@ button {
   position: relative;
   width: 100%;
   height: 100%;
-  border: 1px solid rgba(255, 180, 92, 0.22);
+  border: 1px solid rgba(255, 90, 48, 0.24);
   border-radius: 28px;
   overflow: hidden;
   perspective: 950px;
   background:
-    radial-gradient(ellipse at center, rgba(255, 160, 80, 0.06), transparent 48%),
+    radial-gradient(ellipse at center, rgba(255, 80, 40, 0.08), transparent 48%),
     #020307;
   box-shadow:
-    inset 0 0 80px rgba(255, 120, 50, 0.08),
-    inset 0 0 180px rgba(0, 0, 0, 0.85),
-    0 0 40px rgba(255, 90, 40, 0.12);
+    inset 0 0 80px rgba(255, 60, 30, 0.1),
+    inset 0 0 180px rgba(0, 0, 0, 0.88),
+    0 0 44px rgba(255, 60, 30, 0.14);
 }
 
 .viewer-shell::before,
@@ -72,8 +73,8 @@ button {
   background:
     repeating-linear-gradient(
       to bottom,
-      rgba(255, 180, 92, 0.045) 0,
-      rgba(255, 180, 92, 0.045) 1px,
+      rgba(255, 120, 70, 0.045) 0,
+      rgba(255, 120, 70, 0.045) 1px,
       transparent 1px,
       transparent 5px
     );
@@ -95,62 +96,188 @@ button {
 
 .projected-object {
   position: absolute;
-  color: var(--text);
-  border: 1px solid var(--line);
+  color: var(--phase-text, var(--amber));
+  border: 1px solid var(--phase-line, rgba(255, 90, 48, 0.38));
   background:
-    linear-gradient(135deg, rgba(255, 120, 50, 0.1), rgba(255, 180, 92, 0.025)),
+    linear-gradient(
+      135deg,
+      rgba(255, 50, 35, 0.14),
+      rgba(255, 180, 92, 0.035)
+    ),
     var(--panel);
   box-shadow:
-    0 0 8px rgba(255, 180, 92, 0.32),
-    0 0 24px rgba(255, 80, 35, 0.16),
-    inset 0 0 18px rgba(255, 180, 92, 0.08);
+    0 0 8px var(--phase-glow-soft, rgba(255, 52, 40, 0.34)),
+    0 0 26px var(--phase-glow-wide, rgba(255, 90, 35, 0.16)),
+    inset 0 0 18px var(--phase-glow-inner, rgba(255, 52, 40, 0.08));
   text-shadow:
-    0 0 6px rgba(255, 180, 92, 0.8),
-    0 0 18px rgba(255, 80, 35, 0.36);
-  opacity: 0.82;
+    0 0 5px var(--phase-glow-soft, rgba(255, 52, 40, 0.65)),
+    0 0 16px var(--phase-glow-wide, rgba(255, 90, 35, 0.34));
+  opacity: 0.84;
   transform-style: preserve-3d;
   transition:
     opacity 600ms ease,
     filter 600ms ease,
     box-shadow 600ms ease,
-    transform 600ms ease;
+    color 600ms ease,
+    border-color 600ms ease,
+    transform 1200ms ease;
   animation:
-    object-breathe 6s ease-in-out infinite,
-    object-flicker 11s steps(1) infinite;
+    colour-phase 9s ease-in-out infinite,
+    object-flicker 13s steps(1) infinite;
 }
 
 .projected-object::before {
   content: "";
   position: absolute;
   inset: -8px;
-  border: 1px solid rgba(255, 180, 92, 0.12);
+  border: 1px solid var(--phase-ghost, rgba(255, 90, 48, 0.12));
   pointer-events: none;
 }
 
 .projected-object:hover,
 .projected-object:focus-visible {
   opacity: 1;
-  filter: brightness(1.22);
+  filter: brightness(1.12);
   outline: none;
-  box-shadow:
-    0 0 14px rgba(255, 213, 160, 0.7),
-    0 0 38px rgba(255, 80, 35, 0.28),
-    inset 0 0 24px rgba(255, 180, 92, 0.16);
 }
+
+/* OBJECT PLACEMENT */
 
 .masthead-object {
   top: 7%;
   left: 7%;
   width: min(520px, 82vw);
   padding: 22px 26px;
-  transform: translateZ(120px) rotateY(-4deg);
+  transform:
+    translate3d(var(--drift-x, 0px), var(--drift-y, 0px), var(--focus-z, 0px))
+    translateZ(120px)
+    rotateY(-4deg)
+    scale(var(--object-scale, 1));
 }
+
+.filter-object {
+  top: 28%;
+  left: 7%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: min(560px, 82vw);
+  padding: 12px;
+  transform:
+    translate3d(var(--drift-x, 0px), var(--drift-y, 0px), var(--focus-z, 0px))
+    translateZ(80px)
+    rotateY(-5deg)
+    scale(var(--object-scale, 1));
+}
+
+.submit-object {
+  top: 7%;
+  right: 8%;
+  transform:
+    translate3d(var(--drift-x, 0px), var(--drift-y, 0px), var(--focus-z, 0px))
+    translateZ(160px)
+    rotateY(6deg)
+    scale(var(--object-scale, 1));
+}
+
+.article-object {
+  width: min(420px, 78vw);
+  padding: 18px;
+  cursor: pointer;
+}
+
+.article-object:nth-of-type(1) {
+  top: 42%;
+  left: 10%;
+  transform:
+    translate3d(var(--drift-x, 0px), var(--drift-y, 0px), var(--focus-z, 0px))
+    translateZ(220px)
+    rotateY(-5deg)
+    rotateX(1deg)
+    scale(var(--object-scale, 1));
+}
+
+.article-object:nth-of-type(2) {
+  top: 31%;
+  right: 11%;
+  transform:
+    translate3d(var(--drift-x, 0px), var(--drift-y, 0px), var(--focus-z, 0px))
+    translateZ(340px)
+    rotateY(7deg)
+    rotateX(-1deg)
+    scale(var(--object-scale, 1));
+}
+
+.article-object:nth-of-type(3) {
+  bottom: 11%;
+  left: 34%;
+  transform:
+    translate3d(var(--drift-x, 0px), var(--drift-y, 0px), var(--focus-z, 0px))
+    translateZ(460px)
+    rotateY(2deg)
+    scale(var(--object-scale, 1));
+}
+
+.ticker-object {
+  right: 6%;
+  bottom: 7%;
+  display: flex;
+  gap: 18px;
+  max-width: 720px;
+  padding: 10px 14px;
+  color: var(--cyan);
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  transform:
+    translate3d(var(--drift-x, 0px), var(--drift-y, 0px), var(--focus-z, 0px))
+    translateZ(70px)
+    rotateY(5deg)
+    scale(var(--object-scale, 1));
+}
+
+.detail-object {
+  pointer-events: none;
+  background: transparent;
+}
+
+.detail-ring {
+  right: 25%;
+  top: 18%;
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  border-color: rgba(255, 180, 92, 0.24);
+  transform:
+    translate3d(var(--drift-x, 0px), var(--drift-y, 0px), var(--focus-z, 0px))
+    translateZ(520px)
+    rotateX(68deg)
+    scale(var(--object-scale, 1));
+  opacity: 0.34;
+}
+
+.detail-bracket {
+  left: 4%;
+  bottom: 10%;
+  width: 160px;
+  height: 90px;
+  border-right: 0;
+  border-bottom: 0;
+  transform:
+    translate3d(var(--drift-x, 0px), var(--drift-y, 0px), var(--focus-z, 0px))
+    translateZ(260px)
+    rotateY(-8deg)
+    scale(var(--object-scale, 1));
+  opacity: 0.5;
+}
+
+/* TEXT */
 
 .system-kicker,
 .system-subline,
 .article-meta {
   margin: 0;
-  color: var(--cyan);
+  color: var(--phase-accent, var(--orange));
   font-size: 0.72rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -162,48 +289,6 @@ button {
   line-height: 0.9;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-}
-
-.filter-object {
-  top: 28%;
-  left: 7%;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  width: min(560px, 82vw);
-  padding: 12px;
-  transform: translateZ(80px) rotateY(-5deg);
-}
-
-.filter-button,
-.submit-object,
-.viewer-controls button {
-  border: 1px solid rgba(255, 180, 92, 0.42);
-  background: rgba(255, 120, 50, 0.08);
-  color: var(--text);
-  padding: 8px 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-  box-shadow: 0 0 12px rgba(255, 120, 50, 0.12);
-}
-
-.filter-button.is-selected {
-  color: #020307;
-  background: var(--amber);
-  text-shadow: none;
-}
-
-.submit-object {
-  top: 7%;
-  right: 8%;
-  transform: translateZ(160px) rotateY(6deg);
-}
-
-.article-object {
-  width: min(420px, 78vw);
-  padding: 18px;
-  cursor: pointer;
 }
 
 .article-object h2 {
@@ -218,67 +303,51 @@ button {
   line-height: 1.45;
 }
 
-.article-object:nth-of-type(1) {
-  top: 42%;
-  left: 10%;
-  transform: translateZ(220px) rotateY(-5deg) rotateX(1deg);
-  animation-delay: -1.7s;
-}
+/* BUTTONS */
 
-.article-object:nth-of-type(2) {
-  top: 31%;
-  right: 11%;
-  transform: translateZ(340px) rotateY(7deg) rotateX(-1deg);
-  animation-delay: -4.2s;
-}
-
-.article-object:nth-of-type(3) {
-  bottom: 11%;
-  left: 34%;
-  transform: translateZ(460px) rotateY(2deg);
-  animation-delay: -7.8s;
-}
-
-.ticker-object {
-  right: 6%;
-  bottom: 7%;
-  display: flex;
-  gap: 18px;
-  max-width: 720px;
-  padding: 10px 14px;
-  color: var(--cyan);
-  font-size: 0.75rem;
-  letter-spacing: 0.16em;
+.filter-button,
+.submit-object,
+.viewer-controls button {
+  border: 1px solid rgba(255, 90, 48, 0.42);
+  background: rgba(255, 52, 40, 0.08);
+  color: var(--phase-text, var(--amber));
+  padding: 8px 12px;
   text-transform: uppercase;
-  transform: translateZ(70px) rotateY(5deg);
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(255, 52, 40, 0.14);
 }
 
-.detail-object {
-  pointer-events: none;
-  background: transparent;
+.filter-button.is-selected {
+  color: #020307;
+  background: var(--amber);
+  text-shadow: none;
 }
 
-.detail-ring {
-  right: 25%;
-  top: 18%;
-  width: 210px;
-  height: 210px;
-  border-radius: 50%;
-  border-color: rgba(112, 246, 255, 0.2);
-  transform: translateZ(520px) rotateX(68deg);
-  opacity: 0.34;
+/* JS STATES */
+
+.projected-object.is-focused {
+  z-index: 30;
+  opacity: 1 !important;
+  filter: brightness(1.22);
 }
 
-.detail-bracket {
-  left: 4%;
-  bottom: 10%;
-  width: 160px;
-  height: 90px;
-  border-right: 0;
-  border-bottom: 0;
-  transform: translateZ(260px) rotateY(-8deg);
-  opacity: 0.5;
+.projected-object.is-muted {
+  opacity: 0.26 !important;
+  filter: brightness(0.55) blur(0.6px);
 }
+
+.projected-object.is-background {
+  opacity: 0.12 !important;
+  filter: brightness(0.45) blur(1px);
+}
+
+.projected-object.is-flickering {
+  opacity: 0.16 !important;
+  filter: brightness(1.8);
+}
+
+/* CONTROLS */
 
 .viewer-controls {
   position: fixed;
@@ -294,7 +363,8 @@ button {
   filter: none;
   animation: none;
   text-shadow: none;
-  background: rgba(8, 8, 10, 0.86);
+  color: var(--cream);
+  background: rgba(8, 8, 10, 0.88);
 }
 
 .viewer.is-reduced-motion .projected-object {
@@ -302,14 +372,48 @@ button {
   transition: none;
 }
 
-@keyframes object-breathe {
+/* COLOUR PHASE */
+
+@keyframes colour-phase {
   0%,
   100% {
-    filter: brightness(0.92);
+    --phase-text: var(--red);
+    --phase-accent: var(--red);
+    --phase-line: rgba(255, 52, 40, 0.34);
+    --phase-ghost: rgba(255, 52, 40, 0.12);
+    --phase-glow-soft: rgba(255, 52, 40, 0.34);
+    --phase-glow-wide: rgba(255, 52, 40, 0.16);
+    --phase-glow-inner: rgba(255, 52, 40, 0.08);
   }
 
-  50% {
-    filter: brightness(1.18);
+  34% {
+    --phase-text: var(--orange);
+    --phase-accent: var(--orange);
+    --phase-line: rgba(255, 122, 47, 0.42);
+    --phase-ghost: rgba(255, 122, 47, 0.16);
+    --phase-glow-soft: rgba(255, 122, 47, 0.46);
+    --phase-glow-wide: rgba(255, 122, 47, 0.24);
+    --phase-glow-inner: rgba(255, 122, 47, 0.12);
+  }
+
+  66% {
+    --phase-text: var(--amber);
+    --phase-accent: var(--amber);
+    --phase-line: rgba(255, 180, 92, 0.52);
+    --phase-ghost: rgba(255, 180, 92, 0.22);
+    --phase-glow-soft: rgba(255, 180, 92, 0.62);
+    --phase-glow-wide: rgba(255, 180, 92, 0.32);
+    --phase-glow-inner: rgba(255, 180, 92, 0.16);
+  }
+
+  82% {
+    --phase-text: var(--cream);
+    --phase-accent: var(--cream);
+    --phase-line: rgba(255, 232, 198, 0.68);
+    --phase-ghost: rgba(255, 232, 198, 0.26);
+    --phase-glow-soft: rgba(255, 232, 198, 0.82);
+    --phase-glow-wide: rgba(255, 180, 92, 0.42);
+    --phase-glow-inner: rgba(255, 232, 198, 0.2);
   }
 }
 
@@ -317,11 +421,11 @@ button {
   0%,
   92%,
   100% {
-    opacity: 0.82;
+    opacity: 0.84;
   }
 
   93% {
-    opacity: 0.55;
+    opacity: 0.5;
   }
 
   94% {
@@ -332,6 +436,8 @@ button {
     opacity: 0.68;
   }
 }
+
+/* MOBILE */
 
 @media (max-width: 800px) {
   body {
@@ -396,20 +502,4 @@ button {
     animation: none;
     transition: none;
   }
-}
-.projected-object.is-focused {
-  z-index: 30;
-  opacity: 1 !important;
-  filter: brightness(1.35);
-  transform: translateZ(620px) scale(1.08) !important;
-}
-
-.projected-object.is-muted {
-  opacity: 0.28 !important;
-  filter: brightness(0.55) blur(0.6px);
-}
-
-.projected-object.is-flickering {
-  opacity: 0.18 !important;
-  filter: brightness(1.8);
-}
+  }
