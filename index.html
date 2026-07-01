@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Night City News</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/chamber.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/glyphs.css" />
+  <link rel="stylesheet" href="css/stories.css" />
+  <link rel="stylesheet" href="css/effects.css" />
+  <link rel="stylesheet" href="css/mobile.css" />
+</head>
+
+<body>
+  <div id="viewer" class="viewer">
+    <div id="chamber" class="chamber" aria-hidden="true">
+      <div class="rear-plane"></div>
+      <div class="edge-grid edge-left"></div>
+      <div class="edge-grid edge-right"></div>
+      <div class="scan-sweep"></div>
+      <div id="ambient-layer" class="ambient-layer"></div>
+    </div>
+
+    <main id="feed" class="feed" aria-label="Night City News feed"></main>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/scenes.js"></script>
+  <script src="js/interactions.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
