@@ -9,26 +9,16 @@
 
 <body>
   <main class="viewer" aria-label="Night City News optical viewer">
-
     <div class="viewer-shell">
       <div class="projection-space" id="projectionSpace">
 
-        <header
-          class="projected-object masthead-object"
-          data-object-type="masthead"
-          data-depth="120"
-        >
+        <header class="projected-object masthead-object" data-object-type="masthead" data-depth="120">
           <p class="system-kicker">LOCAL SIGNAL // NIGHT CITY</p>
           <h1>Night City News</h1>
           <p class="system-subline">Independent street feed // optical projection test</p>
         </header>
 
-        <nav
-          class="projected-object filter-object"
-          data-object-type="filters"
-          data-depth="80"
-          aria-label="Feed filters"
-        >
+        <nav class="projected-object filter-object" data-object-type="filters" data-depth="80" aria-label="Feed filters">
           <button class="filter-button is-selected" type="button">Now</button>
           <button class="filter-button" type="button">Street</button>
           <button class="filter-button" type="button">Corp</button>
@@ -36,21 +26,11 @@
           <button class="filter-button" type="button">Rumours</button>
         </nav>
 
-        <button
-          class="projected-object submit-object"
-          data-object-type="submit"
-          data-depth="160"
-          type="button"
-        >
+        <button class="projected-object submit-object" data-object-type="submit" data-depth="160" type="button">
           Submit Signal
         </button>
 
-        <section
-          class="projected-object article-object"
-          data-object-type="article"
-          data-depth="220"
-          tabindex="0"
-        >
+        <section class="projected-object article-object article-a" data-object-type="article" data-depth="220" tabindex="0">
           <p class="article-meta">23:41 // Watson // Street Feed</p>
           <h2>Unmarked AV spotted circling old clinic block</h2>
           <p>
@@ -59,12 +39,7 @@
           </p>
         </section>
 
-        <section
-          class="projected-object article-object"
-          data-object-type="article"
-          data-depth="340"
-          tabindex="0"
-        >
+        <section class="projected-object article-object article-b" data-object-type="article" data-depth="340" tabindex="0">
           <p class="article-meta">00:08 // City Center // Corp Watch</p>
           <h2>Executive blackout hits three linked towers</h2>
           <p>
@@ -73,12 +48,7 @@
           </p>
         </section>
 
-        <section
-          class="projected-object article-object"
-          data-object-type="article"
-          data-depth="460"
-          tabindex="0"
-        >
+        <section class="projected-object article-object article-c" data-object-type="article" data-depth="460" tabindex="0">
           <p class="article-meta">01:12 // Santo Domingo // Infrastructure</p>
           <h2>Substation fire paints the south grid blue</h2>
           <p>
@@ -87,30 +57,15 @@
           </p>
         </section>
 
-        <aside
-          class="projected-object ticker-object"
-          data-object-type="ticker"
-          data-depth="70"
-          aria-label="Status ticker"
-        >
+        <aside class="projected-object ticker-object" data-object-type="ticker" data-depth="70" aria-label="Status ticker">
           <span>SIGNAL STABLE</span>
           <span>RSS NODE PENDING</span>
           <span>3 UNVERIFIED REPORTS</span>
         </aside>
 
-        <div
-          class="projected-object detail-object detail-ring"
-          data-object-type="detail"
-          data-depth="520"
-          aria-hidden="true"
-        ></div>
+        <div class="projected-object detail-object detail-ring" data-object-type="detail" data-depth="520" aria-hidden="true"></div>
 
-        <div
-          class="projected-object detail-object detail-bracket"
-          data-object-type="detail"
-          data-depth="260"
-          aria-hidden="true"
-        ></div>
+        <div class="projected-object detail-object detail-bracket" data-object-type="detail" data-depth="260" aria-hidden="true"></div>
 
       </div>
     </div>
@@ -119,7 +74,6 @@
       <button id="clarityToggle" type="button">Clarity Mode</button>
       <button id="motionToggle" type="button">Reduce Motion</button>
     </aside>
-
   </main>
 
   <script src="script.js"></script>
