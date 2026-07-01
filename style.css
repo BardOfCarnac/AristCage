@@ -397,3 +397,19 @@ button {
     transition: none;
   }
 }
+.projected-object.is-focused {
+  z-index: 30;
+  opacity: 1 !important;
+  filter: brightness(1.35);
+  transform: translateZ(620px) scale(1.08) !important;
+}
+
+.projected-object.is-muted {
+  opacity: 0.28 !important;
+  filter: brightness(0.55) blur(0.6px);
+}
+
+.projected-object.is-flickering {
+  opacity: 0.18 !important;
+  filter: brightness(1.8);
+}
