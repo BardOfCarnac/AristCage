@@ -1,0 +1,65 @@
+/*==================================================
+  MOBILE
+==================================================*/
+
+@media (max-width: 720px) {
+  :root {
+    --feed-width: 92vw;
+  }
+
+  .feed {
+    padding: 42px 14px 180px;
+  }
+
+  .feed-header {
+    margin-bottom: 38px;
+  }
+
+  .story-list {
+    gap: 44px;
+  }
+
+  .story-projection {
+    min-height: 230px;
+  }
+
+  .story.is-expanded {
+    min-height: 620px;
+  }
+
+  .story-content {
+    margin-left: 30px;
+  }
+
+  .story-priority {
+    left: 0;
+    top: 32px;
+    width: 8px;
+    height: 150px;
+  }
+
+  .story-meta,
+  .story-tags {
+    font-size: 0.68rem;
+  }
+
+  .story-headline {
+    font-size: clamp(1.35rem, 7vw, 2.25rem);
+  }
+
+  .story-body {
+    font-size: 0.98rem;
+  }
+
+  .rear-plane {
+    left: 12%;
+    right: 12%;
+    top: 16%;
+    bottom: 12%;
+  }
+
+  .edge-grid {
+    width: 18%;
+    opacity: 0.34;
+  }
+}
