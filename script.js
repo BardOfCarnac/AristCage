@@ -1,3 +1,5 @@
+// script.js — Projection Engine v1
+
 const viewer = document.querySelector(".viewer");
 const projectionSpace = document.querySelector("#projectionSpace");
 const objects = [...document.querySelectorAll(".projected-object")];
@@ -12,53 +14,79 @@ function randomBetween(min, max) {
   return Math.random() * (max - min) + min;
 }
 
+function randomInt(min, max) {
+  return Math.floor(randomBetween(min, max + 1));
+}
+
 function initialiseObjects() {
   objects.forEach((object, index) => {
     const depth = Number(object.dataset.depth || 100);
+    const type = object.dataset.objectType || "generic";
 
-    object.dataset.seed = String(randomBetween(0, 9999));
     object.dataset.state = "active";
+    object.dataset.index = String(index);
+    object.dataset.seed = String(randomInt(1000, 9999));
 
     object.style.setProperty("--object-depth", `${depth}px`);
-    object.style.animationDelay = `${randomBetween(-12, 0)}s`;
-    object.style.animationDuration = `${randomBetween(5, 13)}s`;
+    object.style.setProperty("--drift-x", "0px");
+    object.style.setProperty("--drift-y", "0px");
+    object.style.setProperty("--focus-z", "0px");
+    object.style.setProperty("--object-scale", "1");
+    object.style.setProperty("--phase-delay", `${randomBetween(-12, 0).toFixed(2)}s`);
+    object.style.setProperty("--phase-duration", `${randomBetween(7, 15).toFixed(2)}s`);
 
-    object.style.opacity = randomBetween(0.72, 0.94);
+    object.style.animationDelay = `var(--phase-delay)`;
+    object.style.animationDuration = `var(--phase-duration)`;
 
-    if (object.dataset.objectType === "article") {
-      object.addEventListener("click", () => focusObject(object));
+    if (isInteractiveObject(type)) {
+      object.setAttribute("tabindex", object.getAttribute("tabindex") || "0");
+      object.addEventListener("click", (event) => {
+        event.stopPropagation();
+        focusObject(object);
+      });
+
       object.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           focusObject(object);
-        }
-
-        if (event.key === "Escape") {
-          clearFocus();
         }
       });
     }
   });
 }
 
-function focusObject(object) {
-  if (focusedObject === object) {
+function isInteractiveObject(type) {
+  return ["article", "masthead", "filters", "submit", "ticker"].includes(type);
+}
+
+function focusObject(target) {
+  if (focusedObject === target) {
     clearFocus();
     return;
   }
 
-  focusedObject = object;
+  focusedObject = target;
   viewer.classList.add("has-focus");
 
-  objects.forEach((item) => {
-    item.classList.remove("is-focused", "is-muted");
+  objects.forEach((object) => {
+    object.classList.remove("is-focused", "is-muted", "is-background");
 
-    if (item === object) {
-      item.classList.add("is-focused");
-      item.dataset.state = "focused";
+    if (object === target) {
+      object.dataset.state = "focused";
+      object.classList.add("is-focused");
+      object.style.setProperty("--focus-z", "280px");
+      object.style.setProperty("--object-scale", "1.06");
     } else {
-      item.classList.add("is-muted");
-      item.dataset.state = "muted";
+      object.dataset.state = "muted";
+
+      if (object.dataset.objectType === "detail") {
+        object.classList.add("is-background");
+      } else {
+        object.classList.add("is-muted");
+      }
+
+      object.style.setProperty("--focus-z", "-80px");
+      object.style.setProperty("--object-scale", "0.97");
     }
   });
 }
@@ -68,42 +96,53 @@ function clearFocus() {
   viewer.classList.remove("has-focus");
 
   objects.forEach((object) => {
-    object.classList.remove("is-focused", "is-muted");
     object.dataset.state = "active";
+    object.classList.remove("is-focused", "is-muted", "is-background");
+    object.style.setProperty("--focus-z", "0px");
+    object.style.setProperty("--object-scale", "1");
   });
 }
 
-function runIdlePulse() {
-  if (reducedMotion) return;
+function updateIdleMotion() {
+  if (reducedMotion || viewer.classList.contains("is-clarity")) return;
 
   objects.forEach((object) => {
-    if (object.classList.contains("is-focused")) return;
+    if (object.dataset.state === "focused") return;
 
-    const glow = randomBetween(0.7, 1.25);
-    const driftX = randomBetween(-4, 4);
-    const driftY = randomBetween(-3, 3);
+    const depth = Number(object.dataset.depth || 100);
+    const depthFactor = Math.min(Math.max(depth / 500, 0.3), 1.2);
 
-    object.style.setProperty("--idle-glow", glow.toFixed(2));
-    object.style.setProperty("--idle-x", `${driftX.toFixed(2)}px`);
-    object.style.setProperty("--idle-y", `${driftY.toFixed(2)}px`);
+    const driftX = randomBetween(-5, 5) * depthFactor;
+    const driftY = randomBetween(-3, 3) * depthFactor;
+
+    object.style.setProperty("--drift-x", `${driftX.toFixed(2)}px`);
+    object.style.setProperty("--drift-y", `${driftY.toFixed(2)}px`);
   });
 }
 
 function rareFlicker() {
-  if (reducedMotion) return;
+  if (reducedMotion || viewer.classList.contains("is-clarity")) return;
 
-  const object = objects[Math.floor(Math.random() * objects.length)];
-  if (!object || object.classList.contains("is-focused")) return;
+  const candidates = objects.filter((object) => {
+    return object.dataset.state !== "focused";
+  });
+
+  const object = candidates[randomInt(0, candidates.length - 1)];
+  if (!object) return;
 
   object.classList.add("is-flickering");
 
   window.setTimeout(() => {
     object.classList.remove("is-flickering");
-  }, randomBetween(80, 180));
+  }, randomBetween(70, 180));
 }
 
 clarityToggle.addEventListener("click", () => {
   viewer.classList.toggle("is-clarity");
+
+  if (viewer.classList.contains("is-clarity")) {
+    clearFocus();
+  }
 });
 
 motionToggle.addEventListener("click", () => {
@@ -115,10 +154,8 @@ motionToggle.addEventListener("click", () => {
     : "Reduce Motion";
 });
 
-projectionSpace.addEventListener("click", (event) => {
-  if (!event.target.closest(".article-object")) {
-    clearFocus();
-  }
+projectionSpace.addEventListener("click", () => {
+  clearFocus();
 });
 
 document.addEventListener("keydown", (event) => {
@@ -129,5 +166,5 @@ document.addEventListener("keydown", (event) => {
 
 initialiseObjects();
 
-window.setInterval(runIdlePulse, 1800);
+window.setInterval(updateIdleMotion, 1800);
 window.setInterval(rareFlicker, 4200);
