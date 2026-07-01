@@ -1,0 +1,297 @@
+/*==================================================
+  STORY OBJECT
+==================================================*/
+
+.story{
+
+    position:relative;
+
+    width:100%;
+
+    max-width:var(--feed-width);
+
+    margin:0 auto;
+
+    transform-style:preserve-3d;
+
+}
+
+
+/*==================================================
+  STORY PROJECTION
+==================================================*/
+
+.story-projection{
+
+    position:relative;
+
+    width:100%;
+
+    min-height:240px;
+
+    transform-style:preserve-3d;
+
+}
+
+
+/*==================================================
+  FRAME
+==================================================*/
+
+.story-frame{
+
+    position:absolute;
+
+    inset:0;
+
+}
+
+.story-frame::before,
+.story-frame::after{
+
+    content:"";
+
+    position:absolute;
+
+    width:42px;
+    height:42px;
+
+    border-style:solid;
+    border-color:currentColor;
+
+}
+
+.story-frame::before{
+
+    top:0;
+    left:0;
+
+    border-width:
+
+        1px
+        0
+        0
+        1px;
+
+}
+
+.story-frame::after{
+
+    bottom:0;
+    right:0;
+
+    border-width:
+
+        0
+        1px
+        1px
+        0;
+
+}
+
+
+/*==================================================
+  PRIORITY BAR
+==================================================*/
+
+.story-priority{
+
+    position:absolute;
+
+    left:0;
+
+    top:28px;
+
+    width:8px;
+
+    height:170px;
+
+    border-radius:2px;
+
+    background:
+
+        linear-gradient(
+
+            to bottom,
+
+            var(--red),
+
+            var(--orange),
+
+            var(--amber),
+
+            var(--cream)
+
+        );
+
+    box-shadow:
+
+        0 0 18px var(--amber);
+
+}
+
+
+/*==================================================
+  CONTENT
+==================================================*/
+
+.story-content{
+
+    margin-left:32px;
+
+}
+
+
+/*==================================================
+  META
+==================================================*/
+
+.story-meta{
+
+    margin-bottom:12px;
+
+    font-size:.72rem;
+
+    text-transform:uppercase;
+
+    letter-spacing:.18em;
+
+}
+
+
+/*==================================================
+  HEADLINE
+==================================================*/
+
+.story-headline{
+
+    margin:0;
+
+    font-size:
+
+        clamp(
+
+            1.6rem,
+
+            4vw,
+
+            3rem
+
+        );
+
+    line-height:.94;
+
+    font-weight:700;
+
+    text-transform:uppercase;
+
+}
+
+
+/*==================================================
+  TAGS
+==================================================*/
+
+.story-tags{
+
+    margin-top:18px;
+
+    font-size:.72rem;
+
+    letter-spacing:.16em;
+
+    text-transform:uppercase;
+
+}
+
+
+/*==================================================
+  BODY
+==================================================*/
+
+.story-body{
+
+    display:none;
+
+    margin-top:28px;
+
+    line-height:1.55;
+
+}
+
+
+/*==================================================
+  EXPANDED
+==================================================*/
+
+.story.is-expanded{
+
+    min-height:520px;
+
+}
+
+.story.is-expanded .story-body{
+
+    display:block;
+
+}
+
+
+/*==================================================
+  HOVER
+==================================================*/
+
+.story{
+
+    cursor:pointer;
+
+}
+
+.story:hover .story-headline{
+
+    color:var(--cream);
+
+}
+
+
+/*==================================================
+  MOBILE
+==================================================*/
+
+@media (max-width:720px){
+
+.story{
+
+    min-height:220px;
+
+}
+
+.story-content{
+
+    margin-left:26px;
+
+}
+
+.story-priority{
+
+    height:150px;
+
+}
+
+.story-headline{
+
+    font-size:
+
+        clamp(
+
+            1.35rem,
+
+            7vw,
+
+            2.2rem
+
+        );
+
+}
+
+}
