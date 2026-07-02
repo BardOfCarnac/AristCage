@@ -1,0 +1,72 @@
+/*==================================================
+  DESKTOP
+==================================================*/
+
+@media (min-width: 900px) {
+  :root {
+    --feed-width: 1080px;
+    --feed-unit: 132px;
+    --feed-gap: 16px;
+  }
+
+  .feed {
+    width: min(var(--feed-width), 88vw);
+    padding-top: 24px;
+  }
+
+  .entry {
+    width: min(760px, 72%);
+  }
+
+  .entry:nth-child(even) {
+    margin-left: auto;
+  }
+
+  .rail {
+    padding: 10px 32px;
+  }
+
+  .rail-actions {
+    grid-auto-flow: column;
+  }
+}
+
+/*==================================================
+  SMALL MOBILE
+==================================================*/
+
+@media (max-width: 420px) {
+  :root {
+    --feed-gap: 10px;
+  }
+
+  .rail {
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .rail-mark {
+    font-size: 1.35rem;
+  }
+
+  .rail-title strong {
+    font-size: 0.92rem;
+  }
+
+  .rail-title span {
+    font-size: 0.58rem;
+  }
+
+  .rail-actions button {
+    padding: 3px 7px;
+    font-size: 0.58rem;
+  }
+
+  .projection-plate {
+    padding: 16px 12px 12px 26px;
+  }
+
+  .headline {
+    font-size: clamp(1.55rem, 8vw, 2.7rem);
+  }
+}
