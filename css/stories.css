@@ -1,35 +1,43 @@
 /*==================================================
-  STORY OBJECT
+  STORY
 ==================================================*/
 
-.story{
+.story {
 
-    position:relative;
+    position: relative;
 
-    width:100%;
+    width: 100%;
 
-    max-width:var(--feed-width);
+    margin: 0;
 
-    margin:0 auto;
+    transition:
+        min-height .45s ease,
+        opacity .35s ease;
 
-    transform-style:preserve-3d;
+}
+
+.story.is-hidden {
+
+    opacity: 0;
+
+    pointer-events: none;
 
 }
 
 
 /*==================================================
-  STORY PROJECTION
+  PROJECTION
 ==================================================*/
 
-.story-projection{
+.story-projection {
 
-    position:relative;
+    position: relative;
 
-    width:100%;
+    min-height: 220px;
 
-    min-height:240px;
+    padding: 22px 0 18px 0;
 
-    transform-style:preserve-3d;
+    transform-style: preserve-3d;
 
 }
 
@@ -38,95 +46,115 @@
   FRAME
 ==================================================*/
 
-.story-frame{
+.story-frame {
 
-    position:absolute;
+    position: absolute;
 
-    inset:0;
+    inset: 0;
 
 }
 
 .story-frame::before,
-.story-frame::after{
+.story-frame::after {
 
-    content:"";
+    content: "";
 
-    position:absolute;
+    position: absolute;
 
-    width:42px;
-    height:42px;
+    width: 42px;
+    height: 42px;
 
-    border-style:solid;
-    border-color:currentColor;
-
-}
-
-.story-frame::before{
-
-    top:0;
-    left:0;
-
-    border-width:
-
-        1px
-        0
-        0
-        1px;
+    border-color: currentColor;
+    border-style: solid;
 
 }
 
-.story-frame::after{
+.story-frame::before {
 
-    bottom:0;
-    right:0;
+    top: 0;
+    left: 0;
 
-    border-width:
+    border-width: 1px 0 0 1px;
 
-        0
-        1px
-        1px
-        0;
+}
+
+.story-frame::after {
+
+    right: 0;
+    bottom: 0;
+
+    border-width: 0 1px 1px 0;
 
 }
 
 
 /*==================================================
-  PRIORITY BAR
+  PRIORITY
 ==================================================*/
 
-.story-priority{
+.story-priority {
 
-    position:absolute;
+    position: absolute;
 
-    left:0;
+    left: 0;
 
-    top:28px;
+    top: 28px;
 
-    width:8px;
+    width: 8px;
 
-    height:170px;
+    height: 150px;
 
-    border-radius:2px;
+    border-radius: 2px;
+
+    box-shadow: 0 0 18px currentColor;
+
+}
+
+.priority-1 {
 
     background:
-
         linear-gradient(
-
             to bottom,
-
-            var(--red),
-
-            var(--orange),
-
-            var(--amber),
-
-            var(--cream)
-
+            #3a0908,
+            #7d1712,
+            var(--red)
         );
 
-    box-shadow:
+}
 
-        0 0 18px var(--amber);
+.priority-2 {
+
+    background:
+        linear-gradient(
+            to bottom,
+            var(--red),
+            #ff5330,
+            var(--orange)
+        );
+
+}
+
+.priority-3 {
+
+    background:
+        linear-gradient(
+            to bottom,
+            var(--orange),
+            #ffb44d,
+            var(--amber)
+        );
+
+}
+
+.priority-4 {
+
+    background:
+        linear-gradient(
+            to bottom,
+            var(--orange),
+            var(--amber),
+            var(--cream)
+        );
 
 }
 
@@ -135,9 +163,9 @@
   CONTENT
 ==================================================*/
 
-.story-content{
+.story-content {
 
-    margin-left:32px;
+    margin-left: 32px;
 
 }
 
@@ -146,15 +174,15 @@
   META
 ==================================================*/
 
-.story-meta{
+.story-meta {
 
-    margin-bottom:12px;
+    margin-bottom: 10px;
 
-    font-size:.72rem;
+    font-size: .72rem;
 
-    text-transform:uppercase;
+    text-transform: uppercase;
 
-    letter-spacing:.18em;
+    letter-spacing: .16em;
 
 }
 
@@ -163,27 +191,20 @@
   HEADLINE
 ==================================================*/
 
-.story-headline{
+.story-headline {
 
-    margin:0;
+    margin: 0;
+
+    line-height: .94;
 
     font-size:
-
         clamp(
-
-            1.6rem,
-
+            1.55rem,
             4vw,
-
             3rem
-
         );
 
-    line-height:.94;
-
-    font-weight:700;
-
-    text-transform:uppercase;
+    text-transform: uppercase;
 
 }
 
@@ -192,15 +213,15 @@
   TAGS
 ==================================================*/
 
-.story-tags{
+.story-tags {
 
-    margin-top:18px;
+    margin-top: 18px;
 
-    font-size:.72rem;
+    font-size: .72rem;
 
-    letter-spacing:.16em;
+    letter-spacing: .14em;
 
-    text-transform:uppercase;
+    text-transform: uppercase;
 
 }
 
@@ -209,13 +230,13 @@
   BODY
 ==================================================*/
 
-.story-body{
+.story-body {
 
-    display:none;
+    display: none;
 
-    margin-top:28px;
+    margin-top: 26px;
 
-    line-height:1.55;
+    line-height: 1.6;
 
 }
 
@@ -224,15 +245,15 @@
   EXPANDED
 ==================================================*/
 
-.story.is-expanded{
+.story.is-expanded {
 
-    min-height:520px;
+    min-height: 520px;
 
 }
 
-.story.is-expanded .story-body{
+.story.is-expanded .story-body {
 
-    display:block;
+    display: block;
 
 }
 
@@ -241,15 +262,15 @@
   HOVER
 ==================================================*/
 
-.story{
+.story:hover .story-headline {
 
-    cursor:pointer;
+    color: var(--cream);
 
 }
 
-.story:hover .story-headline{
+.story:hover .story-priority {
 
-    color:var(--cream);
+    filter: brightness(1.15);
 
 }
 
@@ -260,37 +281,32 @@
 
 @media (max-width:720px){
 
-.story{
+.story-projection{
 
-    min-height:220px;
+    min-height:200px;
 
 }
 
 .story-content{
 
-    margin-left:26px;
-
-}
-
-.story-priority{
-
-    height:150px;
+    margin-left:28px;
 
 }
 
 .story-headline{
 
     font-size:
-
         clamp(
-
-            1.35rem,
-
-            7vw,
-
-            2.2rem
-
+            1.3rem,
+            6vw,
+            2.1rem
         );
+
+}
+
+.story.is-expanded{
+
+    min-height:620px;
 
 }
 
