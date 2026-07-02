@@ -8,7 +8,7 @@ const Interactions = (() => {
 
   function init() {
     document.addEventListener("click", handleClick);
-    window.addEventListener("scroll", updateScrollParallax);
+    window.addEventListener("scroll", updateScrollParallax, { passive: true });
     window.addEventListener("resize", updateScrollParallax);
 
     updateScrollParallax();
@@ -33,54 +33,28 @@ const Interactions = (() => {
   function transitionTo(scene, storyIdToScroll = null) {
     isTransitioning = true;
 
-    dismissProjection();
+    ProjectionEngine.render(scene);
 
-    window.setTimeout(() => {
-      ProjectionEngine.render(scene);
-      revealProjection();
+    requestAnimationFrame(() => {
+      updateScrollParallax();
 
       if (storyIdToScroll) {
-        requestAnimationFrame(() => {
-          const target = document.querySelector(
-            `.story[data-story-id="${storyIdToScroll}"]`
-          );
+        const target = document.querySelector(
+          `.story[data-story-id="${storyIdToScroll}"]`
+        );
 
-          if (target) {
-            target.scrollIntoView({
-              behavior: "smooth",
-              block: "center"
-            });
-          }
-        });
+        if (target) {
+          target.scrollIntoView({
+            behavior: "smooth",
+            block: "center"
+          });
+        }
       }
 
-      isTransitioning = false;
-    }, 260);
-  }
-
-  function revealProjection() {
-    const glyphs = document.querySelectorAll(".glyph");
-
-    glyphs.forEach((glyph, index) => {
-      glyph.classList.remove("is-leaving");
-      glyph.classList.remove("is-present");
-
       window.setTimeout(() => {
-        glyph.classList.add("is-present");
-      }, 60 + index * 42);
-    });
-
-    updateScrollParallax();
-  }
-
-  function dismissProjection() {
-    const glyphs = document.querySelectorAll(".glyph");
-
-    glyphs.forEach((glyph, index) => {
-      window.setTimeout(() => {
-        glyph.classList.remove("is-present");
-        glyph.classList.add("is-leaving");
-      }, index * 10);
+        updateScrollParallax();
+        isTransitioning = false;
+      }, 420);
     });
   }
 
@@ -104,8 +78,6 @@ const Interactions = (() => {
 
   return {
     init,
-    revealProjection,
-    dismissProjection,
     updateScrollParallax
   };
 })();
