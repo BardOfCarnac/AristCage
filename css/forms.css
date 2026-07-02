@@ -1,0 +1,178 @@
+/*==================================================
+  PANEL FIELDS
+==================================================*/
+
+.panel-fields {
+
+    display: grid;
+
+    gap: 10px;
+
+}
+
+/*==================================================
+  INPUTS
+==================================================*/
+
+.panel-fields input,
+.panel-fields textarea,
+.panel-fields select {
+
+    width: 100%;
+
+    padding:
+
+        8px
+        10px;
+
+    border: 1px solid rgba(255,70,40,.24);
+
+    background: transparent;
+
+    color: var(--amber);
+
+    font-family: var(--font-main);
+
+    font-size: .9rem;
+
+    outline: none;
+
+    transition:
+
+        border-color .2s,
+        box-shadow .2s,
+        color .2s;
+
+}
+
+/*==================================================
+  TEXTAREA
+==================================================*/
+
+.panel-fields textarea {
+
+    min-height: 120px;
+
+    resize: vertical;
+
+}
+
+/*==================================================
+  PLACEHOLDERS
+==================================================*/
+
+.panel-fields input::placeholder,
+.panel-fields textarea::placeholder {
+
+    color: rgba(255,180,120,.45);
+
+    letter-spacing: .08em;
+
+}
+
+/*==================================================
+  FOCUS
+==================================================*/
+
+.panel-fields input:focus,
+.panel-fields textarea:focus,
+.panel-fields select:focus {
+
+    border-color: var(--orange);
+
+    box-shadow:
+
+        0 0 8px rgba(255,140,60,.20);
+
+}
+
+/*==================================================
+  BUTTONS
+==================================================*/
+
+.panel-fields button {
+
+    justify-self: start;
+
+    padding:
+
+        8px
+        18px;
+
+    border: 1px solid rgba(255,70,40,.30);
+
+    background: transparent;
+
+    color: var(--orange);
+
+    cursor: pointer;
+
+    font-family: var(--font-main);
+
+    letter-spacing: .12em;
+
+    text-transform: uppercase;
+
+    transition:
+
+        color .2s,
+        border-color .2s,
+        box-shadow .2s;
+
+}
+
+.panel-fields button:hover {
+
+    color: var(--white);
+
+    border-color: var(--orange);
+
+    box-shadow:
+
+        0 0 12px rgba(255,140,70,.25);
+
+}
+
+/*==================================================
+  CHECKBOXES
+==================================================*/
+
+.panel-fields label {
+
+    display: flex;
+
+    gap: 8px;
+
+    align-items: center;
+
+    color: var(--amber);
+
+    cursor: pointer;
+
+}
+
+.panel-fields input[type="checkbox"] {
+
+    width: auto;
+
+}
+
+/*==================================================
+  FUTURE
+==================================================*/
+
+/*
+
+Tag selector
+
+Priority selector
+
+Image uploader
+
+RSS preview
+
+Location picker
+
+Live validation
+
+*/
