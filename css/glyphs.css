@@ -1,22 +1,11 @@
-/*==================================================
-  GLYPHS
-==================================================*/
-
 .glyph {
   position: relative;
-
   color: var(--text-main);
-
   text-shadow:
     0 0 8px currentColor,
     0 0 22px currentColor;
-
   opacity: 0;
-
-  filter:
-    blur(12px)
-    brightness(0.2);
-
+  filter: blur(12px) brightness(0.2);
   transform:
     translate3d(
       var(--parallax-x, 0px),
@@ -24,7 +13,6 @@
       var(--glyph-z, 0px)
     )
     scale(0.96);
-
   transition:
     opacity 520ms ease,
     filter 520ms ease,
@@ -34,11 +22,7 @@
 
 .glyph.is-present {
   opacity: var(--glyph-opacity, 0.92);
-
-  filter:
-    blur(0)
-    brightness(1);
-
+  filter: blur(0) brightness(1);
   transform:
     translate3d(
       var(--parallax-x, 0px),
@@ -50,24 +34,8 @@
 
 .glyph.is-leaving {
   opacity: 0;
-
-  filter:
-    blur(16px)
-    brightness(0.12);
-
-  transform:
-    translate3d(
-      var(--parallax-x, 0px),
-      var(--parallax-y, 0px),
-      var(--glyph-z, 0px)
-    )
-    scale(0.98);
+  filter: blur(16px) brightness(0.12);
 }
-
-
-/*==================================================
-  GLYPH DEPTH ROLES
-==================================================*/
 
 .glyph-frame {
   --glyph-z: -180px;
