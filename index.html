@@ -6,33 +6,44 @@
 
   <title>Night City News</title>
 
+  <link rel="stylesheet" href="css/variables.css" />
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/chamber.css" />
-  <link rel="stylesheet" href="css/layout.css" />
-  <link rel="stylesheet" href="css/glyphs.css" />
-  <link rel="stylesheet" href="css/stories.css" />
-  <link rel="stylesheet" href="css/effects.css" />
-  <link rel="stylesheet" href="css/mobile.css" />
+  <link rel="stylesheet" href="css/rail.css" />
+  <link rel="stylesheet" href="css/entries.css" />
+  <link rel="stylesheet" href="css/projection.css" />
+  <link rel="stylesheet" href="css/forms.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
 </head>
 
 <body>
-  <div id="viewer" class="viewer">
-    <div id="chamber" class="chamber" aria-hidden="true">
-      <div class="rear-plane"></div>
-      <div class="edge-grid edge-left"></div>
-      <div class="edge-grid edge-right"></div>
-      <div class="scan-sweep"></div>
-      <div id="ambient-layer" class="ambient-layer"></div>
-    </div>
+  <div class="viewer">
+    <div class="chamber" aria-hidden="true"></div>
 
-    <main id="feed" class="feed" aria-label="Night City News feed"></main>
+    <header class="rail">
+      <div class="rail-mark">NCN</div>
+
+      <div class="rail-title">
+        <strong>Night City News</strong>
+        <span>14.07.2045 / v1.0</span>
+      </div>
+
+      <nav class="rail-actions" aria-label="Feed controls">
+        <button type="button" data-panel="filter">Filter</button>
+        <button type="button" data-panel="submit">Submit</button>
+      </nav>
+    </header>
+
+    <main class="app">
+      <section class="feed" id="feed" aria-label="Projected feed"></section>
+    </main>
   </div>
 
   <script src="js/data.js"></script>
-  <script src="js/layout.js"></script>
-  <script src="js/engine.js"></script>
-  <script src="js/scenes.js"></script>
-  <script src="js/interactions.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/projection.js"></script>
+  <script src="js/actions.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
