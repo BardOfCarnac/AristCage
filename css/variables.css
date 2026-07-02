@@ -1,0 +1,18 @@
+@import url("https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@400;500;600;700&family=Saira:wght@400;500;600&display=swap");
+
+:root {
+  --bg: #020204;
+
+  --deep-red: #340606;
+  --red: #ff3828;
+  --orange: #ff8a34;
+  --amber: #ffc060;
+  --white: #fff3d6;
+
+  --feed-width: 760px;
+  --feed-unit: 118px;
+  --feed-gap: 14px;
+
+  --font-main: "Saira", Arial, Helvetica, sans-serif;
+  --font-display: "Saira Condensed", Arial, Helvetica, sans-serif;
+}
