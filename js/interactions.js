@@ -3,88 +3,109 @@
 ==================================================*/
 
 const Interactions = (() => {
+  let selectedStoryId = null;
+  let isTransitioning = false;
 
-    let currentScene = "feed";
-    let selectedStoryId = null;
+  function init() {
+    document.addEventListener("click", handleClick);
+    window.addEventListener("scroll", updateScrollParallax);
+    window.addEventListener("resize", updateScrollParallax);
 
-    function init() {
+    updateScrollParallax();
+  }
 
-        document.addEventListener("click", handleClick);
+  function handleClick(event) {
+    const story = event.target.closest(".story");
+    if (!story || isTransitioning) return;
 
-    }
+    const storyId = story.dataset.storyId;
+    if (!storyId) return;
 
-    function handleClick(event) {
+    selectedStoryId = selectedStoryId === storyId ? null : storyId;
 
-        const story = event.target.closest(".story");
+    const nextScene = selectedStoryId
+      ? Scenes.expanded(selectedStoryId)
+      : Scenes.feed();
 
-        if (!story) return;
+    transitionTo(nextScene, storyId);
+  }
 
-        const storyId = story.dataset.storyId;
+  function transitionTo(scene, storyIdToScroll) {
+    isTransitioning = true;
 
-        if (!storyId) return;
+    dismissProjection();
 
-        if (selectedStoryId === storyId) {
+    window.setTimeout(() => {
+      ProjectionEngine.render(scene);
+      revealProjection();
 
-            selectedStoryId = null;
-            currentScene = "feed";
-            ProjectionEngine.render(Scenes.feed());
-            revealProjection();
-
-            return;
-
-        }
-
-        selectedStoryId = storyId;
-        currentScene = "expanded";
-
-        ProjectionEngine.render(
-            Scenes.expanded(storyId)
-        );
-
-        revealProjection();
-
+      if (storyIdToScroll) {
         requestAnimationFrame(() => {
+          const target = document.querySelector(
+            `.story[data-story-id="${storyIdToScroll}"]`
+          );
 
-            const expandedStory = document.querySelector(
-                `.story[data-story-id="${storyId}"]`
-            );
-
-            if (expandedStory) {
-
-                expandedStory.scrollIntoView({
-                    behavior: "smooth",
-                    block: "center"
-                });
-
-            }
-
+          if (target) {
+            target.scrollIntoView({
+              behavior: "smooth",
+              block: "center"
+            });
+          }
         });
+      }
 
-    }
+      isTransitioning = false;
+    }, 520);
+  }
 
-    function revealProjection() {
+  function revealProjection() {
+    const glyphs = document.querySelectorAll(".glyph");
 
-        const glyphs = document.querySelectorAll(".glyph");
+    glyphs.forEach((glyph, index) => {
+      glyph.classList.remove("is-leaving");
+      glyph.classList.remove("is-present");
 
-        glyphs.forEach((glyph, index) => {
+      window.setTimeout(() => {
+        glyph.classList.add("is-present");
+      }, 80 + index * 55);
+    });
 
-            glyph.classList.remove("is-present");
+    updateScrollParallax();
+  }
 
-            window.setTimeout(() => {
+  function dismissProjection() {
+    const glyphs = document.querySelectorAll(".glyph");
 
-                glyph.classList.add("is-present");
+    glyphs.forEach((glyph, index) => {
+      window.setTimeout(() => {
+        glyph.classList.remove("is-present");
+        glyph.classList.add("is-leaving");
+      }, index * 18);
+    });
+  }
 
-            }, 80 + index * 55);
+  function updateScrollParallax() {
+    document.querySelectorAll(".story").forEach((story) => {
+      const rect = story.getBoundingClientRect();
+      const screenOffset = rect.top / window.innerHeight;
 
-        });
+      story.querySelectorAll(".glyph").forEach((glyph) => {
+        const z = parseFloat(
+          getComputedStyle(glyph).getPropertyValue("--glyph-z")
+        ) || 0;
 
-    }
+        const closeness = Math.max(0, (z + 200) / 300);
+        const movement = screenOffset * closeness * -22;
 
-    return {
+        glyph.style.setProperty("--parallax-y", `${movement}px`);
+      });
+    });
+  }
 
-        init,
-        revealProjection
-
-    };
-
+  return {
+    init,
+    revealProjection,
+    dismissProjection,
+    updateScrollParallax
+  };
 })();
