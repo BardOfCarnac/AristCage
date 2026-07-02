@@ -3,145 +3,95 @@
 ==================================================*/
 
 const ProjectionEngine = (() => {
+  const feed = document.getElementById("feed");
 
-    const feed = document.getElementById("feed");
+  function clear() {
+    feed.innerHTML = "";
+  }
 
-    /*==============================================
-      PUBLIC
-    ==============================================*/
+  function render(scene) {
+    clear();
 
-    function clear() {
-
-        feed.innerHTML = "";
-
+    if (scene.header) {
+      feed.appendChild(createHeader(scene.header));
     }
 
-    function render(scene) {
+    if (scene.stories) {
+      const list = document.createElement("section");
+      list.className = "story-list";
 
-        clear();
+      scene.stories.forEach((story) => {
+        list.appendChild(createStory(story));
+      });
 
-        if(scene.header){
-
-            feed.appendChild(
-                createHeader(scene.header)
-            );
-
-        }
-
-        if(scene.stories){
-
-            const list = document.createElement("section");
-
-            list.className = "story-list";
-
-            scene.stories.forEach(story=>{
-
-                list.appendChild(
-                    createStory(story)
-                );
-
-            });
-
-            feed.appendChild(list);
-
-        }
-
+      feed.appendChild(list);
     }
+  }
 
-    /*==============================================
-      HEADER
-    ==============================================*/
+  function createHeader(data) {
+    const header = document.createElement("header");
+    header.className = "feed-header";
 
-    function createHeader(data){
+    header.innerHTML = `
+      <div class="feed-header-meta">
+        <span class="glyph glyph-meta">${data.date}</span>
+        <span class="glyph glyph-meta">${data.version}</span>
+      </div>
 
-        const header = document.createElement("header");
+      <h1 class="feed-title glyph glyph-headline">${data.title}</h1>
 
-        header.className = "feed-header";
+      <div class="feed-tagline glyph glyph-tags">
+        ${data.tagline}
+      </div>
+    `;
 
-        header.innerHTML = `
+    return header;
+  }
 
-            <div class="glyph glyph-meta">
-                ${data.date}
-                &nbsp;&nbsp;&nbsp;
-                ${data.version}
-            </div>
+  function createStory(data) {
+    const article = document.createElement("article");
 
-            <h1 class="glyph glyph-headline">
-                ${data.title}
-            </h1>
+    article.className = data.expanded
+      ? "story is-expanded"
+      : "story";
 
-            <div class="glyph glyph-tags">
-                ${data.tagline}
-            </div>
+    article.dataset.storyId = data.id;
 
-        `;
+    article.innerHTML = `
+      <div class="story-projection">
 
-        return header;
+        <div class="story-frame glyph glyph-frame"></div>
 
-    }
+        <div class="story-priority glyph glyph-priority priority-${data.priority}"></div>
 
-    /*==============================================
-      STORY
-    ==============================================*/
+        <div class="story-content">
 
-    function createStory(data){
+          <div class="story-meta glyph glyph-meta">
+            ${data.meta}
+          </div>
 
-        const article = document.createElement("article");
+          <h2 class="story-headline glyph glyph-headline">
+            ${data.title}
+          </h2>
 
-        article.className = "story";
+          <div class="story-tags glyph glyph-tags">
+            ${data.tags.join(" // ")}
+          </div>
 
-        article.dataset.storyId = data.id;
+          <div class="story-body glyph glyph-body">
+            ${data.body}
+          </div>
 
-        article.innerHTML = `
+        </div>
 
-            <div class="story-projection">
+      </div>
+    `;
 
-                <div class="story-frame glyph glyph-frame"></div>
+    return article;
+  }
 
-                <div class="story-priority glyph glyph-priority"></div>
-
-                <div class="story-content">
-
-                    <div class="story-meta glyph glyph-meta">
-
-                        ${data.meta}
-
-                    </div>
-
-                    <h2 class="story-headline glyph glyph-headline">
-
-                        ${data.title}
-
-                    </h2>
-
-                    <div class="story-tags glyph glyph-tags">
-
-                        ${data.tags.join(" // ")}
-
-                    </div>
-
-                    <div class="story-body glyph glyph-body">
-
-                        ${data.body}
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        `;
-
-        return article;
-
-    }
-
-    return {
-
-        render,
-
-        clear
-
-    };
-
+  return {
+    render,
+    clear
+  };
 })();
