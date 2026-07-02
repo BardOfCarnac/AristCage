@@ -1,0 +1,175 @@
+/*==================================================
+  PROJECTION OBJECTS
+==================================================*/
+
+.part {
+
+    transition:
+
+        opacity .35s ease,
+        color .35s ease,
+        filter .35s ease,
+        transform .12s linear;
+
+    will-change:
+        transform,
+        opacity,
+        filter;
+
+}
+
+/*==================================================
+  DEPTH VARIABLES
+==================================================*/
+
+.entry {
+
+    --depth: 0;
+
+    --scroll-factor: 1;
+
+    --energy: .5;
+
+}
+
+/*==================================================
+  PARALLAX
+==================================================*/
+
+.frame {
+
+    transform:
+
+        translateY(calc(var(--frame-y,0px)));
+
+}
+
+.priority {
+
+    transform:
+
+        translateY(calc(var(--priority-y,0px)));
+
+}
+
+.meta {
+
+    transform:
+
+        translateY(calc(var(--meta-y,0px)));
+
+}
+
+.headline {
+
+    transform:
+
+        translateY(calc(var(--headline-y,0px)));
+
+}
+
+.tags {
+
+    transform:
+
+        translateY(calc(var(--tags-y,0px)));
+
+}
+
+.body {
+
+    transform:
+
+        translateY(calc(var(--body-y,0px)));
+
+}
+
+/*==================================================
+  GLOW
+==================================================*/
+
+.headline {
+
+    text-shadow:
+
+        0 0 6px currentColor,
+        0 0 18px currentColor,
+        0 0 36px rgba(255,180,100,.18);
+
+}
+
+.meta,
+.tags {
+
+    text-shadow:
+
+        0 0 6px currentColor;
+
+}
+
+.priority {
+
+    box-shadow:
+
+        0 0 10px rgba(255,90,50,.20),
+        0 0 22px rgba(255,120,60,.25);
+
+}
+
+/*==================================================
+  ENERGY
+==================================================*/
+
+.energy-low {
+
+    opacity: .55;
+
+}
+
+.energy-medium {
+
+    opacity: .82;
+
+}
+
+.energy-high {
+
+    opacity: 1;
+
+}
+
+/*==================================================
+  PRESENT
+==================================================*/
+
+.present {
+
+    opacity: 1;
+
+}
+
+.dormant {
+
+    opacity: 0;
+
+}
+
+/*==================================================
+  FUTURE STATES
+==================================================*/
+
+/*
+
+.resolve
+
+.dismiss
+
+.scan
+
+.beam
+
+.glitch
+
+.focus
+
+*/
