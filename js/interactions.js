@@ -69,7 +69,7 @@ const Interactions = (() => {
         const z = parseFloat(rawZ) || 0;
 
         const closeness = Math.max(0, (z + 220) / 320);
-        const movement = offset * closeness * -26;
+        const movement = offset * closeness * -55;
 
         glyph.style.setProperty("--parallax-y", `${movement}px`);
       });
