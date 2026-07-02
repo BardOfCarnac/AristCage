@@ -3,261 +3,138 @@
 ==================================================*/
 
 @keyframes resolve {
+  0% {
+    opacity: 0;
+    filter: blur(16px) brightness(0.12);
+    color: var(--deep-red);
+  }
 
-    0%{
+  35% {
+    color: var(--red);
+  }
 
-        opacity:0;
+  70% {
+    color: var(--orange);
+  }
 
-        filter:
-
-            blur(16px)
-
-            brightness(.12);
-
-        color:var(--deep-red);
-
-        transform:
-
-            translate3d(0,0,var(--glyph-z))
-
-            scale(.96);
-
-    }
-
-    35%{
-
-        color:var(--red);
-
-    }
-
-    70%{
-
-        color:var(--orange);
-
-    }
-
-    100%{
-
-        opacity:var(--glyph-opacity,.95);
-
-        color:currentColor;
-
-        filter:
-
-            blur(0)
-
-            brightness(1);
-
-        transform:
-
-            translate3d(
-
-                var(--parallax-x,0),
-
-                var(--parallax-y,0),
-
-                var(--glyph-z)
-
-            )
-
-            scale(1);
-
-    }
-
+  100% {
+    opacity: var(--glyph-opacity, 0.95);
+    filter: blur(0) brightness(1);
+  }
 }
-
 
 /*==================================================
   DISMISS
 ==================================================*/
 
-@keyframes dismiss{
+@keyframes dismiss {
+  0% {
+    opacity: var(--glyph-opacity, 0.95);
+    filter: blur(0) brightness(1);
+  }
 
-    0%{
-
-        opacity:var(--glyph-opacity,.95);
-
-        filter:
-
-            blur(0);
-
-    }
-
-    100%{
-
-        opacity:0;
-
-        filter:
-
-            blur(18px)
-
-            brightness(.08);
-
-    }
-
+  100% {
+    opacity: 0;
+    filter: blur(18px) brightness(0.08);
+  }
 }
-
 
 /*==================================================
   HEAT
 ==================================================*/
 
-@keyframes heat{
+@keyframes heat {
+  0% {
+    color: var(--deep-red);
+  }
 
-    0%{
+  30% {
+    color: var(--red);
+  }
 
-        color:var(--deep-red);
+  65% {
+    color: var(--orange);
+  }
 
-    }
-
-    30%{
-
-        color:var(--red);
-
-    }
-
-    65%{
-
-        color:var(--orange);
-
-    }
-
-    100%{
-
-        color:currentColor;
-
-    }
-
+  100% {
+    color: inherit;
+  }
 }
-
 
 /*==================================================
   AMBIENT GLOW
 ==================================================*/
 
-@keyframes breathe{
+@keyframes breathe {
+  0%,
+  100% {
+    text-shadow:
+      0 0 8px currentColor,
+      0 0 18px currentColor;
+  }
 
-    0%{
-
-        text-shadow:
-
-            0 0 8px currentColor,
-
-            0 0 18px currentColor;
-
-    }
-
-    50%{
-
-        text-shadow:
-
-            0 0 12px currentColor,
-
-            0 0 30px currentColor;
-
-    }
-
-    100%{
-
-        text-shadow:
-
-            0 0 8px currentColor,
-
-            0 0 18px currentColor;
-
-    }
-
+  50% {
+    text-shadow:
+      0 0 12px currentColor,
+      0 0 30px currentColor;
+  }
 }
-
 
 /*==================================================
   SCAN
 ==================================================*/
 
-@keyframes scan{
+@keyframes scan {
+  0% {
+    top: -12%;
+    opacity: 0;
+  }
 
-    0%{
+  12% {
+    opacity: 1;
+  }
 
-        top:-12%;
-
-        opacity:0;
-
-    }
-
-    12%{
-
-        opacity:1;
-
-    }
-
-    100%{
-
-        top:110%;
-
-        opacity:0;
-
-    }
-
+  100% {
+    top: 110%;
+    opacity: 0;
+  }
 }
-
 
 /*==================================================
   FLICKER
 ==================================================*/
 
-@keyframes flicker{
-
-    0%{opacity:1;}
-
-    4%{opacity:.94;}
-
-    8%{opacity:1;}
-
-    14%{opacity:.97;}
-
-    21%{opacity:1;}
-
-    100%{opacity:1;}
-
+@keyframes flicker {
+  0% { opacity: 1; }
+  4% { opacity: 0.94; }
+  8% { opacity: 1; }
+  14% { opacity: 0.97; }
+  21% { opacity: 1; }
+  100% { opacity: 1; }
 }
-
 
 /*==================================================
   DEFAULT EFFECTS
 ==================================================*/
 
-.glyph.is-present{
-
-    animation:
-
-        resolve .65s ease forwards,
-
-        heat 1s ease forwards,
-
-        breathe 7s ease-in-out infinite;
-
+.glyph.is-present {
+  animation:
+    resolve 0.65s ease forwards,
+    heat 1s ease forwards,
+    breathe 7s ease-in-out infinite;
 }
 
-.glyph.is-leaving{
-
-    animation:
-
-        dismiss .45s ease forwards;
-
+.glyph.is-leaving {
+  animation:
+    dismiss 0.85s ease forwards;
 }
 
-.scan-sweep.active{
-
-    animation:
-
-        scan 1.4s ease-out;
-
+.scan-sweep.active {
+  animation:
+    scan 1.4s ease-out;
 }
 
-.glyph.flicker{
-
-    animation:
-
-        flicker .35s linear;
-
+.glyph.flicker {
+  animation:
+    flicker 0.35s linear;
 }
