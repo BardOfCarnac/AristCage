@@ -7,6 +7,10 @@
   margin-bottom: var(--feed-gap);
 }
 
+/*==================================================
+  PROJECTION PLATE
+==================================================*/
+
 .projection-plate {
   position: relative;
   min-height: var(--feed-unit);
@@ -15,7 +19,7 @@
 }
 
 /*==================================================
-  PLATE FRAME
+  FRAME
 ==================================================*/
 
 .frame {
@@ -110,52 +114,24 @@
 ==================================================*/
 
 .expansion-zone {
-
-    display: none;
-
-    margin: 10px 6px 0 22px;
-
-    padding: 18px 20px;
-
-    border: 1px solid rgba(255,70,40,.14);
-
-    color: var(--amber);
-
-    overflow: hidden;
-
+  display: none;
+  margin: 10px 6px 0 22px;
+  color: var(--amber);
 }
 
 .entry.expanded .expansion-zone,
 .entry.panel .expansion-zone {
-
-    display: block;
-
+  display: block;
 }
 
 .body {
-
-    opacity: 0;
-
-    filter: blur(8px);
-
-    transform: translateY(8px);
-
-    transition:
-        opacity .25s ease,
-        filter .25s ease,
-        transform .25s ease;
-
-    line-height: 1.45;
-
+  opacity: 0;
+  filter: blur(8px);
+  line-height: 1.45;
 }
 
 .entry.expanded .body,
 .entry.panel .body {
-
-    opacity: 1;
-
-    filter: blur(0);
-
-    transform: translateY(0);
-
+  opacity: 1;
+  filter: blur(0);
 }
