@@ -54,3 +54,6 @@
 .body {
   text-shadow: 0 0 6px currentColor;
 }
+.entry:not(.present) .part {
+  opacity: 0 !important;
+}
