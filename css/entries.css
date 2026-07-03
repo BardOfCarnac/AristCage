@@ -58,18 +58,39 @@
 .priority {
   position: absolute;
   left: 0;
-  top: 18px;
-  width: 8px;
-  height: calc(100% - 34px);
+  top: 14px;
+  width: 10px;
+  height: calc(100% - 28px);
+
   background:
     linear-gradient(
       to bottom,
-      var(--deep-red),
-      var(--red),
-      var(--orange),
-      var(--white)
+      #3a0505 0%,
+      #7d0b08 45%,
+      #b71610 100%
     );
-  box-shadow: 0 0 16px rgba(255, 138, 52, 0.35);
+
+  box-shadow:
+    0 0 8px rgba(255, 56, 40, 0.35),
+    0 0 18px rgba(255, 138, 52, 0.18);
+}
+.priority-1 {
+  opacity: 0.45;
+}
+
+.priority-2 {
+  opacity: 0.65;
+}
+
+.priority-3 {
+  opacity: 0.82;
+}
+
+.priority-4 {
+  opacity: 1;
+  box-shadow:
+    0 0 10px rgba(255, 56, 40, 0.55),
+    0 0 22px rgba(255, 138, 52, 0.28);
 }
 
 /*==================================================
