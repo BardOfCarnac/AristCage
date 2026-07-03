@@ -18,13 +18,14 @@ document.addEventListener("click", (event) => {
 
   const entryId = entry.dataset.entryId;
 
+  animateLayoutChange(() => {
   toggleEntry(entryId);
   entry.classList.toggle("expanded", isExpanded(entryId));
+});
 
-  requestAnimationFrame(updateProjection);
-  setTimeout(updateProjection, 80);
-  setTimeout(updateProjection, 180);
-  setTimeout(updateProjection, 320);
+setTimeout(updateProjection, 80);
+setTimeout(updateProjection, 180);
+setTimeout(updateProjection, 320);
 });
 
 /*==================================================
