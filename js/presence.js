@@ -4,6 +4,6 @@ function activatePresence() {
 
     setTimeout(() => {
       entry.classList.add("present");
-    }, 120 + index * 90);
+    }, 3000);
   });
 }
