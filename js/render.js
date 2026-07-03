@@ -9,23 +9,17 @@ const feed = document.querySelector("#feed");
 ==================================================*/
 
 function render() {
+  const output = [];
 
-    const output = [];
+  if (NCN_STATE.activePanel) {
+    output.push(createPanelEntry(NCN_STATE.activePanel));
+  }
 
-    if (NCN_STATE.activePanel) {
+  output.push(...NCN_ENTRIES);
 
-        output.push(
-            createPanelEntry(NCN_STATE.activePanel)
-        );
-
-    }
-
-    output.push(...NCN_ENTRIES);
-
-    feed.innerHTML = output
-        .map(entryMarkup)
-        .join("");
-
+  feed.innerHTML = output
+    .map(entryMarkup)
+    .join("");
 }
 
 /*==================================================
@@ -33,61 +27,42 @@ function render() {
 ==================================================*/
 
 function entryMarkup(entry) {
+  const expanded =
+    entry.type === "panel" ||
+    isExpanded(entry.id);
 
-    const expanded =
-        entry.type === "panel" ||
-        isExpanded(entry.id);
+  return `
+    <article
+      class="entry present ${expanded ? "expanded" : ""} ${entry.type === "panel" ? "panel" : ""}"
+      data-entry-id="${entry.id}">
 
-    return `
-
-<article
-    class="entry ${expanded ? "expanded" : ""} ${entry.type === "panel" ? "panel" : ""}"
-    data-entry-id="${entry.id}">
-
-    <div class="projection-plate">
-
+      <div class="projection-plate">
         <div class="part frame"></div>
-
         <div class="part priority priority-${entry.priority}"></div>
 
         <div class="entry-content">
+          <div class="part meta">
+            ${entry.meta}
+          </div>
 
-            <div class="part meta">
+          <h2 class="part headline">
+            ${entry.headline}
+          </h2>
 
-                ${entry.meta}
-
-            </div>
-
-            <h2 class="part headline">
-
-                ${entry.headline}
-
-            </h2>
-
-            <div class="part tags">
-
-                ${entry.tags}
-
-            </div>
-
+          <div class="part tags">
+            ${entry.tags}
+          </div>
         </div>
+      </div>
 
-    </div>
-
-    <div class="expansion-zone">
-
+      <div class="expansion-zone">
         <div class="part body">
-
-            ${entry.body}
-
+          ${entry.body}
         </div>
+      </div>
 
-    </div>
-
-</article>
-
-`;
-
+    </article>
+  `;
 }
 
 /*==================================================
@@ -95,73 +70,40 @@ function entryMarkup(entry) {
 ==================================================*/
 
 function createPanelEntry(type) {
+  const filterPanel = {
+    id: "panel-filter",
+    type: "panel",
+    priority: 3,
+    headline: "Refine Local Feed",
+    meta: "Filter Mode",
+    tags: "Time // Source // Priority",
+    body: `
+      <div class="panel-fields">
+        <button type="button">Now</button>
+        <button type="button">Street</button>
+        <button type="button">Corp</button>
+        <button type="button">Combat Zone</button>
+      </div>
+    `
+  };
 
-    const filterPanel = {
+  const submitPanel = {
+    id: "panel-submit",
+    type: "panel",
+    priority: 4,
+    headline: "Transmit Signal",
+    meta: "Submission",
+    tags: "Headline // Body",
+    body: `
+      <div class="panel-fields">
+        <input placeholder="Headline">
+        <textarea placeholder="Signal body"></textarea>
+        <button type="button">Transmit</button>
+      </div>
+    `
+  };
 
-        id: "panel-filter",
-
-        type: "panel",
-
-        priority: 3,
-
-        headline: "Refine Local Feed",
-
-        meta: "Filter Mode",
-
-        tags: "Time // Source // Priority",
-
-        body: `
-
-<div class="panel-fields">
-
-<button>Now</button>
-
-<button>Street</button>
-
-<button>Corp</button>
-
-<button>Combat Zone</button>
-
-</div>
-
-`
-
-    };
-
-    const submitPanel = {
-
-        id: "panel-submit",
-
-        type: "panel",
-
-        priority: 4,
-
-        headline: "Transmit Signal",
-
-        meta: "Submission",
-
-        tags: "Headline // Body",
-
-        body: `
-
-<div class="panel-fields">
-
-<input placeholder="Headline">
-
-<textarea placeholder="Signal body"></textarea>
-
-<button>Transmit</button>
-
-</div>
-
-`
-
-    };
-
-    return type === "filter"
-
-        ? filterPanel
-
-        : submitPanel;
-
+  return type === "filter"
+    ? filterPanel
+    : submitPanel;
 }
