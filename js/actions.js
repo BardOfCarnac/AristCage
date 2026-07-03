@@ -16,9 +16,10 @@ document.addEventListener("click", (event) => {
 
   if (!entry || entry.classList.contains("panel")) return;
 
-  toggleEntry(entry.dataset.entryId);
+  const entryId = entry.dataset.entryId;
 
-  render();
+  toggleEntry(entryId);
+  entry.classList.toggle("expanded", isExpanded(entryId));
 
   requestAnimationFrame(updateProjection);
   setTimeout(updateProjection, 80);
