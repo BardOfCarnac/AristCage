@@ -8,6 +8,7 @@ function boot() {
     render();
 
     updateProjection();
+  activatePresence();
 
 }
 
