@@ -3,6 +3,8 @@
 ==================================================*/
 
 .part {
+  opacity: 0;
+
   transition:
     opacity 0.35s ease,
     color 0.35s ease,
@@ -29,6 +31,70 @@
 }
 
 /*==================================================
+  PRESENCE
+==================================================*/
+
+.entry.present .part {
+  opacity: 1;
+}
+
+.body {
+  opacity: 0;
+}
+
+.entry.expanded .body,
+.entry.panel .body {
+  opacity: 1;
+}
+
+/*==================================================
+  ENERGY RISE
+==================================================*/
+
+.entry.present .meta,
+.entry.present .headline,
+.entry.present .tags,
+.entry.present .body {
+  animation: energyRise 0.9s ease forwards;
+}
+
+@keyframes energyRise {
+  0% {
+    color: var(--deep-red);
+    filter: blur(8px) brightness(0.25);
+  }
+
+  35% {
+    color: var(--red);
+  }
+
+  65% {
+    color: var(--orange);
+  }
+
+  100% {
+    filter: blur(0) brightness(1);
+  }
+}
+
+/*==================================================
+  PART ENERGY SETTLE
+==================================================*/
+
+.entry.present .meta {
+  color: var(--orange);
+}
+
+.entry.present .headline {
+  color: var(--white);
+}
+
+.entry.present .tags,
+.entry.present .body {
+  color: var(--amber);
+}
+
+/*==================================================
   GLOW
 ==================================================*/
 
@@ -40,7 +106,8 @@
 }
 
 .meta,
-.tags {
+.tags,
+.body {
   text-shadow: 0 0 6px currentColor;
 }
 
@@ -51,29 +118,24 @@
 }
 
 /*==================================================
-  ENERGY STATES
+  PRIORITY ENERGY
 ==================================================*/
 
-.energy-low {
-  opacity: 0.55;
+.priority-1 {
+  opacity: 0.45;
 }
 
-.energy-medium {
-  opacity: 0.82;
+.priority-2 {
+  opacity: 0.65;
 }
 
-.energy-high {
+.priority-3 {
+  opacity: 0.85;
+}
+
+.priority-4 {
   opacity: 1;
-}
-
-/*==================================================
-  PRESENCE STATES
-==================================================*/
-
-.present {
-  opacity: 1;
-}
-
-.dormant {
-  opacity: 0;
+  box-shadow:
+    0 0 14px rgba(255, 70, 40, 0.45),
+    0 0 30px rgba(255, 180, 100, 0.35);
 }
