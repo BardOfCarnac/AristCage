@@ -1,0 +1,117 @@
+/*==================================================
+  PROJECTION OBJECT
+==================================================*/
+
+.projection-object {
+
+    position: relative;
+
+    transform-style: preserve-3d;
+
+    will-change:
+        transform,
+        opacity,
+        filter;
+
+    --depth: 0;
+    --scroll-factor: 1;
+    --energy: .5;
+    --presence: 1;
+
+}
+
+/*==================================================
+  DEPTH
+==================================================*/
+
+.depth-near {
+    --depth: 5;
+}
+
+.depth-mid {
+    --depth: 15;
+}
+
+.depth-far {
+    --depth: 30;
+}
+
+/*==================================================
+  SCROLL RESPONSE
+==================================================*/
+
+.scroll-high {
+    --scroll-factor: 1;
+}
+
+.scroll-medium {
+    --scroll-factor: .6;
+}
+
+.scroll-low {
+    --scroll-factor: .3;
+}
+
+.scroll-fixed {
+    --scroll-factor: 0;
+}
+
+/*==================================================
+  ENERGY
+==================================================*/
+
+.energy-low {
+
+    --energy: .3;
+
+}
+
+.energy-medium {
+
+    --energy: .6;
+
+}
+
+.energy-high {
+
+    --energy: 1;
+
+}
+
+/*==================================================
+  PRESENCE
+==================================================*/
+
+.present {
+
+    --presence: 1;
+
+}
+
+.hidden {
+
+    --presence: 0;
+
+}
+
+/*==================================================
+  FUTURE STATES
+==================================================*/
+
+/*
+
+.resolving
+
+.stable
+
+.fading
+
+.glitching
+
+.focused
+
+.idle
+
+.offline
+
+*/
