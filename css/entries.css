@@ -110,22 +110,52 @@
 ==================================================*/
 
 .expansion-zone {
-  margin: 10px 6px 0 22px;
-  padding: 18px 18px 22px 22px;
-  border: 1px solid rgba(255, 70, 40, 0.14);
-  color: var(--amber);
+
+    display: none;
+
+    margin: 10px 6px 0 22px;
+
+    padding: 18px 20px;
+
+    border: 1px solid rgba(255,70,40,.14);
+
+    color: var(--amber);
+
+    overflow: hidden;
+
+}
+
+.entry.expanded .expansion-zone,
+.entry.panel .expansion-zone {
+
+    display: block;
+
 }
 
 .body {
-  display: none;
-  opacity: 0;
-  filter: blur(8px);
-  line-height: 1.45;
+
+    opacity: 0;
+
+    filter: blur(8px);
+
+    transform: translateY(8px);
+
+    transition:
+        opacity .25s ease,
+        filter .25s ease,
+        transform .25s ease;
+
+    line-height: 1.45;
+
 }
 
 .entry.expanded .body,
 .entry.panel .body {
-  display: block;
-  opacity: 1;
-  filter: blur(0);
+
+    opacity: 1;
+
+    filter: blur(0);
+
+    transform: translateY(0);
+
 }
