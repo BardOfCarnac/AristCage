@@ -53,6 +53,9 @@ function activatePresence() {
   resolve([...document.querySelectorAll(".entry")]);
 
   requestAnimationFrame(() => {
-    resolve([...document.querySelectorAll(".entry.expanded .body, .entry.panel .body")]);
+    resolve([
+      ...document.querySelectorAll(".priority"),
+      ...document.querySelectorAll(".entry.expanded .body, .entry.panel .body")
+    ]);
   });
 }
