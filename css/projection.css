@@ -16,6 +16,52 @@
 }
 
 /*==================================================
+  PROJECTION PROFILES
+==================================================*/
+
+.frame {
+  --projection-color: var(--energy-3);
+  --resolve-speed: .85s;
+  --dismiss-speed: .70s;
+  --glow-strength: .35;
+}
+
+.priority {
+  --projection-color: var(--red);
+  --resolve-speed: .75s;
+  --dismiss-speed: .65s;
+  --glow-strength: .9;
+}
+
+.meta {
+  --projection-color: var(--orange);
+  --resolve-speed: .55s;
+  --dismiss-speed: .40s;
+  --glow-strength: .7;
+}
+
+.headline {
+  --projection-color: var(--white);
+  --resolve-speed: .45s;
+  --dismiss-speed: .35s;
+  --glow-strength: 1;
+}
+
+.tags {
+  --projection-color: var(--amber);
+  --resolve-speed: .60s;
+  --dismiss-speed: .45s;
+  --glow-strength: .65;
+}
+
+.body {
+  --projection-color: var(--amber);
+  --resolve-speed: .80s;
+  --dismiss-speed: .55s;
+  --glow-strength: .75;
+}
+
+/*==================================================
   ENERGY STATES
 ==================================================*/
 
@@ -44,11 +90,15 @@
 }
 
 .energy-up {
-  animation: energy-up .55s ease-out both;
+  animation:
+    energy-up var(--resolve-speed, .55s)
+    ease-out both;
 }
 
 .energy-down {
-  animation: energy-down .32s ease-in both;
+  animation:
+    energy-down var(--dismiss-speed, .35s)
+    ease-in both;
 }
 
 /*==================================================
@@ -65,31 +115,6 @@
 
 .body.present {
   filter: blur(0);
-}
-
-/*==================================================
-  COLOUR TARGETS
-==================================================*/
-
-.meta {
-  --projection-color: var(--orange);
-  color: var(--orange);
-}
-
-.headline {
-  --projection-color: var(--white);
-  color: var(--white);
-}
-
-.tags,
-.body {
-  --projection-color: var(--amber);
-  color: var(--amber);
-}
-
-.priority {
-  --projection-color: var(--red);
-  background: var(--red);
 }
 
 /*==================================================
@@ -114,19 +139,22 @@
 .tags,
 .body {
   text-shadow:
-    0 0 6px currentColor,
-    0 0 18px rgba(255, 120, 60, 0.22);
+    0 0 calc(6px * var(--glow-strength)) currentColor,
+    0 0 calc(18px * var(--glow-strength)) rgba(255, 120, 60, 0.22);
 }
 
 .priority {
+  background: var(--red);
+
   box-shadow:
-    0 0 8px rgba(255, 56, 40, 0.48),
-    0 0 20px rgba(255, 90, 40, 0.34),
-    0 0 42px rgba(255, 138, 52, 0.18);
+    0 0 calc(8px * var(--glow-strength)) rgba(255, 56, 40, 0.48),
+    0 0 calc(20px * var(--glow-strength)) rgba(255, 90, 40, 0.34),
+    0 0 calc(42px * var(--glow-strength)) rgba(255, 138, 52, 0.18);
 }
 
 .priority.leaving {
-  background: var(--deep-red);
+  background: var(--energy-0);
+
   box-shadow:
     0 0 3px rgba(255, 56, 40, 0.12);
 }
