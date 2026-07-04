@@ -29,7 +29,7 @@ function dismiss(objects, onComplete) {
     if (typeof onComplete === "function") {
       onComplete();
     }
-  }, 520);
+  }, 760);
 }
 
 /*==================================================
@@ -61,22 +61,34 @@ function getVisibleProjectionObjects(entry) {
 }
 
 function getDisplacedProjectionObjects(entries) {
-  return entries
-    .flatMap(getVisibleProjectionObjects)
-    .filter(Boolean);
+  return entries.flatMap(getVisibleProjectionObjects).filter(Boolean);
 }
 
-function dismissEntryChange(entry, affectedEntries, onComplete) {
+function dismissForExpand(entry, affectedEntries, onComplete) {
   dismiss([
     entry.querySelector(".priority"),
     ...getDisplacedProjectionObjects(affectedEntries)
   ], onComplete);
 }
 
-function resolveEntryBody(entry) {
+function dismissForCollapse(entry, affectedEntries, onComplete) {
+  dismiss([
+    entry.querySelector(".priority"),
+    getEntryBodyObject(entry),
+    ...getDisplacedProjectionObjects(affectedEntries)
+  ], onComplete);
+}
+
+function resolveExpandedBody(entry) {
   resolve([
     entry.querySelector(".priority"),
     getEntryBodyObject(entry)
+  ]);
+}
+
+function resolveCollapsedEntry(entry) {
+  resolve([
+    entry.querySelector(".priority")
   ]);
 }
 
