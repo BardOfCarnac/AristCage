@@ -135,3 +135,27 @@
   box-shadow:
     0 0 3px rgba(255, 56, 40, 0.10);
 }
+/*==================================================
+  PRIORITY BAR PRESENCE OVERRIDE
+==================================================*/
+
+.entry > .priority {
+  opacity: 0;
+  transition:
+    opacity .45s ease,
+    background-color .35s ease,
+    box-shadow .35s ease,
+    filter .35s ease,
+    transform .12s linear;
+}
+
+.entry.present > .priority {
+  opacity: 1;
+}
+
+.entry.leaving > .priority {
+  opacity: 0 !important;
+  background: var(--deep-red);
+  box-shadow:
+    0 0 3px rgba(255, 56, 40, 0.12);
+}
