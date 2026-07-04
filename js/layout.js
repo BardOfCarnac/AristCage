@@ -14,38 +14,30 @@ function getAffectedEntries(changedEntry) {
 
 function toggleEntryLayout(changedEntry) {
   const entryId = changedEntry.dataset.entryId;
-  const body = changedEntry.querySelector(".body");
-  const priority = changedEntry.querySelector(".priority");
   const affectedEntries = getAffectedEntries(changedEntry);
   const expanding = !isExpanded(entryId);
 
   if (expanding) {
-    dismiss([priority, ...affectedEntries], () => {
+    dismissEntryChange(changedEntry, affectedEntries, () => {
       expandEntry(entryId);
       changedEntry.classList.add("expanded");
 
       requestAnimationFrame(() => {
         updateProjection();
-
-        resolve([priority, body]);
-        resolve(affectedEntries);
+        resolveEntryChange(changedEntry, affectedEntries);
       });
     });
 
     return;
   }
 
-  dismiss([body, priority], () => {
-    dismiss(affectedEntries, () => {
-      collapseEntry(entryId);
-      changedEntry.classList.remove("expanded");
+  dismissEntryChange(changedEntry, affectedEntries, () => {
+    collapseEntry(entryId);
+    changedEntry.classList.remove("expanded");
 
-      requestAnimationFrame(() => {
-        updateProjection();
-
-        resolve([priority]);
-        resolve(affectedEntries);
-      });
+    requestAnimationFrame(() => {
+      updateProjection();
+      resolveEntryChange(changedEntry, affectedEntries);
     });
   });
 }
