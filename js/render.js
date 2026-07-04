@@ -29,54 +29,34 @@ function render() {
 ==================================================*/
 
 function entryMarkup(entry) {
+  const expanded =
+    entry.type === "panel" ||
+    isExpanded(entry.id);
 
-    const expanded =
-        entry.type === "panel" ||
-        isExpanded(entry.id);
-
-    return `
-
+  return `
 <article
-    class="entry ${expanded ? "expanded" : ""} ${entry.type === "panel" ? "panel" : ""}" data-entry-id="${entry.id}">
+  class="entry ${expanded ? "expanded" : ""} ${entry.type === "panel" ? "panel" : ""}"
+  data-entry-id="${entry.id}"
+>
+  <div class="projection-plate">
 
+    <div class="part frame"></div>
     <div class="part priority priority-${entry.priority}"></div>
 
-    <div class="projection-plate">
+    <div class="entry-content">
+      <div class="part meta">${entry.meta}</div>
+      <h2 class="part headline">${entry.headline}</h2>
+      <div class="part tags">${entry.tags}</div>
 
-        <div class="part frame"></div>
-
-        <div class="entry-content">
-
-            <div class="part meta">
-                ${entry.meta}
-            </div>
-
-            <h2 class="part headline">
-                ${entry.headline}
-            </h2>
-
-            <div class="part tags">
-                ${entry.tags}
-            </div>
-
-        </div>
-
+      <div class="expansion-zone">
+        <div class="part body">${entry.body}</div>
+      </div>
     </div>
 
-    <div class="expansion-zone">
-
-        <div class="part body">
-            ${entry.body}
-        </div>
-
-    </div>
-
+  </div>
 </article>
-
 `;
-
 }
-
 /*==================================================
   PANEL
 ==================================================*/
