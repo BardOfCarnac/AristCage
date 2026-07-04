@@ -17,23 +17,14 @@ function toggleEntryLayout(changedEntry) {
   const affectedEntries = getAffectedEntries(changedEntry);
   const expanding = !isExpanded(entryId);
 
-  if (expanding) {
-    dismissEntryChange(changedEntry, affectedEntries, () => {
+  dismissEntryChange(changedEntry, affectedEntries, () => {
+    if (expanding) {
       expandEntry(entryId);
       changedEntry.classList.add("expanded");
-
-      requestAnimationFrame(() => {
-        updateProjection();
-        resolveEntryChange(changedEntry, affectedEntries);
-      });
-    });
-
-    return;
-  }
-
-  dismissEntryChange(changedEntry, affectedEntries, () => {
-    collapseEntry(entryId);
-    changedEntry.classList.remove("expanded");
+    } else {
+      collapseEntry(entryId);
+      changedEntry.classList.remove("expanded");
+    }
 
     requestAnimationFrame(() => {
       updateProjection();
