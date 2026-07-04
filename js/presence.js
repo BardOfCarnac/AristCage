@@ -3,7 +3,7 @@
 ==================================================*/
 
 function resolve(objects) {
-  objects.forEach((object, index) => {
+  objects.filter(Boolean).forEach((object, index) => {
     object.classList.remove("leaving");
 
     setTimeout(() => {
@@ -13,7 +13,7 @@ function resolve(objects) {
 }
 
 function dismiss(objects, onComplete) {
-  objects.forEach(object => {
+  objects.filter(Boolean).forEach(object => {
     object.classList.remove("present");
     object.classList.add("leaving");
   });
@@ -22,7 +22,27 @@ function dismiss(objects, onComplete) {
     if (typeof onComplete === "function") {
       onComplete();
     }
-  }, 280);
+  }, 480);
+}
+
+/*==================================================
+  ENTRY CHANGE HELPERS
+==================================================*/
+
+function getEntryChangeObjects(entry, affectedEntries) {
+  return [
+    entry.querySelector(".priority"),
+    entry.querySelector(".body"),
+    ...affectedEntries
+  ].filter(Boolean);
+}
+
+function dismissEntryChange(entry, affectedEntries, onComplete) {
+  dismiss(getEntryChangeObjects(entry, affectedEntries), onComplete);
+}
+
+function resolveEntryChange(entry, affectedEntries) {
+  resolve(getEntryChangeObjects(entry, affectedEntries));
 }
 
 /*==================================================
