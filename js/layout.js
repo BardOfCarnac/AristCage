@@ -1,35 +1,23 @@
-function animateLayoutChange(changeFn) {
-  const entries = [...document.querySelectorAll(".entry")];
+function animateLayoutChange(changeFn, changedEntry) {
+  const affected = [...document.querySelectorAll(".entry")]
+    .filter(entry => entry !== changedEntry);
 
-  const first = new Map(
-    entries.map(entry => [entry, entry.getBoundingClientRect()])
-  );
+  affected.forEach(entry => entry.classList.add("leaving"));
 
-  changeFn();
+  setTimeout(() => {
+    changeFn();
 
-  requestAnimationFrame(() => {
-    entries.forEach(entry => {
-      const before = first.get(entry);
-      const after = entry.getBoundingClientRect();
+    requestAnimationFrame(() => {
+      affected.forEach(entry => {
+        entry.classList.remove("leaving");
+        entry.classList.remove("present");
 
-      if (!before) return;
+        setTimeout(() => {
+          entry.classList.add("present");
+        }, 80);
+      });
 
-      const deltaY = before.top - after.top;
-
-      if (!deltaY) return;
-
-      entry.animate(
-        [
-          { transform: `translateY(${deltaY}px)` },
-          { transform: "translateY(0)" }
-        ],
-        {
-          duration: 320,
-          easing: "ease"
-        }
-      );
+      updateProjection();
     });
-
-    updateProjection();
-  });
+  }, 220);
 }
