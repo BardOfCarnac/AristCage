@@ -3,11 +3,17 @@
 :root {
   --bg: #020204;
 
-  --deep-red: #340606;
-  --red: #ff3828;
-  --orange: #ff8a34;
-  --amber: #ffc060;
-  --white: #fff3d6;
+  --energy-0: #120202;
+--energy-1: #240404;
+--energy-2: #340606;
+--energy-3: #5a0907;
+--energy-4: #8a100c;
+--energy-5: #b01814;
+--energy-6: #ff3828;
+--energy-7: #ff6a28;
+--energy-8: #ff8a34;
+--energy-9: #ffc060;
+--energy-10: #fff3d6;
 
   --feed-width: 760px;
   --feed-unit: 118px;
