@@ -42,8 +42,8 @@
 
 .priority {
   position: absolute;
-  left: 16px;
-  top: 18px;
+  left: 14px;
+  top: 14px;
   z-index: 5;
   width: 5px;
   height: 58px;
@@ -55,7 +55,7 @@
 
 .entry.expanded .priority,
 .entry.panel .priority {
-  height: calc(100% - 36px);
+  height: calc(100% - 28px);
 }
 
 .priority-1 { opacity: 0.35; }
