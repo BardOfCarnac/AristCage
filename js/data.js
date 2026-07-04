@@ -16,6 +16,38 @@ const NCN_ENTRIES = [
     meta: "00:12 // Corpo Plaza",
     tags: "Corp // Traffic // Escort",
     body: "A corporate convoy halted traffic for fourteen minutes before diverting through private security lanes."
+  },{
+    id: "arasaka-convoy",
+    type: "story",
+    priority: 3,
+    headline: "Arasaka convoy delayed",
+    meta: "00:12 // Corpo Plaza",
+    tags: "Corp // Traffic // Escort",
+    body: "A corporate convoy halted traffic for fourteen minutes before diverting through private security lanes."
+  },{
+    id: "arasaka-convoy",
+    type: "story",
+    priority: 3,
+    headline: "Arasaka convoy delayed",
+    meta: "00:12 // Corpo Plaza",
+    tags: "Corp // Traffic // Escort",
+    body: "A corporate convoy halted traffic for fourteen minutes before diverting through private security lanes."
+  },{
+    id: "arasaka-convoy",
+    type: "story",
+    priority: 3,
+    headline: "Arasaka convoy delayed",
+    meta: "00:12 // Corpo Plaza",
+    tags: "Corp // Traffic // Escort",
+    body: "A corporate convoy halted traffic for fourteen minutes before diverting through private security lanes."
+  },{
+    id: "arasaka-convoy",
+    type: "story",
+    priority: 3,
+    headline: "Arasaka convoy delayed",
+    meta: "00:12 // Corpo Plaza",
+    tags: "Corp // Traffic // Escort",
+    body: "A corporate convoy halted traffic for fourteen minutes before diverting through private security lanes."
   },
   {
     id: "power-surge",
