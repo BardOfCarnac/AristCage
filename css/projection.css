@@ -15,8 +15,8 @@
 }
 
 /* Entry presence controls collapsed projection only */
-.entry.present > .priority,
-.entry.present .projection-plate .part {
+.entry.present .projection-plate .part,
+.priority.present {
   opacity: 1;
 }
 
