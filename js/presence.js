@@ -5,6 +5,7 @@
 function resolve(objects) {
   objects.filter(Boolean).forEach((object, index) => {
     object.classList.remove("leaving", "energy-down", "energy-up");
+
     setTimeout(() => {
       object.classList.add("present", "energy-up");
     }, index * 60);
@@ -12,14 +13,17 @@ function resolve(objects) {
 }
 
 function dismiss(objects, onComplete) {
-  objects.filter(Boolean).forEach(object => {
+  const items = objects.filter(Boolean);
+
+  items.forEach(object => {
     object.classList.remove("energy-up");
-    object.classList.add("leaving", "energy-down");
+    object.classList.add("energy-down");
   });
 
   setTimeout(() => {
-    objects.filter(Boolean).forEach(object => {
-      object.classList.remove("present", "leaving", "energy-down");
+    items.forEach(object => {
+      object.classList.remove("present", "energy-down");
+      object.classList.add("leaving");
     });
 
     if (typeof onComplete === "function") {
@@ -32,36 +36,52 @@ function dismiss(objects, onComplete) {
   PROJECTION OBJECT HELPERS
 ==================================================*/
 
-function getVisibleProjectionObjects(entry) {
-  const objects = [
+function getEntryCoreObjects(entry) {
+  return [
     entry.querySelector(".frame"),
     entry.querySelector(".priority"),
     entry.querySelector(".meta"),
     entry.querySelector(".headline"),
     entry.querySelector(".tags")
-  ];
+  ].filter(Boolean);
+}
+
+function getEntryBodyObject(entry) {
+  return entry.querySelector(".body");
+}
+
+function getVisibleProjectionObjects(entry) {
+  const objects = getEntryCoreObjects(entry);
 
   if (entry.classList.contains("expanded") || entry.classList.contains("panel")) {
-    objects.push(entry.querySelector(".body"));
+    objects.push(getEntryBodyObject(entry));
   }
 
   return objects.filter(Boolean);
 }
 
-function getEntryChangeObjects(entry, affectedEntries) {
-  return [
-    entry.querySelector(".priority"),
-    entry.querySelector(".body"),
-    ...affectedEntries.flatMap(getVisibleProjectionObjects)
-  ].filter(Boolean);
+function getDisplacedProjectionObjects(entries) {
+  return entries
+    .flatMap(getVisibleProjectionObjects)
+    .filter(Boolean);
 }
 
 function dismissEntryChange(entry, affectedEntries, onComplete) {
-  dismiss(getEntryChangeObjects(entry, affectedEntries), onComplete);
+  dismiss([
+    entry.querySelector(".priority"),
+    ...getDisplacedProjectionObjects(affectedEntries)
+  ], onComplete);
 }
 
-function resolveEntryChange(entry, affectedEntries) {
-  resolve(getEntryChangeObjects(entry, affectedEntries));
+function resolveEntryBody(entry) {
+  resolve([
+    entry.querySelector(".priority"),
+    getEntryBodyObject(entry)
+  ]);
+}
+
+function resolveDisplacedEntries(affectedEntries) {
+  resolve(getDisplacedProjectionObjects(affectedEntries));
 }
 
 /*==================================================
