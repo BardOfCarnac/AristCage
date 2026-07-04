@@ -13,34 +13,16 @@ function resolve(objects) {
 }
 
 function dismiss(objects, onComplete) {
-  const items = objects.filter(Boolean);
-
-  if (!items.length) {
-    if (typeof onComplete === "function") onComplete();
-    return;
-  }
-
-  let remaining = items.length;
-
-  function finishOne() {
-    remaining -= 1;
-
-    if (remaining <= 0 && typeof onComplete === "function") {
-      onComplete();
-    }
-  }
-
-  items.forEach(object => {
+  objects.forEach(object => {
     object.classList.remove("present");
     object.classList.add("leaving");
-
-    object.addEventListener("transitionend", function handler(event) {
-      if (event.propertyName !== "opacity") return;
-
-      object.removeEventListener("transitionend", handler);
-      finishOne();
-    });
   });
+
+  setTimeout(() => {
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+  }, 480);
 }
 
 /*==================================================
