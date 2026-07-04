@@ -4,71 +4,30 @@
 
 .part {
   opacity: 0;
-
   transition:
     opacity .45s ease,
     color .35s ease,
     filter .35s ease,
     transform .12s linear;
-
   will-change: transform, opacity, filter;
 }
+
+/*==================================================
+  ENERGY STATES
+==================================================*/
+
 @keyframes energy-up {
-  0% {
-    color: var(--deep-red);
-    text-shadow: 0 0 2px rgba(255, 56, 40, 0.08);
-  }
-
-  45% {
-    color: var(--red);
-    text-shadow:
-      0 0 5px currentColor,
-      0 0 14px rgba(255, 56, 40, 0.28);
-  }
-
-  75% {
-    color: var(--orange);
-    text-shadow:
-      0 0 7px currentColor,
-      0 0 20px rgba(255, 138, 52, 0.32);
-  }
-
-  100% {
-    color: var(--projection-color, var(--white));
-    text-shadow:
-      0 0 6px currentColor,
-      0 0 18px currentColor,
-      0 0 36px rgba(255, 180, 100, 0.18);
-  }
+  0% { color: var(--deep-red); }
+  45% { color: var(--red); }
+  75% { color: var(--orange); }
+  100% { color: var(--projection-color); }
 }
 
 @keyframes energy-down {
-  0% {
-    color: var(--projection-color, var(--white));
-    text-shadow:
-      0 0 6px currentColor,
-      0 0 18px currentColor,
-      0 0 36px rgba(255, 180, 100, 0.18);
-  }
-
-  45% {
-    color: var(--orange);
-    text-shadow:
-      0 0 7px currentColor,
-      0 0 20px rgba(255, 138, 52, 0.24);
-  }
-
-  75% {
-    color: var(--red);
-    text-shadow:
-      0 0 5px currentColor,
-      0 0 14px rgba(255, 56, 40, 0.18);
-  }
-
-  100% {
-    color: var(--deep-red);
-    text-shadow: 0 0 2px rgba(255, 56, 40, 0.06);
-  }
+  0% { color: var(--projection-color); }
+  45% { color: var(--orange); }
+  75% { color: var(--red); }
+  100% { color: var(--deep-red); }
 }
 
 .energy-up {
@@ -78,16 +37,56 @@
 .energy-down {
   animation: energy-down .32s ease-in both;
 }
-/* Entry presence controls collapsed projection only */
+
+/*==================================================
+  PRESENCE
+==================================================*/
+
 .entry.present .projection-plate .part,
 .priority.present {
   opacity: 1;
 }
 
-/* Body presence is independent */
 .body.present {
   opacity: 1;
   filter: blur(0);
+}
+
+.entry:not(.present) .projection-plate .part,
+.priority:not(.present):not(.energy-down),
+.body:not(.present):not(.energy-down) {
+  opacity: 0 !important;
+}
+
+.entry.leaving .projection-plate .part,
+.priority.leaving,
+.body.leaving {
+  opacity: 0;
+}
+
+/*==================================================
+  COLOUR TARGETS
+==================================================*/
+
+.meta {
+  --projection-color: var(--orange);
+  color: var(--orange);
+}
+
+.headline {
+  --projection-color: var(--white);
+  color: var(--white);
+}
+
+.tags,
+.body {
+  --projection-color: var(--amber);
+  color: var(--amber);
+}
+
+.priority {
+  --projection-color: var(--red);
+  background: var(--red);
 }
 
 /*==================================================
@@ -104,46 +103,16 @@
 }
 
 /*==================================================
-  GLOW / ENERGY RESOLVE
+  GLOW
 ==================================================*/
 
-@keyframes projection-energy-rise {
-  0% {
-    color: var(--deep-red);
-    text-shadow: 0 0 2px rgba(255, 56, 40, 0.08);
-  }
-
-  45% {
-    color: var(--red);
-    text-shadow:
-      0 0 5px currentColor,
-      0 0 14px rgba(255, 56, 40, 0.28);
-  }
-
-  75% {
-    color: var(--orange);
-    text-shadow:
-      0 0 7px currentColor,
-      0 0 20px rgba(255, 138, 52, 0.32);
-  }
-
-  100% {
-    color: var(--white);
-    text-shadow:
-      0 0 6px currentColor,
-      0 0 18px currentColor,
-      0 0 36px rgba(255, 180, 100, 0.18);
-  }
-}
-
-.entry.present .headline,
-.body.present {
-  animation: projection-energy-rise .55s ease-out both;
-}
-
-.entry.present .meta,
-.entry.present .tags {
-  animation: projection-energy-rise .45s ease-out both;
+.headline,
+.meta,
+.tags,
+.body {
+  text-shadow:
+    0 0 6px currentColor,
+    0 0 18px rgba(255, 120, 60, 0.22);
 }
 
 .priority {
@@ -154,7 +123,6 @@
 }
 
 .priority.present {
-  background: var(--red);
   box-shadow:
     0 0 10px rgba(255, 56, 40, 0.72),
     0 0 24px rgba(255, 90, 40, 0.46),
