@@ -1,50 +1,32 @@
-/*==================================================
-  PRESENCE
-==================================================*/
-
-function resolve(entries) {
-
-    entries.forEach((entry, index) => {
-
-        entry.classList.remove("leaving");
-
-        setTimeout(() => {
-            entry.classList.add("present");
-        }, index * 60);
-
-    });
-
-}
-
-function dismiss(entries, onComplete) {
-
-    entries.forEach(entry => {
-
-        entry.classList.remove("present");
-        entry.classList.add("leaving");
-
-    });
-
-    const delay = 180;
+function resolve(objects) {
+  objects.forEach((object, index) => {
+    object.classList.remove("leaving");
 
     setTimeout(() => {
-
-        if (typeof onComplete === "function") {
-            onComplete();
-        }
-
-    }, delay);
-
+      object.classList.add("present");
+    }, index * 60);
+  });
 }
 
-/*==================================================
-  INITIAL LOAD
-==================================================*/
+function dismiss(objects, onComplete) {
+  objects.forEach(object => {
+    object.classList.remove("present");
+    object.classList.add("leaving");
+  });
+
+  setTimeout(() => {
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+  }, 180);
+}
 
 function activatePresence() {
+  const entries = [...document.querySelectorAll(".entry")];
 
-    resolve(
-        [...document.querySelectorAll(".entry")]
-    );
+  resolve(entries);
 
+  requestAnimationFrame(() => {
+    resolve([...document.querySelectorAll(".entry.expanded .body, .entry.panel .body")]);
+  });
 }
