@@ -13,7 +13,71 @@
 
   will-change: transform, opacity, filter;
 }
+@keyframes energy-up {
+  0% {
+    color: var(--deep-red);
+    text-shadow: 0 0 2px rgba(255, 56, 40, 0.08);
+  }
 
+  45% {
+    color: var(--red);
+    text-shadow:
+      0 0 5px currentColor,
+      0 0 14px rgba(255, 56, 40, 0.28);
+  }
+
+  75% {
+    color: var(--orange);
+    text-shadow:
+      0 0 7px currentColor,
+      0 0 20px rgba(255, 138, 52, 0.32);
+  }
+
+  100% {
+    color: var(--projection-color, var(--white));
+    text-shadow:
+      0 0 6px currentColor,
+      0 0 18px currentColor,
+      0 0 36px rgba(255, 180, 100, 0.18);
+  }
+}
+
+@keyframes energy-down {
+  0% {
+    color: var(--projection-color, var(--white));
+    text-shadow:
+      0 0 6px currentColor,
+      0 0 18px currentColor,
+      0 0 36px rgba(255, 180, 100, 0.18);
+  }
+
+  45% {
+    color: var(--orange);
+    text-shadow:
+      0 0 7px currentColor,
+      0 0 20px rgba(255, 138, 52, 0.24);
+  }
+
+  75% {
+    color: var(--red);
+    text-shadow:
+      0 0 5px currentColor,
+      0 0 14px rgba(255, 56, 40, 0.18);
+  }
+
+  100% {
+    color: var(--deep-red);
+    text-shadow: 0 0 2px rgba(255, 56, 40, 0.06);
+  }
+}
+
+.energy-up {
+  animation: energy-up .55s ease-out both;
+}
+
+.energy-down {
+  animation: energy-down .32s ease-in both;
+}
 /* Entry presence controls collapsed projection only */
 .entry.present .projection-plate .part,
 .priority.present {
