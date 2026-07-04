@@ -21,7 +21,7 @@ document.addEventListener("click", (event) => {
   animateLayoutChange(() => {
   toggleEntry(entryId);
   entry.classList.toggle("expanded", isExpanded(entryId));
-});
+}, entry);
 
 setTimeout(updateProjection, 80);
 setTimeout(updateProjection, 180);
