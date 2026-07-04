@@ -1,33 +1,24 @@
-/*==================================================
-  PROJECTION OBJECTS
-==================================================*/
-
 .part {
-
-    opacity: 0;
-
-    transition:
-        opacity .45s ease,
-        color .35s ease,
-        filter .35s ease,
-        transform .12s linear;
-
-    will-change:
-        transform,
-        opacity,
-        filter;
-
+  opacity: 0;
+  transition:
+    opacity .45s ease,
+    color .35s ease,
+    filter .35s ease,
+    transform .12s linear;
+  will-change: transform, opacity, filter;
 }
 
-.entry.present .part {
-
-    opacity: 1;
-
+/* Entry presence controls collapsed projection only */
+.entry.present > .priority,
+.entry.present .projection-plate .part {
+  opacity: 1;
 }
 
-/*==================================================
-  PARALLAX
-==================================================*/
+/* Body presence is independent */
+.body.present {
+  opacity: 1;
+  filter: blur(0);
+}
 
 .frame,
 .priority,
@@ -37,10 +28,6 @@
 .body {
   transform: translateY(var(--projection-y, 0px));
 }
-
-/*==================================================
-  GLOW
-==================================================*/
 
 .headline {
   text-shadow:
@@ -54,10 +41,16 @@
 .body {
   text-shadow: 0 0 6px currentColor;
 }
-.entry:not(.present) .part {
+
+.entry:not(.present) > .priority,
+.entry:not(.present) .projection-plate .part,
+.body:not(.present) {
   opacity: 0 !important;
 }
-.entry.leaving .part {
+
+.entry.leaving > .priority,
+.entry.leaving .projection-plate .part,
+.body.leaving {
   opacity: 0;
   filter: none;
 }
