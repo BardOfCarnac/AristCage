@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@400;500;600;700&family=Saira:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700&family=Saira:wght@400;500;600&display=swap");
 
 :root {
   --bg: #020204;
@@ -33,5 +33,5 @@
   --feed-gap: 8px;
 
   --font-main: "Saira", Arial, Helvetica, sans-serif;
-  --font-display: "Saira Condensed", Arial, Helvetica, sans-serif;
+--font-display: "Barlow Condensed", Arial, Helvetica, sans-serif;
 }
