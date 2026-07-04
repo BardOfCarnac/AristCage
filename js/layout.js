@@ -28,7 +28,12 @@ function toggleEntryLayout(changedEntry) {
 
     requestAnimationFrame(() => {
       updateProjection();
-      resolveEntryChange(changedEntry, affectedEntries);
+
+      resolveEntryBody(changedEntry);
+
+      setTimeout(() => {
+        resolveDisplacedEntries(affectedEntries);
+      }, 160);
     });
   });
 }
