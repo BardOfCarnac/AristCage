@@ -3,18 +3,31 @@
 :root {
   --bg: #020204;
 
-  --energy-0: #120202;
---energy-1: #240404;
---energy-2: #340606;
---energy-3: #5a0907;
---energy-4: #8a100c;
---energy-5: #b01814;
---energy-6: #ff3828;
---energy-7: #ff6a28;
---energy-8: #ff8a34;
---energy-9: #ffc060;
---energy-10: #fff3d6;
+/*==================================================
+  PROJECTION ENERGY SCALE
+==================================================*/
 
+--energy-0:  #2a0303;  /* Very Dark Red */
+--energy-1:  #420505;  /* Dark Red */
+--energy-2:  #690808;  /* Crimson */
+--energy-3:  #94100d;  /* Bright Crimson */
+--energy-4:  #c91a14;  /* Red */
+--energy-5:  #ff3828;  /* Red-Orange */
+--energy-6:  #ff6a28;  /* Orange */
+--energy-7:  #ff9e42;  /* Amber */
+--energy-8:  #ffd17a;  /* Gold */
+--energy-9:  #fff0c4;  /* Warm White */
+--energy-10: #ffffff;  /* Pure White */
+
+/* Common aliases */
+
+--deep-red: var(--energy-0);
+--red:      var(--energy-5);
+--orange:   var(--energy-6);
+--amber:    var(--energy-7);
+--gold:     var(--energy-8);
+--warm-white: var(--energy-9);
+--white:    var(--energy-10);
   --feed-width: 760px;
   --feed-unit: 118px;
   --feed-gap: 8px;
