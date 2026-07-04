@@ -17,6 +17,40 @@ const NCN_ENTRIES = [
     tags: "Corp // Traffic // Escort",
     body: "A corporate convoy halted traffic for fourteen minutes before diverting through private security lanes."
   },{
+    id: "av-clinic",
+    type: "story",
+    priority: 4,
+    headline: "Unmarked AV spotted circling old clinic block",
+    meta: "23:41 // Watson // Street Feed",
+    tags: "AV // Clinic // Unverified",
+    body: "Locals report repeated low-altitude passes over a shuttered ripperdoc unit. Power is back on inside, but no official permits have been logged."
+  },
+  {
+    id: "arasaka-convoy",
+    type: "story",
+    priority: 3,
+    headline: "Arasaka convoy delayed",
+    meta: "00:12 // Corpo Plaza",
+    tags: "Corp // Traffic // Escort",
+    body: "A corporate convoy halted traffic for fourteen minutes before diverting through private security lanes."
+  },{
+    id: "arasaka-convoy",
+    type: "story",
+    priority: 3,
+    headline: "Arasaka convoy delayed",
+    meta: "00:12 // Corpo Plaza",
+    tags: "Corp // Traffic // Escort",
+    body: "A corporate convoy halted traffic for fourteen minutes before diverting through private security lanes."
+  },{
+    id: "av-clinic",
+    type: "story",
+    priority: 4,
+    headline: "Unmarked AV spotted circling old clinic block",
+    meta: "23:41 // Watson // Street Feed",
+    tags: "AV // Clinic // Unverified",
+    body: "Locals report repeated low-altitude passes over a shuttered ripperdoc unit. Power is back on inside, but no official permits have been logged."
+  },
+  {
     id: "arasaka-convoy",
     type: "story",
     priority: 3,
