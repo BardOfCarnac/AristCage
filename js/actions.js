@@ -9,16 +9,15 @@ document.addEventListener("click", (event) => {
     togglePanel(panelButton.dataset.panel);
     render();
     updateProjection();
+    activatePresence();
     return;
   }
 
   const entry = event.target.closest(".entry");
 
-if (!entry || entry.classList.contains("panel")) return;
+  if (!entry || entry.classList.contains("panel")) return;
 
-const entryId = entry.dataset.entryId;
-
-toggleEntryLayout(entry);
+  toggleEntryLayout(entry);
 });
 
 /*==================================================
