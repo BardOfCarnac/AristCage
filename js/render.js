@@ -37,7 +37,7 @@ function entryMarkup(entry) {
     return `
 
 <article
-    class="entry ${expanded ? "expanded" : ""} ${entry.type === "panel" ? "panel" : ""}"data-entry-id="${entry.id}">
+    class="entry ${expanded ? "expanded" : ""} ${entry.type === "panel" ? "panel" : ""}" data-entry-id="${entry.id}">
 
     <div class="part priority priority-${entry.priority}"></div>
 
