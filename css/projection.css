@@ -20,39 +20,27 @@
 ==================================================*/
 
 @keyframes energy-up {
-  0% {
-    color: var(--deep-red);
-  }
-
-  45% {
-    color: var(--red);
-  }
-
-  75% {
-    color: var(--orange);
-  }
-
-  100% {
-    color: var(--projection-color);
-  }
+  0% { color: var(--energy-0); }
+  12% { color: var(--energy-1); }
+  24% { color: var(--energy-2); }
+  36% { color: var(--energy-3); }
+  48% { color: var(--energy-4); }
+  60% { color: var(--energy-5); }
+  72% { color: var(--energy-6); }
+  84% { color: var(--energy-8); }
+  100% { color: var(--projection-color); }
 }
 
 @keyframes energy-down {
-  0% {
-    color: var(--projection-color);
-  }
-
-  45% {
-    color: var(--orange);
-  }
-
-  75% {
-    color: var(--red);
-  }
-
-  100% {
-    color: var(--deep-red);
-  }
+  0% { color: var(--projection-color); }
+  16% { color: var(--energy-8); }
+  28% { color: var(--energy-6); }
+  40% { color: var(--energy-5); }
+  52% { color: var(--energy-4); }
+  64% { color: var(--energy-3); }
+  76% { color: var(--energy-2); }
+  88% { color: var(--energy-1); }
+  100% { color: var(--energy-0); }
 }
 
 .energy-up {
