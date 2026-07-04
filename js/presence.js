@@ -15,12 +15,12 @@ function resolve(objects) {
 function dismiss(objects, onComplete) {
   objects.filter(Boolean).forEach(object => {
     object.classList.remove("energy-up");
-    object.classList.add("energy-down", "leaving");
+    object.classList.add("leaving", "energy-down");
   });
 
   setTimeout(() => {
     objects.filter(Boolean).forEach(object => {
-      object.classList.remove("present");
+      object.classList.remove("present", "leaving", "energy-down");
     });
 
     if (typeof onComplete === "function") {
@@ -30,22 +30,30 @@ function dismiss(objects, onComplete) {
 }
 
 /*==================================================
-  ENTRY CHANGE HELPERS
+  PROJECTION OBJECT HELPERS
 ==================================================*/
 
-function getEntryProjectionObjects(entry) {
-  return [
-    entry,
+function getVisibleProjectionObjects(entry) {
+  const objects = [
+    entry.querySelector(".frame"),
     entry.querySelector(".priority"),
-    entry.querySelector(".body")
-  ].filter(Boolean);
+    entry.querySelector(".meta"),
+    entry.querySelector(".headline"),
+    entry.querySelector(".tags")
+  ];
+
+  if (entry.classList.contains("expanded") || entry.classList.contains("panel")) {
+    objects.push(entry.querySelector(".body"));
+  }
+
+  return objects.filter(Boolean);
 }
 
 function getEntryChangeObjects(entry, affectedEntries) {
   return [
-    entry,
+    entry.querySelector(".priority"),
     entry.querySelector(".body"),
-    ...affectedEntries
+    ...affectedEntries.flatMap(getVisibleProjectionObjects)
   ].filter(Boolean);
 }
 
@@ -62,12 +70,8 @@ function resolveEntryChange(entry, affectedEntries) {
 ==================================================*/
 
 function activatePresence() {
-  resolve([...document.querySelectorAll(".entry")]);
-
-  requestAnimationFrame(() => {
-    resolve([
-      ...document.querySelectorAll(".priority"),
-      ...document.querySelectorAll(".entry.expanded .body, .entry.panel .body")
-    ]);
-  });
+  resolve(
+    [...document.querySelectorAll(".entry")]
+      .flatMap(getVisibleProjectionObjects)
+  );
 }
