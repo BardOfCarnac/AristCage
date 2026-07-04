@@ -13,16 +13,34 @@ function resolve(objects) {
 }
 
 function dismiss(objects, onComplete) {
-  objects.forEach(object => {
-    object.classList.remove("present");
-    object.classList.add("leaving");
-  });
+  const items = objects.filter(Boolean);
 
-  setTimeout(() => {
-    if (typeof onComplete === "function") {
+  if (!items.length) {
+    if (typeof onComplete === "function") onComplete();
+    return;
+  }
+
+  let remaining = items.length;
+
+  function finishOne() {
+    remaining -= 1;
+
+    if (remaining <= 0 && typeof onComplete === "function") {
       onComplete();
     }
-  }, 720);
+  }
+
+  items.forEach(object => {
+    object.classList.remove("present");
+    object.classList.add("leaving");
+
+    object.addEventListener("transitionend", function handler(event) {
+      if (event.propertyName !== "opacity") return;
+
+      object.removeEventListener("transitionend", handler);
+      finishOne();
+    });
+  });
 }
 
 /*==================================================
