@@ -15,15 +15,14 @@ function resolve(objects) {
 function dismiss(objects, onComplete) {
   objects.filter(Boolean).forEach(object => {
     object.classList.remove("energy-up");
-    object.classList.add("energy-down");
-
-    setTimeout(() => {
-      object.classList.remove("present");
-      object.classList.add("leaving");
-    }, 320);
+    object.classList.add("energy-down", "leaving");
   });
 
   setTimeout(() => {
+    objects.filter(Boolean).forEach(object => {
+      object.classList.remove("present");
+    });
+
     if (typeof onComplete === "function") {
       onComplete();
     }
@@ -34,11 +33,19 @@ function dismiss(objects, onComplete) {
   ENTRY CHANGE HELPERS
 ==================================================*/
 
+function getEntryProjectionObjects(entry) {
+  return [
+    entry,
+    entry.querySelector(".priority"),
+    entry.querySelector(".body")
+  ].filter(Boolean);
+}
+
 function getEntryChangeObjects(entry, affectedEntries) {
   return [
     entry.querySelector(".priority"),
     entry.querySelector(".body"),
-    ...affectedEntries
+    ...affectedEntries.flatMap(getEntryProjectionObjects)
   ].filter(Boolean);
 }
 
