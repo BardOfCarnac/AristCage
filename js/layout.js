@@ -1,3 +1,7 @@
+/*==================================================
+  LAYOUT
+==================================================*/
+
 function getAffectedEntries(changedEntry) {
   const changedTop = changedEntry.getBoundingClientRect().top;
 
