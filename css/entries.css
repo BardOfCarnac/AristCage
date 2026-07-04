@@ -4,7 +4,8 @@
 
 .entry {
   position: relative;
-  margin-bottom: var(--feed-gap);
+  margin-bottom: 14px;
+  padding-left: 26px;
 }
 
 /*==================================================
@@ -13,8 +14,8 @@
 
 .projection-plate {
   position: relative;
-  min-height: var(--feed-unit);
-  padding: 18px 16px 14px 28px;
+  min-height: 96px;
+  padding: 14px 14px 12px 16px;
   transform-style: preserve-3d;
 }
 
@@ -24,15 +25,11 @@
 
 .frame {
   position: absolute;
-  inset: 4px 5px 5px 20px;
+  inset: 0;
   pointer-events: none;
-
   background: transparent;
-
-  border: 1px solid rgba(255, 70, 40, 0.16);
-
-  box-shadow:
-    0 0 8px rgba(255, 70, 40, 0.10);
+  border: 1px solid rgba(255, 70, 40, 0.18);
+  box-shadow: 0 0 8px rgba(255, 70, 40, 0.08);
 }
 
 .frame::before,
@@ -48,17 +45,18 @@
   position: absolute;
   left: 0;
   top: 14px;
-  bottom: 4px;
   z-index: 5;
-
-  width: 10px;
-  height: auto;
-
+  width: 7px;
+  height: 76px;
   background: #b01814;
-
   box-shadow:
     0 0 8px rgba(255, 56, 40, 0.42),
     0 0 18px rgba(255, 90, 40, 0.22);
+}
+
+.entry.expanded .priority,
+.entry.panel .priority {
+  height: calc(100% - 18px);
 }
 
 .priority-1 {
@@ -85,14 +83,14 @@
   position: relative;
   z-index: 2;
   display: grid;
-  gap: 7px;
+  gap: 8px;
 }
 
 .meta {
   color: var(--orange);
-  font-size: 0.68rem;
-  letter-spacing: 0.16em;
-  line-height: 1.1;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  line-height: 1;
   text-transform: uppercase;
 }
 
@@ -101,17 +99,20 @@
   color: var(--white);
   font-family: var(--font-display);
   font-weight: 700;
-  line-height: 0.86;
-  font-size: clamp(1.75rem, 8vw, 3.35rem);
+  line-height: 0.9;
+  font-size: clamp(1.65rem, 7vw, 3rem);
   text-transform: uppercase;
 }
 
 .tags {
   color: var(--amber);
-  font-size: 0.68rem;
-  letter-spacing: 0.15em;
-  line-height: 1.15;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  line-height: 1.1;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /*==================================================
@@ -120,7 +121,7 @@
 
 .expansion-zone {
   display: none;
-  margin: 10px 6px 0 22px;
+  margin: 10px 6px 0 0;
   color: var(--amber);
 }
 
