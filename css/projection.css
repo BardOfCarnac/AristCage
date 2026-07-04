@@ -57,3 +57,7 @@
 .entry:not(.present) .part {
   opacity: 0 !important;
 }
+.entry.leaving .part {
+  opacity: 0;
+  filter: none;
+}
