@@ -109,7 +109,6 @@
 .leaving {
   opacity: 0 !important;
 }
-}
 
 .body.present {
   filter: blur(0);
