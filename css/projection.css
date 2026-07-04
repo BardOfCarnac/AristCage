@@ -1,10 +1,16 @@
+/*==================================================
+  PROJECTION OBJECTS
+==================================================*/
+
 .part {
   opacity: 0;
+
   transition:
     opacity .45s ease,
     color .35s ease,
     filter .35s ease,
     transform .12s linear;
+
   will-change: transform, opacity, filter;
 }
 
@@ -20,6 +26,10 @@
   filter: blur(0);
 }
 
+/*==================================================
+  PARALLAX
+==================================================*/
+
 .frame,
 .priority,
 .meta,
@@ -28,6 +38,10 @@
 .body {
   transform: translateY(var(--projection-y, 0px));
 }
+
+/*==================================================
+  GLOW
+==================================================*/
 
 .headline {
   text-shadow:
