@@ -56,8 +56,8 @@
   text-shadow: 0 0 6px currentColor;
 }
 
-.entry:not(.present) > .priority,
 .entry:not(.present) .projection-plate .part,
+.priority:not(.present),
 .body:not(.present) {
   opacity: 0 !important;
 }
