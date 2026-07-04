@@ -128,3 +128,10 @@
     0 0 24px rgba(255, 90, 40, 0.46),
     0 0 52px rgba(255, 138, 52, 0.28);
 }
+.priority.leaving,
+.entry.leaving > .priority {
+  opacity: 0 !important;
+  background: var(--deep-red);
+  box-shadow:
+    0 0 3px rgba(255, 56, 40, 0.10);
+}
