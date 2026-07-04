@@ -22,7 +22,7 @@ function dismiss(objects, onComplete) {
     if (typeof onComplete === "function") {
       onComplete();
     }
-  }, 480);
+  }, 380);
 }
 
 /*==================================================
