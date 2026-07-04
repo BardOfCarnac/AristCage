@@ -43,9 +43,9 @@ function getEntryProjectionObjects(entry) {
 
 function getEntryChangeObjects(entry, affectedEntries) {
   return [
-    entry.querySelector(".priority"),
+    entry,
     entry.querySelector(".body"),
-    ...affectedEntries.flatMap(getEntryProjectionObjects)
+    ...affectedEntries
   ].filter(Boolean);
 }
 
