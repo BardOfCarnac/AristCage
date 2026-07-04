@@ -4,25 +4,30 @@
 
 function resolve(objects) {
   objects.filter(Boolean).forEach((object, index) => {
-    object.classList.remove("leaving");
+    object.classList.remove("leaving", "energy-down");
 
     setTimeout(() => {
-      object.classList.add("present");
+      object.classList.add("present", "energy-up");
     }, index * 60);
   });
 }
 
 function dismiss(objects, onComplete) {
   objects.filter(Boolean).forEach(object => {
-    object.classList.remove("present");
-    object.classList.add("leaving");
+    object.classList.remove("energy-up");
+    object.classList.add("energy-down");
+
+    setTimeout(() => {
+      object.classList.remove("present");
+      object.classList.add("leaving");
+    }, 320);
   });
 
   setTimeout(() => {
     if (typeof onComplete === "function") {
       onComplete();
     }
-  }, 480);
+  }, 520);
 }
 
 /*==================================================
