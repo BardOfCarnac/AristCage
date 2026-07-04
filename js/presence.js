@@ -16,20 +16,24 @@ function resolve(entries) {
 
 }
 
-function dismiss(entries, callback) {
+function dismiss(entries, onComplete) {
 
     entries.forEach(entry => {
+
         entry.classList.remove("present");
         entry.classList.add("leaving");
+
     });
+
+    const delay = 180;
 
     setTimeout(() => {
 
-        if (callback) {
-            callback();
+        if (typeof onComplete === "function") {
+            onComplete();
         }
 
-    }, 180);
+    }, delay);
 
 }
 
