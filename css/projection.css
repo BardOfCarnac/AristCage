@@ -30,13 +30,20 @@
   100% { color: var(--deep-red); }
 }
 
-.energy-up {
+.entry.energy-up .projection-plate .part,
+.priority.energy-up,
+.body.energy-up {
   animation: energy-up .55s ease-out both;
 }
 
-.energy-down {
+.entry.energy-down .projection-plate .part,
+.priority.energy-down,
+.body.energy-down {
   animation: energy-down .32s ease-in both;
 }
+}
+
+
 
 /*==================================================
   PRESENCE
