@@ -18,16 +18,17 @@ function toggleEntryLayout(changedEntry) {
   const expanding = !isExpanded(entryId);
 
   if (expanding) {
-    dismissForExpand(changedEntry, affectedEntries, () => {
+    dismiss(getExpandDismissObjects(changedEntry, affectedEntries), () => {
       expandEntry(entryId);
       changedEntry.classList.add("expanded");
 
       requestAnimationFrame(() => {
         updateProjection();
-        resolveExpandedBody(changedEntry);
+
+        resolve(getExpandResolveObjects(changedEntry));
 
         setTimeout(() => {
-          resolveDisplacedEntries(affectedEntries);
+          resolve(getDisplacedProjectionObjects(affectedEntries));
         }, 180);
       });
     });
@@ -35,16 +36,17 @@ function toggleEntryLayout(changedEntry) {
     return;
   }
 
-  dismissForCollapse(changedEntry, affectedEntries, () => {
+  dismiss(getCollapseDismissObjects(changedEntry, affectedEntries), () => {
     collapseEntry(entryId);
     changedEntry.classList.remove("expanded");
 
     requestAnimationFrame(() => {
       updateProjection();
-      resolveCollapsedEntry(changedEntry);
+
+      resolve(getCollapseResolveObjects(changedEntry));
 
       setTimeout(() => {
-        resolveDisplacedEntries(affectedEntries);
+        resolve(getDisplacedProjectionObjects(affectedEntries));
       }, 180);
     });
   });
