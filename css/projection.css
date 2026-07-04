@@ -2,7 +2,7 @@
   PROJECTION OBJECTS
 ==================================================*/
 
-.part {
+.part, .priority {
   opacity: 0;
   transition:
     opacity .45s ease,
