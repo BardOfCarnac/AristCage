@@ -1,23 +1,27 @@
 function animateLayoutChange(changeFn, changedEntry) {
-  const affected = [...document.querySelectorAll(".entry")]
-    .filter(entry => entry !== changedEntry);
+  const affectedEntries = [...document.querySelectorAll(".entry")]
+    .filter(entry => {
+      return entry !== changedEntry &&
+        entry.getBoundingClientRect().top > changedEntry.getBoundingClientRect().top;
+    });
 
-  affected.forEach(entry => entry.classList.add("leaving"));
+  affectedEntries.forEach(entry => {
+    entry.classList.add("leaving");
+    entry.classList.remove("present");
+  });
 
   setTimeout(() => {
     changeFn();
 
     requestAnimationFrame(() => {
-      affected.forEach(entry => {
-        entry.classList.remove("leaving");
-        entry.classList.remove("present");
-
-        setTimeout(() => {
-          entry.classList.add("present");
-        }, 80);
-      });
-
       updateProjection();
+
+      affectedEntries.forEach((entry, index) => {
+        setTimeout(() => {
+          entry.classList.remove("leaving");
+          entry.classList.add("present");
+        }, 80 + index * 45);
+      });
     });
-  }, 220);
+  }, 160);
 }
