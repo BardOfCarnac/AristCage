@@ -1,3 +1,7 @@
+/*==================================================
+  PRESENCE
+==================================================*/
+
 function resolve(objects) {
   objects.forEach((object, index) => {
     object.classList.remove("leaving");
@@ -21,10 +25,12 @@ function dismiss(objects, onComplete) {
   }, 180);
 }
 
-function activatePresence() {
-  const entries = [...document.querySelectorAll(".entry")];
+/*==================================================
+  INITIAL LOAD
+==================================================*/
 
-  resolve(entries);
+function activatePresence() {
+  resolve([...document.querySelectorAll(".entry")]);
 
   requestAnimationFrame(() => {
     resolve([...document.querySelectorAll(".entry.expanded .body, .entry.panel .body")]);
