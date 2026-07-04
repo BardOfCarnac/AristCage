@@ -2,18 +2,32 @@
   PRESENCE
 ==================================================*/
 
-function resolve(objects) {
-  objects.filter(Boolean).forEach((object, index) => {
-    object.classList.remove("leaving", "energy-down", "energy-up");
+const GLOW_DOWN_TIME = 700;
+const FADE_OUT_TIME = 480;
+const RESOLVE_STAGGER = 60;
 
+function resolve(objects) {
+  const items = objects.filter(Boolean);
+
+  items.forEach((object, index) => {
     setTimeout(() => {
-      object.classList.add("present", "energy-up");
-    }, index * 60);
+      object.classList.remove("leaving", "energy-down", "energy-up");
+      object.classList.add("present");
+
+      requestAnimationFrame(() => {
+        object.classList.add("energy-up");
+      });
+    }, index * RESOLVE_STAGGER);
   });
 }
 
 function dismiss(objects, onComplete) {
   const items = objects.filter(Boolean);
+
+  if (!items.length) {
+    if (typeof onComplete === "function") onComplete();
+    return;
+  }
 
   items.forEach(object => {
     object.classList.remove("energy-up");
@@ -22,14 +36,20 @@ function dismiss(objects, onComplete) {
 
   setTimeout(() => {
     items.forEach(object => {
-      object.classList.remove("present", "energy-down");
+      object.classList.remove("present");
       object.classList.add("leaving");
     });
 
-    if (typeof onComplete === "function") {
-      onComplete();
-    }
-  }, 760);
+    setTimeout(() => {
+      items.forEach(object => {
+        object.classList.remove("energy-down");
+      });
+
+      if (typeof onComplete === "function") {
+        onComplete();
+      }
+    }, FADE_OUT_TIME);
+  }, GLOW_DOWN_TIME);
 }
 
 /*==================================================
@@ -64,36 +84,36 @@ function getDisplacedProjectionObjects(entries) {
   return entries.flatMap(getVisibleProjectionObjects).filter(Boolean);
 }
 
-function dismissForExpand(entry, affectedEntries, onComplete) {
-  dismiss([
+/*==================================================
+  ENTRY CHANGE GROUPS
+==================================================*/
+
+function getExpandDismissObjects(entry, affectedEntries) {
+  return [
     entry.querySelector(".priority"),
     ...getDisplacedProjectionObjects(affectedEntries)
-  ], onComplete);
+  ].filter(Boolean);
 }
 
-function dismissForCollapse(entry, affectedEntries, onComplete) {
-  dismiss([
+function getExpandResolveObjects(entry) {
+  return [
+    entry.querySelector(".priority"),
+    getEntryBodyObject(entry)
+  ].filter(Boolean);
+}
+
+function getCollapseDismissObjects(entry, affectedEntries) {
+  return [
     entry.querySelector(".priority"),
     getEntryBodyObject(entry),
     ...getDisplacedProjectionObjects(affectedEntries)
-  ], onComplete);
+  ].filter(Boolean);
 }
 
-function resolveExpandedBody(entry) {
-  resolve([
-    entry.querySelector(".priority"),
-    getEntryBodyObject(entry)
-  ]);
-}
-
-function resolveCollapsedEntry(entry) {
-  resolve([
+function getCollapseResolveObjects(entry) {
+  return [
     entry.querySelector(".priority")
-  ]);
-}
-
-function resolveDisplacedEntries(affectedEntries) {
-  resolve(getDisplacedProjectionObjects(affectedEntries));
+  ].filter(Boolean);
 }
 
 /*==================================================
