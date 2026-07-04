@@ -2,13 +2,16 @@
   PROJECTION OBJECTS
 ==================================================*/
 
-.part, .priority {
+.part,
+.priority {
   opacity: 0;
+
   transition:
     opacity .45s ease,
     color .35s ease,
     filter .35s ease,
     transform .12s linear;
+
   will-change: transform, opacity, filter;
 }
 
@@ -17,17 +20,39 @@
 ==================================================*/
 
 @keyframes energy-up {
-  0% { color: var(--deep-red); }
-  45% { color: var(--red); }
-  75% { color: var(--orange); }
-  100% { color: var(--projection-color); }
+  0% {
+    color: var(--deep-red);
+  }
+
+  45% {
+    color: var(--red);
+  }
+
+  75% {
+    color: var(--orange);
+  }
+
+  100% {
+    color: var(--projection-color);
+  }
 }
 
 @keyframes energy-down {
-  0% { color: var(--projection-color); }
-  45% { color: var(--orange); }
-  75% { color: var(--red); }
-  100% { color: var(--deep-red); }
+  0% {
+    color: var(--projection-color);
+  }
+
+  45% {
+    color: var(--orange);
+  }
+
+  75% {
+    color: var(--red);
+  }
+
+  100% {
+    color: var(--deep-red);
+  }
 }
 
 .energy-up {
@@ -38,33 +63,20 @@
   animation: energy-down .32s ease-in both;
 }
 
-
-
-
 /*==================================================
   PRESENCE
 ==================================================*/
 
-.entry.present .projection-plate .part,
-.priority.present {
+.present {
   opacity: 1;
 }
 
-.body.present {
-  opacity: 1;
-  filter: blur(0);
-}
-
-.entry:not(.present) .projection-plate .part,
-.priority:not(.present):not(.energy-down),
-.body:not(.present):not(.energy-down) {
+.leaving {
   opacity: 0 !important;
 }
 
-.entry.leaving .projection-plate .part,
-.priority.leaving,
-.body.leaving {
-  opacity: 0;
+.body.present {
+  filter: blur(0);
 }
 
 /*==================================================
@@ -125,39 +137,7 @@
     0 0 42px rgba(255, 138, 52, 0.18);
 }
 
-.priority.present {
-  box-shadow:
-    0 0 10px rgba(255, 56, 40, 0.72),
-    0 0 24px rgba(255, 90, 40, 0.46),
-    0 0 52px rgba(255, 138, 52, 0.28);
-}
-.priority.leaving,
-.entry.leaving > .priority {
-  opacity: 0 !important;
-  background: var(--deep-red);
-  box-shadow:
-    0 0 3px rgba(255, 56, 40, 0.10);
-}
-/*==================================================
-  PRIORITY BAR PRESENCE OVERRIDE
-==================================================*/
-
-.entry > .priority {
-  opacity: 0;
-  transition:
-    opacity .45s ease,
-    background-color .35s ease,
-    box-shadow .35s ease,
-    filter .35s ease,
-    transform .12s linear;
-}
-
-.entry.present > .priority {
-  opacity: 1;
-}
-
-.entry.leaving > .priority {
-  opacity: 0 !important;
+.priority.leaving {
   background: var(--deep-red);
   box-shadow:
     0 0 3px rgba(255, 56, 40, 0.12);
