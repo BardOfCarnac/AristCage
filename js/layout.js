@@ -1,34 +1,43 @@
-/*==================================================
-  LAYOUT
-==================================================*/
+function getAffectedEntries(changedEntry) {
+  const changedTop = changedEntry.getBoundingClientRect().top;
 
-function animateLayoutChange(changeFn, changedEntry) {
+  return [...document.querySelectorAll(".entry")]
+    .filter(entry => {
+      if (entry === changedEntry) return false;
+      return entry.getBoundingClientRect().top > changedTop;
+    });
+}
 
-    const affectedEntries =
-        [...document.querySelectorAll(".entry")]
-            .filter(entry => {
+function toggleEntryLayout(changedEntry) {
+  const entryId = changedEntry.dataset.entryId;
+  const body = changedEntry.querySelector(".body");
+  const affectedEntries = getAffectedEntries(changedEntry);
+  const expanding = !isExpanded(entryId);
 
-                if (entry === changedEntry) return false;
-
-                return (
-                    entry.getBoundingClientRect().top >
-                    changedEntry.getBoundingClientRect().top
-                );
-
-            });
-
+  if (expanding) {
     dismiss(affectedEntries, () => {
+      expandEntry(entryId);
+      changedEntry.classList.add("expanded");
 
-        changeFn();
-
-        requestAnimationFrame(() => {
-
-            updateProjection();
-
-            resolve(affectedEntries);
-
-        });
-
+      requestAnimationFrame(() => {
+        updateProjection();
+        resolve(body ? [body] : []);
+        resolve(affectedEntries);
+      });
     });
 
+    return;
+  }
+
+  dismiss(body ? [body] : [], () => {
+    dismiss(affectedEntries, () => {
+      collapseEntry(entryId);
+      changedEntry.classList.remove("expanded");
+
+      requestAnimationFrame(() => {
+        updateProjection();
+        resolve(affectedEntries);
+      });
+    });
+  });
 }
