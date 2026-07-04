@@ -17,23 +17,35 @@ function toggleEntryLayout(changedEntry) {
   const affectedEntries = getAffectedEntries(changedEntry);
   const expanding = !isExpanded(entryId);
 
-  dismissEntryChange(changedEntry, affectedEntries, () => {
-    if (expanding) {
+  if (expanding) {
+    dismissForExpand(changedEntry, affectedEntries, () => {
       expandEntry(entryId);
       changedEntry.classList.add("expanded");
-    } else {
-      collapseEntry(entryId);
-      changedEntry.classList.remove("expanded");
-    }
+
+      requestAnimationFrame(() => {
+        updateProjection();
+        resolveExpandedBody(changedEntry);
+
+        setTimeout(() => {
+          resolveDisplacedEntries(affectedEntries);
+        }, 180);
+      });
+    });
+
+    return;
+  }
+
+  dismissForCollapse(changedEntry, affectedEntries, () => {
+    collapseEntry(entryId);
+    changedEntry.classList.remove("expanded");
 
     requestAnimationFrame(() => {
       updateProjection();
-
-      resolveEntryBody(changedEntry);
+      resolveCollapsedEntry(changedEntry);
 
       setTimeout(() => {
         resolveDisplacedEntries(affectedEntries);
-      }, 160);
+      }, 180);
     });
   });
 }
