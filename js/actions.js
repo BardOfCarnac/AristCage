@@ -16,11 +16,17 @@ document.addEventListener("click", (event) => {
 
   if (!entry || entry.classList.contains("panel")) return;
 
-  const entryId = entry.dataset.entryId;
+const entryId = entry.dataset.entryId;
 
-  animateLayoutChange(() => {
-  toggleEntry(entryId);
-  entry.classList.toggle("expanded", isExpanded(entryId));
+animateLayoutChange(() => {
+
+    toggleEntry(entryId);
+
+    entry.classList.toggle(
+        "expanded",
+        isExpanded(entryId)
+    );
+
 }, entry);
 
 setTimeout(updateProjection, 80);
