@@ -4,8 +4,7 @@
 
 function resolve(objects) {
   objects.filter(Boolean).forEach((object, index) => {
-    object.classList.remove("leaving", "energy-down");
-
+    object.classList.remove("leaving", "energy-down", "energy-up");
     setTimeout(() => {
       object.classList.add("present", "energy-up");
     }, index * 60);
