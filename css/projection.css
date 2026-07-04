@@ -106,7 +106,7 @@
   opacity: 1;
 }
 
-.leaving {
+.leaving:not(.energy-down) {
   opacity: 0 !important;
 }
 
