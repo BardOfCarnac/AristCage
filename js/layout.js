@@ -15,17 +15,19 @@ function getAffectedEntries(changedEntry) {
 function toggleEntryLayout(changedEntry) {
   const entryId = changedEntry.dataset.entryId;
   const body = changedEntry.querySelector(".body");
+  const priority = changedEntry.querySelector(".priority");
   const affectedEntries = getAffectedEntries(changedEntry);
   const expanding = !isExpanded(entryId);
 
   if (expanding) {
-    dismiss(affectedEntries, () => {
+    dismiss([priority, ...affectedEntries], () => {
       expandEntry(entryId);
       changedEntry.classList.add("expanded");
 
       requestAnimationFrame(() => {
         updateProjection();
-        resolve(body ? [body] : []);
+
+        resolve([priority, body]);
         resolve(affectedEntries);
       });
     });
@@ -33,13 +35,15 @@ function toggleEntryLayout(changedEntry) {
     return;
   }
 
-  dismiss(body ? [body] : [], () => {
+  dismiss([body, priority], () => {
     dismiss(affectedEntries, () => {
       collapseEntry(entryId);
       changedEntry.classList.remove("expanded");
 
       requestAnimationFrame(() => {
         updateProjection();
+
+        resolve([priority]);
         resolve(affectedEntries);
       });
     });
