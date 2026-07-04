@@ -134,9 +134,3 @@
   filter: blur(8px);
   line-height: 1.45;
 }
-
-.entry.expanded .body,
-.entry.panel .body {
-  opacity: 1;
-  filter: blur(0);
-}
