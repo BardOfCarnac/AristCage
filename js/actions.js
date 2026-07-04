@@ -14,24 +14,11 @@ document.addEventListener("click", (event) => {
 
   const entry = event.target.closest(".entry");
 
-  if (!entry || entry.classList.contains("panel")) return;
+if (!entry || entry.classList.contains("panel")) return;
 
 const entryId = entry.dataset.entryId;
 
-animateLayoutChange(() => {
-
-    toggleEntry(entryId);
-
-    entry.classList.toggle(
-        "expanded",
-        isExpanded(entryId)
-    );
-
-}, entry);
-
-setTimeout(updateProjection, 80);
-setTimeout(updateProjection, 180);
-setTimeout(updateProjection, 320);
+toggleEntryLayout(entry);
 });
 
 /*==================================================
