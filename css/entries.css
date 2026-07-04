@@ -4,8 +4,7 @@
 
 .entry {
   position: relative;
-  margin-bottom: 14px;
-  padding-left: 26px;
+  margin-bottom: 12px;
 }
 
 /*==================================================
@@ -14,8 +13,8 @@
 
 .projection-plate {
   position: relative;
-  min-height: 96px;
-  padding: 14px 14px 12px 16px;
+  min-height: 92px;
+  padding: 13px 14px 11px 46px;
   transform-style: preserve-3d;
 }
 
@@ -27,8 +26,8 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: transparent;
-  border: 1px solid rgba(255, 70, 40, 0.18);
+  background: rgba(255, 70, 40, 0.018);
+  border: 1px solid rgba(255, 70, 40, 0.16);
   box-shadow: 0 0 8px rgba(255, 70, 40, 0.08);
 }
 
@@ -43,37 +42,26 @@
 
 .priority {
   position: absolute;
-  left: 0;
-  top: 14px;
+  left: 16px;
+  top: 18px;
   z-index: 5;
-  width: 7px;
-  height: 76px;
+  width: 5px;
+  height: 58px;
   background: #b01814;
   box-shadow:
-    0 0 8px rgba(255, 56, 40, 0.42),
-    0 0 18px rgba(255, 90, 40, 0.22);
+    0 0 7px rgba(255, 56, 40, 0.42),
+    0 0 16px rgba(255, 90, 40, 0.22);
 }
 
 .entry.expanded .priority,
 .entry.panel .priority {
-  height: calc(100% - 18px);
+  height: calc(100% - 36px);
 }
 
-.priority-1 {
-  opacity: 0.35;
-}
-
-.priority-2 {
-  opacity: 0.55;
-}
-
-.priority-3 {
-  opacity: 0.75;
-}
-
-.priority-4 {
-  opacity: 1;
-}
+.priority-1 { opacity: 0.35; }
+.priority-2 { opacity: 0.55; }
+.priority-3 { opacity: 0.75; }
+.priority-4 { opacity: 1; }
 
 /*==================================================
   CONTENT
@@ -83,32 +71,35 @@
   position: relative;
   z-index: 2;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .meta {
   color: var(--orange);
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   letter-spacing: 0.2em;
   line-height: 1;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .headline {
   margin: 0;
   color: var(--white);
   font-family: var(--font-display);
-  font-weight: 700;
-  line-height: 0.9;
-  font-size: clamp(1.65rem, 7vw, 3rem);
+  font-weight: 600;
+  line-height: 0.88;
+  font-size: clamp(1.75rem, 7.4vw, 3.05rem);
   text-transform: uppercase;
 }
 
 .tags {
   color: var(--amber);
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  line-height: 1.1;
+  font-size: 0.68rem;
+  letter-spacing: 0.17em;
+  line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
@@ -121,7 +112,7 @@
 
 .expansion-zone {
   display: none;
-  margin: 10px 6px 0 0;
+  margin: 10px 6px 0 46px;
   color: var(--amber);
 }
 
