@@ -1,5 +1,5 @@
 /*==================================================
-  PROJECTION OBJECTS
+  PROJECTED OBJECTS
 ==================================================*/
 
 .part,
@@ -9,10 +9,13 @@
   transition:
     opacity .45s ease,
     color .35s ease,
+    background-color .35s ease,
+    border-color .35s ease,
+    box-shadow .35s ease,
     filter .35s ease,
     transform .12s linear;
 
-  will-change: transform, opacity, filter;
+  will-change: opacity, color, background-color, box-shadow, filter, transform;
 }
 
 /*==================================================
@@ -21,69 +24,76 @@
 
 .frame {
   --projection-color: var(--energy-3);
-  --resolve-speed: .85s;
-  --dismiss-speed: .70s;
+  --resolve-speed: .75s;
+  --dismiss-speed: .55s;
   --glow-strength: .35;
 }
 
 .priority {
   --projection-color: var(--red);
-  --resolve-speed: .75s;
-  --dismiss-speed: .65s;
+  --resolve-speed: .65s;
+  --dismiss-speed: .55s;
   --glow-strength: .9;
 }
 
 .meta {
   --projection-color: var(--orange);
-  --resolve-speed: .55s;
-  --dismiss-speed: .40s;
+  --resolve-speed: .5s;
+  --dismiss-speed: .38s;
   --glow-strength: .7;
 }
 
 .headline {
   --projection-color: var(--white);
-  --resolve-speed: .45s;
-  --dismiss-speed: .35s;
+  --resolve-speed: .42s;
+  --dismiss-speed: .32s;
   --glow-strength: 1;
 }
 
 .tags {
   --projection-color: var(--amber);
-  --resolve-speed: .60s;
-  --dismiss-speed: .45s;
+  --resolve-speed: .55s;
+  --dismiss-speed: .4s;
   --glow-strength: .65;
 }
 
 .body {
-  --projection-color: var(--amber);
-  --resolve-speed: .80s;
-  --dismiss-speed: .55s;
+  --projection-color: var(--gold);
+  --resolve-speed: .7s;
+  --dismiss-speed: .5s;
   --glow-strength: .75;
 }
 
 /*==================================================
   ENERGY STATES
 ==================================================*/
+
 @keyframes energy-up {
-  0% { color: var(--energy-0); }
-  14% { color: var(--energy-1); }
-  28% { color: var(--energy-2); }
-  42% { color: var(--energy-3); }
-  56% { color: var(--energy-4); }
-  70% { color: var(--energy-5); }
-  84% { color: var(--energy-7); }
-  100% { color: var(--projection-color); }
+  0%   { --live-energy: var(--energy-0); }
+  10%  { --live-energy: var(--energy-1); }
+  20%  { --live-energy: var(--energy-2); }
+  30%  { --live-energy: var(--energy-3); }
+  40%  { --live-energy: var(--energy-4); }
+  50%  { --live-energy: var(--energy-5); }
+  60%  { --live-energy: var(--energy-6); }
+  70%  { --live-energy: var(--energy-7); }
+  82%  { --live-energy: var(--energy-8); }
+  92%  { --live-energy: var(--energy-9); }
+  100% { --live-energy: var(--projection-color); }
 }
 
 @keyframes energy-down {
-  0% { color: var(--projection-color); }
-  16% { color: var(--energy-7); }
-  30% { color: var(--energy-5); }
-  44% { color: var(--energy-4); }
-  58% { color: var(--energy-3); }
-  72% { color: var(--energy-2); }
-  86% { color: var(--energy-1); }
-  100% { color: var(--energy-0); }
+  0%   { --live-energy: var(--projection-color); }
+  10%  { --live-energy: var(--energy-9); }
+  20%  { --live-energy: var(--energy-8); }
+  30%  { --live-energy: var(--energy-7); }
+  40%  { --live-energy: var(--energy-6); }
+  50%  { --live-energy: var(--energy-5); }
+  60%  { --live-energy: var(--energy-4); }
+  70%  { --live-energy: var(--energy-3); }
+  80%  { --live-energy: var(--energy-2); }
+  90%  { --live-energy: var(--energy-1); }
+  100% { --live-energy: var(--energy-0); }
 }
 
 .energy-up {
@@ -94,7 +104,7 @@
 
 .energy-down {
   animation:
-    energy-down var(--dismiss-speed, .35s)
+    energy-down var(--dismiss-speed, .45s)
     ease-in both;
 }
 
@@ -115,6 +125,40 @@
 }
 
 /*==================================================
+  ENERGY EXPRESSION
+==================================================*/
+
+/* Text-like projections */
+.meta,
+.headline,
+.tags,
+.body {
+  color: var(--live-energy, var(--projection-color));
+
+  text-shadow:
+    0 0 calc(6px * var(--glow-strength)) currentColor,
+    0 0 calc(18px * var(--glow-strength)) currentColor;
+}
+
+/* Solid bar projections */
+.priority {
+  background-color: var(--live-energy, var(--projection-color));
+
+  box-shadow:
+    0 0 calc(8px * var(--glow-strength)) var(--live-energy, var(--projection-color)),
+    0 0 calc(20px * var(--glow-strength)) var(--live-energy, var(--projection-color)),
+    0 0 calc(42px * var(--glow-strength)) rgba(255, 138, 52, 0.18);
+}
+
+/* Frame / panel-like projections */
+.frame {
+  border-color: var(--live-energy, var(--projection-color));
+
+  box-shadow:
+    0 0 calc(8px * var(--glow-strength)) var(--live-energy, var(--projection-color));
+}
+
+/*==================================================
   PARALLAX
 ==================================================*/
 
@@ -125,33 +169,4 @@
 .tags,
 .body {
   transform: translateY(var(--projection-y, 0px));
-}
-
-/*==================================================
-  GLOW
-==================================================*/
-
-.headline,
-.meta,
-.tags,
-.body {
-  text-shadow:
-    0 0 calc(6px * var(--glow-strength)) currentColor,
-    0 0 calc(18px * var(--glow-strength)) rgba(255, 120, 60, 0.22);
-}
-
-.priority {
-  background: var(--red);
-
-  box-shadow:
-    0 0 calc(8px * var(--glow-strength)) rgba(255, 56, 40, 0.48),
-    0 0 calc(20px * var(--glow-strength)) rgba(255, 90, 40, 0.34),
-    0 0 calc(42px * var(--glow-strength)) rgba(255, 138, 52, 0.18);
-}
-
-.priority.leaving {
-  background: var(--energy-0);
-
-  box-shadow:
-    0 0 3px rgba(255, 56, 40, 0.12);
 }
