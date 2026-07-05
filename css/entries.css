@@ -14,7 +14,7 @@
 .projection-plate {
   position: relative;
   min-height: 92px;
-  padding: 13px 14px 11px 46px;
+  padding: 13px 14px 14px 46px;
   transform-style: preserve-3d;
 }
 
@@ -126,4 +126,8 @@
   font-size: 1rem;
   line-height: 1.55;
   max-width: 38ch;
+}
+.entry.expanded .body,
+.entry.panel .body {
+  padding-top: 12px;
 }
