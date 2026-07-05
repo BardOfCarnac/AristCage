@@ -96,16 +96,37 @@
   100% { color: var(--energy-0); }
 }
 
-.energy-up {
-  animation:
-    energy-up var(--resolve-speed, .55s)
-    ease-out both;
+/* Text surfaces */
+.meta.energy-up,
+.headline.energy-up,
+.tags.energy-up,
+.body.energy-up {
+  animation: energy-up var(--resolve-speed, .55s) ease-out both;
 }
 
-.energy-down {
-  animation:
-    energy-down var(--dismiss-speed, .45s)
-    ease-in both;
+.meta.energy-down,
+.headline.energy-down,
+.tags.energy-down,
+.body.energy-down {
+  animation: energy-down var(--dismiss-speed, .45s) ease-in both;
+}
+
+/* Solid surfaces */
+.priority.energy-up {
+  animation: solid-energy-up var(--resolve-speed, .55s) ease-out both;
+}
+
+.priority.energy-down {
+  animation: solid-energy-down var(--dismiss-speed, .45s) ease-in both;
+}
+
+/* Line surfaces */
+.frame.energy-up {
+  animation: line-energy-up var(--resolve-speed, .55s) ease-out both;
+}
+
+.frame.energy-down {
+  animation: line-energy-down var(--dismiss-speed, .45s) ease-in both;
 }
 
 /*==================================================
