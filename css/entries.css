@@ -58,10 +58,10 @@
   height: calc(100% - 28px);
 }
 
-.priority-1 { opacity: 0.35; }
-.priority-2 { opacity: 0.55; }
-.priority-3 { opacity: 0.75; }
-.priority-4 { opacity: 1; }
+.priority-1 { --glow-strength: .35; }
+.priority-2 { --glow-strength: .55; }
+.priority-3 { --glow-strength: .75; }
+.priority-4 { --glow-strength: 1; }
 
 /*==================================================
   CONTENT
