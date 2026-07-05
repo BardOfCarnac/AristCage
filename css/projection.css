@@ -69,31 +69,31 @@
 ==================================================*/
 
 @keyframes energy-up {
-  0%   { --live-energy: var(--energy-0); }
-  10%  { --live-energy: var(--energy-1); }
-  20%  { --live-energy: var(--energy-2); }
-  30%  { --live-energy: var(--energy-3); }
-  40%  { --live-energy: var(--energy-4); }
-  50%  { --live-energy: var(--energy-5); }
-  60%  { --live-energy: var(--energy-6); }
-  70%  { --live-energy: var(--energy-7); }
-  82%  { --live-energy: var(--energy-8); }
-  92%  { --live-energy: var(--energy-9); }
-  100% { --live-energy: var(--projection-color); }
+  0%   { color: var(--energy-0); }
+  10%  { color: var(--energy-1); }
+  20%  { color: var(--energy-2); }
+  30%  { color: var(--energy-3); }
+  40%  { color: var(--energy-4); }
+  50%  { color: var(--energy-5); }
+  60%  { color: var(--energy-6); }
+  70%  { color: var(--energy-7); }
+  82%  { color: var(--energy-8); }
+  92%  { color: var(--energy-9); }
+  100% { color: var(--projection-color); }
 }
 
 @keyframes energy-down {
-  0%   { --live-energy: var(--projection-color); }
-  10%  { --live-energy: var(--energy-9); }
-  20%  { --live-energy: var(--energy-8); }
-  30%  { --live-energy: var(--energy-7); }
-  40%  { --live-energy: var(--energy-6); }
-  50%  { --live-energy: var(--energy-5); }
-  60%  { --live-energy: var(--energy-4); }
-  70%  { --live-energy: var(--energy-3); }
-  80%  { --live-energy: var(--energy-2); }
-  90%  { --live-energy: var(--energy-1); }
-  100% { --live-energy: var(--energy-0); }
+  0%   { color: var(--projection-color); }
+  10%  { color: var(--energy-9); }
+  20%  { color: var(--energy-8); }
+  30%  { color: var(--energy-7); }
+  40%  { color: var(--energy-6); }
+  50%  { color: var(--energy-5); }
+  60%  { color: var(--energy-4); }
+  70%  { color: var(--energy-3); }
+  80%  { color: var(--energy-2); }
+  90%  { color: var(--energy-1); }
+  100% { color: var(--energy-0); }
 }
 
 .energy-up {
@@ -133,8 +133,7 @@
 .headline,
 .tags,
 .body {
-  color: var(--live-energy, var(--projection-color));
-
+  color: var(--projection-color);
   text-shadow:
     0 0 calc(6px * var(--glow-strength)) currentColor,
     0 0 calc(18px * var(--glow-strength)) currentColor;
