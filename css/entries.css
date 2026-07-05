@@ -134,3 +134,6 @@
 .entry:not(.expanded):not(.panel) .meta {
   display: none;
 }
+.entry:not(.expanded):not(.panel) .entry-content > .meta {
+  display: none !important;
+}
