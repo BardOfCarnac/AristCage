@@ -153,6 +153,13 @@
 .body.energy-down {
   animation: energy-down var(--dismiss-speed, .45s) ease-in both;
 }
+.priority.energy-up {
+  animation: solid-energy-up var(--resolve-speed, .55s) ease-out both;
+}
+
+.priority.energy-down {
+  animation: solid-energy-down var(--dismiss-speed, .45s) ease-in both;
+}
 
 /* Solid surfaces */
 .priority.energy-up {
