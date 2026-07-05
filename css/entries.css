@@ -131,3 +131,6 @@
 .entry.panel .body {
   padding-top: 12px;
 }
+.entry:not(.expanded):not(.panel) .meta {
+  display: none;
+}
