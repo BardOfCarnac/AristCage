@@ -2,54 +2,12 @@
   PRESENCE
 ==================================================*/
 
-const GLOW_DOWN_TIME = 700;
-const FADE_OUT_TIME = 480;
-const RESOLVE_STAGGER = 60;
-
 function resolve(objects) {
-  const items = objects.filter(Boolean);
-
-  items.forEach((object, index) => {
-    setTimeout(() => {
-      object.classList.remove("leaving", "energy-down", "energy-up");
-      object.classList.add("present");
-
-      requestAnimationFrame(() => {
-        object.classList.add("energy-up");
-      });
-    }, index * RESOLVE_STAGGER);
-  });
+  Projection.resolve(objects);
 }
 
 function dismiss(objects, onComplete) {
-  const items = objects.filter(Boolean);
-
-  if (!items.length) {
-    if (typeof onComplete === "function") onComplete();
-    return;
-  }
-
-  items.forEach(object => {
-    object.classList.remove("energy-up");
-    object.classList.add("energy-down");
-  });
-
-  setTimeout(() => {
-    items.forEach(object => {
-      object.classList.remove("present");
-      object.classList.add("leaving");
-    });
-
-    setTimeout(() => {
-      items.forEach(object => {
-        object.classList.remove("energy-down");
-      });
-
-      if (typeof onComplete === "function") {
-        onComplete();
-      }
-    }, FADE_OUT_TIME);
-  }, GLOW_DOWN_TIME);
+  Projection.dismiss(objects, onComplete);
 }
 
 /*==================================================
