@@ -6,7 +6,8 @@ const NCN_CONFIG = {
   motion: {
     reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     resolveStagger: 60,
-    dismissDuration: 450,
+    // Must be at least as long as the slowest energy-down animation.
+    dismissDuration: 600,
     displacedResolveDelay: 180
   },
   projection: {
