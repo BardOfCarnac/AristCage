@@ -28,11 +28,12 @@ function render() {
     output.push(createPanelEntry(NCN_STATE.activePanel));
   }
 
-  output.push(...NCN_ENTRIES);
+  const visibleEntries = getVisibleEntries();
+  output.push(...visibleEntries);
 
-  feed.innerHTML = output
-    .map(entryMarkup)
-    .join("");
+  feed.innerHTML = output.length
+    ? output.map(entryMarkup).join("")
+    : `<div class="empty-state">No transmissions match the current filter.</div>`;
 }
 
 /*==================================================
@@ -69,6 +70,46 @@ function entryMarkup(entry) {
 }
 
 /*==================================================
+  FILTER MARKUP
+==================================================*/
+
+function filterChecks(group, values) {
+  const selected = NCN_STATE.filters[group];
+
+  return values.map(value => `
+    <label>
+      <input
+        type="checkbox"
+        name="${escapeHTML(group)}"
+        value="${escapeHTML(value)}"
+        ${selected.has(value) ? "checked" : ""}
+      >
+      ${escapeHTML(value)}
+    </label>
+  `).join("");
+}
+
+function selectedCount(group) {
+  return NCN_STATE.filters[group].size;
+}
+
+function filterGroup(group, label) {
+  const values = NCN_FILTER_OPTIONS[group];
+
+  return `
+<details class="filter-group">
+  <summary>
+    <span>${escapeHTML(label)}</span>
+    <span class="filter-count">${selectedCount(group)}/${values.length}</span>
+  </summary>
+  <div class="filter-options">
+    ${filterChecks(group, values)}
+  </div>
+</details>
+`;
+}
+
+/*==================================================
   PANEL
 ==================================================*/
 
@@ -81,62 +122,36 @@ function createPanelEntry(type) {
     meta: "Filter Mode",
     tags: "Category // Area // Priority // Source // Time",
     body: `
-<form class="panel-fields panel-form" aria-label="Feed filters">
-  <fieldset class="panel-section">
-    <legend>Search</legend>
-    <input type="search" name="search" placeholder="Search headlines and reports">
-  </fieldset>
+<form class="panel-fields panel-form filter-form" aria-label="Feed filters">
+  <label class="field-label filter-search">
+    Search
+    <input
+      type="search"
+      name="search"
+      value="${escapeHTML(NCN_STATE.filters.search)}"
+      placeholder="Search headlines and reports"
+    >
+  </label>
 
-  <div class="panel-grid">
-    <fieldset class="panel-section">
-      <legend>Category</legend>
-      <label><input type="checkbox" checked> Business</label>
-      <label><input type="checkbox" checked> Community</label>
-      <label><input type="checkbox" checked> Crime</label>
-      <label><input type="checkbox" checked> Infrastructure</label>
-      <label><input type="checkbox" checked> Politics</label>
-      <label><input type="checkbox" checked> Culture</label>
-    </fieldset>
-
-    <fieldset class="panel-section">
-      <legend>Area</legend>
-      <label><input type="checkbox" checked> City Core</label>
-      <label><input type="checkbox" checked> Urban Sprawl</label>
-      <label><input type="checkbox" checked> Industrial Fringe</label>
-      <label><input type="checkbox" checked> Private Enclave</label>
-      <label><input type="checkbox" checked> Frontier Zone</label>
-    </fieldset>
-
-    <fieldset class="panel-section">
-      <legend>Priority</legend>
-      <label><input type="checkbox" checked> Bulletin</label>
-      <label><input type="checkbox" checked> Advisory</label>
-      <label><input type="checkbox" checked> Alert</label>
-      <label><input type="checkbox" checked> Warning</label>
-      <label><input type="checkbox" checked> Emergency</label>
-    </fieldset>
-
-    <fieldset class="panel-section">
-      <legend>Source</legend>
-      <label><input type="checkbox" checked> Corporate</label>
-      <label><input type="checkbox" checked> Civic Notice</label>
-      <label><input type="checkbox" checked> Press Report</label>
-      <label><input type="checkbox" checked> Eyewitness</label>
-      <label><input type="checkbox" checked> Scanner Traffic</label>
-      <label><input type="checkbox" checked> Anonymous Leak</label>
-      <label><input type="checkbox" checked> Underground</label>
-    </fieldset>
+  <div class="filter-groups">
+    ${filterGroup("category", "Category")}
+    ${filterGroup("area", "Area")}
+    ${filterGroup("priority", "Priority")}
+    ${filterGroup("sourceType", "Source")}
   </div>
 
-  <fieldset class="panel-section panel-section-inline">
+  <fieldset class="panel-section panel-section-inline filter-time">
     <legend>Time</legend>
-    <label><input type="radio" name="time" checked> Now</label>
-    <label><input type="radio" name="time"> Last Day</label>
-    <label><input type="radio" name="time"> All Time</label>
+    ${["Now", "Last Day", "All Time"].map(value => `
+      <label>
+        <input type="radio" name="time" value="${value}" ${NCN_STATE.filters.time === value ? "checked" : ""}>
+        ${value}
+      </label>
+    `).join("")}
   </fieldset>
 
   <div class="panel-actions">
-    <button type="button">Apply Filters</button>
+    <button type="submit">Apply Filters</button>
     <button type="reset" class="secondary-action">Reset</button>
   </div>
 </form>
@@ -154,69 +169,18 @@ function createPanelEntry(type) {
 <form class="panel-fields panel-form" aria-label="Submit report">
   <fieldset class="panel-section">
     <legend>Report</legend>
-    <label class="field-label">
-      Headline
-      <input name="headline" placeholder="Headline" required>
-    </label>
-    <label class="field-label">
-      Signal body
-      <textarea name="body" placeholder="Body text"></textarea>
-    </label>
+    <label class="field-label">Headline<input name="headline" placeholder="Headline" required></label>
+    <label class="field-label">Signal body<textarea name="body" placeholder="Body text"></textarea></label>
   </fieldset>
 
   <div class="panel-grid compact-grid">
-    <label class="field-label">
-      Category
-      <select name="category">
-        <option>Business</option>
-        <option>Community</option>
-        <option>Crime</option>
-        <option>Infrastructure</option>
-        <option>Politics</option>
-        <option>Culture</option>
-      </select>
-    </label>
-
-    <label class="field-label">
-      Area
-      <select name="area">
-        <option>City Core</option>
-        <option>Urban Sprawl</option>
-        <option>Industrial Fringe</option>
-        <option>Private Enclave</option>
-        <option>Frontier Zone</option>
-      </select>
-    </label>
-
-    <label class="field-label">
-      Source type
-      <select name="sourceType">
-        <option>Corporate</option>
-        <option>Civic Notice</option>
-        <option>Press Report</option>
-        <option>Eyewitness</option>
-        <option>Scanner Traffic</option>
-        <option>Anonymous Leak</option>
-        <option>Underground</option>
-      </select>
-    </label>
-
-    <label class="field-label">
-      Priority
-      <select name="priority">
-        <option>Bulletin</option>
-        <option>Advisory</option>
-        <option>Alert</option>
-        <option>Warning</option>
-        <option>Emergency</option>
-      </select>
-    </label>
+    <label class="field-label">Category<select name="category">${NCN_FILTER_OPTIONS.category.map(value => `<option>${value}</option>`).join("")}</select></label>
+    <label class="field-label">Area<select name="area">${NCN_FILTER_OPTIONS.area.map(value => `<option>${value}</option>`).join("")}</select></label>
+    <label class="field-label">Source type<select name="sourceType">${NCN_FILTER_OPTIONS.sourceType.map(value => `<option>${value}</option>`).join("")}</select></label>
+    <label class="field-label">Priority<select name="priority">${NCN_FILTER_OPTIONS.priority.map(value => `<option>${value}</option>`).join("")}</select></label>
   </div>
 
-  <label class="field-label">
-    Source
-    <input name="source" placeholder="Name, outlet, scanner or anonymous handle">
-  </label>
+  <label class="field-label">Source<input name="source" placeholder="Name, outlet, scanner or anonymous handle"></label>
 
   <div class="panel-actions">
     <button type="button">Transmit</button>
