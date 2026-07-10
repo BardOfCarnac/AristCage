@@ -1,13 +1,73 @@
 /*==================================================
-  PANEL FIELDS
+  PANEL LAYOUT
 ==================================================*/
 
 .panel-fields {
+  display: grid;
+  gap: 14px;
+}
 
-    display: grid;
+.panel-form {
+  max-width: 68rem;
+}
 
-    gap: 10px;
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 12px;
+}
 
+.compact-grid {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.panel-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 70, 40, .18);
+  background:
+    linear-gradient(135deg, rgba(255, 70, 40, .035), transparent 60%),
+    rgba(0, 0, 0, .16);
+}
+
+.panel-section legend {
+  padding: 0 6px;
+  color: var(--orange);
+  font-size: .68rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.panel-section-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+}
+
+.field-label {
+  display: grid;
+  gap: 6px;
+  color: var(--orange);
+  font-size: .68rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.panel-note {
+  color: rgba(255, 180, 120, .58);
+  font-size: .72rem;
+  letter-spacing: .08em;
 }
 
 /*==================================================
@@ -17,73 +77,53 @@
 .panel-fields input,
 .panel-fields textarea,
 .panel-fields select {
-
-    width: 100%;
-
-    padding:
-
-        8px
-        10px;
-
-    border: 1px solid rgba(255,70,40,.24);
-
-    background: transparent;
-
-    color: var(--amber);
-
-    font-family: var(--font-main);
-
-    font-size: .9rem;
-
-    outline: none;
-
-    transition:
-
-        border-color .2s,
-        box-shadow .2s,
-        color .2s;
-
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 70, 40, .28);
+  border-radius: 0;
+  background: rgba(0, 0, 0, .28);
+  color: var(--amber);
+  font-family: var(--font-main);
+  font-size: .9rem;
+  outline: none;
+  transition:
+    border-color .2s,
+    box-shadow .2s,
+    color .2s,
+    background-color .2s;
 }
-
-/*==================================================
-  TEXTAREA
-==================================================*/
 
 .panel-fields textarea {
-
-    min-height: 120px;
-
-    resize: vertical;
-
+  min-height: 140px;
+  resize: vertical;
 }
 
-/*==================================================
-  PLACEHOLDERS
-==================================================*/
+.panel-fields select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--orange) 50%),
+    linear-gradient(135deg, var(--orange) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) calc(50% - 2px),
+    calc(100% - 10px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
 
 .panel-fields input::placeholder,
 .panel-fields textarea::placeholder {
-
-    color: rgba(255,180,120,.45);
-
-    letter-spacing: .08em;
-
+  color: rgba(255, 180, 120, .42);
+  letter-spacing: .05em;
 }
-
-/*==================================================
-  FOCUS
-==================================================*/
 
 .panel-fields input:focus,
 .panel-fields textarea:focus,
 .panel-fields select:focus {
-
-    border-color: var(--orange);
-
-    box-shadow:
-
-        0 0 8px rgba(255,140,60,.20);
-
+  border-color: var(--orange);
+  background-color: rgba(255, 70, 40, .035);
+  box-shadow:
+    0 0 8px rgba(255, 140, 60, .2),
+    inset 0 0 12px rgba(255, 70, 40, .035);
 }
 
 /*==================================================
@@ -91,88 +131,65 @@
 ==================================================*/
 
 .panel-fields button {
-
-    justify-self: start;
-
-    padding:
-
-        8px
-        18px;
-
-    border: 1px solid rgba(255,70,40,.30);
-
-    background: transparent;
-
-    color: var(--orange);
-
-    cursor: pointer;
-
-    font-family: var(--font-main);
-
-    letter-spacing: .12em;
-
-    text-transform: uppercase;
-
-    transition:
-
-        color .2s,
-        border-color .2s,
-        box-shadow .2s;
-
+  justify-self: start;
+  padding: 9px 18px;
+  border: 1px solid rgba(255, 70, 40, .34);
+  background: rgba(255, 70, 40, .025);
+  color: var(--orange);
+  cursor: pointer;
+  font-family: var(--font-main);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  transition:
+    color .2s,
+    border-color .2s,
+    box-shadow .2s,
+    background-color .2s;
 }
 
-.panel-fields button:hover {
+.panel-fields button:hover,
+.panel-fields button:focus-visible {
+  color: var(--white);
+  border-color: var(--orange);
+  background-color: rgba(255, 70, 40, .06);
+  box-shadow: 0 0 12px rgba(255, 140, 70, .25);
+}
 
-    color: var(--white);
-
-    border-color: var(--orange);
-
-    box-shadow:
-
-        0 0 12px rgba(255,140,70,.25);
-
+.panel-fields .secondary-action {
+  color: var(--amber);
+  border-color: rgba(255, 180, 100, .18);
 }
 
 /*==================================================
-  CHECKBOXES
+  CHECKS AND RADIOS
 ==================================================*/
 
-.panel-fields label {
-
-    display: flex;
-
-    gap: 8px;
-
-    align-items: center;
-
-    color: var(--amber);
-
-    cursor: pointer;
-
+.panel-fields label:not(.field-label) {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--amber);
+  cursor: pointer;
+  font-size: .82rem;
+  letter-spacing: .04em;
 }
 
-.panel-fields input[type="checkbox"] {
-
-    width: auto;
-
+.panel-fields input[type="checkbox"],
+.panel-fields input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  padding: 0;
+  accent-color: var(--orange);
 }
 
-/*==================================================
-  FUTURE
-==================================================*/
+@media (max-width: 600px) {
+  .panel-grid,
+  .compact-grid {
+    grid-template-columns: 1fr;
+  }
 
-/*
-
-Tag selector
-
-Priority selector
-
-Image uploader
-
-RSS preview
-
-Location picker
-
-Live validation
-
-*/
+  .panel-section {
+    padding: 10px;
+  }
+}
