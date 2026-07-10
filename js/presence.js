@@ -44,34 +44,32 @@ function getDisplacedProjectionObjects(entries) {
 
 /*==================================================
   ENTRY CHANGE GROUPS
+
+  The changed card now powers down and resolves as one
+  ordered object group. This prevents the frame from
+  appearing at its resting colour before its contents.
 ==================================================*/
 
 function getExpandDismissObjects(entry, affectedEntries) {
   return [
-    entry.querySelector(".priority"),
+    ...getEntryCoreObjects(entry),
     ...getDisplacedProjectionObjects(affectedEntries)
   ].filter(Boolean);
 }
 
 function getExpandResolveObjects(entry) {
-  return [
-    entry.querySelector(".priority"),
-    getEntryBodyObject(entry)
-  ].filter(Boolean);
+  return getVisibleProjectionObjects(entry);
 }
 
 function getCollapseDismissObjects(entry, affectedEntries) {
   return [
-    entry.querySelector(".priority"),
-    getEntryBodyObject(entry),
+    ...getVisibleProjectionObjects(entry),
     ...getDisplacedProjectionObjects(affectedEntries)
   ].filter(Boolean);
 }
 
 function getCollapseResolveObjects(entry) {
-  return [
-    entry.querySelector(".priority")
-  ].filter(Boolean);
+  return getEntryCoreObjects(entry);
 }
 
 /*==================================================
