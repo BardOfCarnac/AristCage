@@ -6,12 +6,7 @@
 .priority {
   opacity: 0;
   transition:
-    opacity .45s ease,
-    color .35s ease,
-    background-color .35s ease,
-    border-color .35s ease,
-    box-shadow .35s ease,
-    filter .35s ease,
+    opacity .2s ease,
     transform .12s linear;
 }
 
@@ -23,7 +18,7 @@
 .priority.leaving,
 .priority.energy-up,
 .priority.energy-down {
-  will-change: opacity, color, background-color, box-shadow, filter, transform;
+  will-change: opacity, color, background-color, border-color, box-shadow, filter, text-shadow, transform;
 }
 
 /*==================================================
@@ -77,74 +72,124 @@
 ==================================================*/
 
 @keyframes energy-up {
-  0%   { color: var(--energy-0); }
-  10%  { color: var(--energy-1); }
-  20%  { color: var(--energy-2); }
-  30%  { color: var(--energy-3); }
-  40%  { color: var(--energy-4); }
-  50%  { color: var(--energy-5); }
-  60%  { color: var(--energy-6); }
-  70%  { color: var(--energy-7); }
-  82%  { color: var(--energy-8); }
-  92%  { color: var(--energy-9); }
-  100% { color: var(--projection-color); }
+  0% {
+    opacity: 0;
+    color: var(--energy-0);
+    text-shadow: none;
+    filter: brightness(.35);
+  }
+  35% {
+    opacity: .72;
+    color: var(--energy-6);
+    text-shadow: 0 0 4px currentColor;
+    filter: brightness(1.6);
+  }
+  72% {
+    opacity: 1;
+    color: var(--energy-9);
+    text-shadow:
+      0 0 calc(10px * var(--glow-strength)) currentColor,
+      0 0 calc(28px * var(--glow-strength)) currentColor;
+    filter: brightness(1.25);
+  }
+  100% {
+    opacity: 1;
+    color: var(--projection-color);
+    text-shadow:
+      0 0 calc(6px * var(--glow-strength)) currentColor,
+      0 0 calc(18px * var(--glow-strength)) currentColor;
+    filter: brightness(1);
+  }
 }
 
 @keyframes energy-down {
-  0%   { color: var(--projection-color); }
-  10%  { color: var(--energy-9); }
-  20%  { color: var(--energy-8); }
-  30%  { color: var(--energy-7); }
-  40%  { color: var(--energy-6); }
-  50%  { color: var(--energy-5); }
-  60%  { color: var(--energy-4); }
-  70%  { color: var(--energy-3); }
-  80%  { color: var(--energy-2); }
-  90%  { color: var(--energy-1); }
-  100% { color: var(--energy-0); }
+  0% {
+    opacity: 1;
+    color: var(--projection-color);
+    text-shadow:
+      0 0 calc(6px * var(--glow-strength)) currentColor,
+      0 0 calc(18px * var(--glow-strength)) currentColor;
+    filter: brightness(1);
+  }
+  35% {
+    opacity: 1;
+    color: var(--energy-8);
+    text-shadow:
+      0 0 calc(12px * var(--glow-strength)) currentColor,
+      0 0 calc(34px * var(--glow-strength)) currentColor;
+    filter: brightness(1.45);
+  }
+  72% {
+    opacity: .55;
+    color: var(--energy-3);
+    text-shadow: 0 0 5px currentColor;
+    filter: brightness(.75);
+  }
+  100% {
+    opacity: 0;
+    color: var(--energy-0);
+    text-shadow: none;
+    filter: brightness(.25);
+  }
 }
 
 @keyframes solid-energy-up {
   0% {
+    opacity: 0;
     background-color: var(--energy-0);
-    box-shadow: 0 0 2px rgba(255, 56, 40, .08);
+    box-shadow: none;
   }
-  45% {
-    background-color: var(--energy-4);
-    box-shadow: 0 0 6px rgba(255, 56, 40, .28);
-  }
-  75% {
+  50% {
+    opacity: 1;
     background-color: var(--energy-7);
+    box-shadow: 0 0 18px var(--energy-7);
+  }
+  78% {
+    background-color: var(--energy-9);
     box-shadow:
-      0 0 10px currentColor,
-      0 0 20px rgba(255, 138, 52, .28);
+      0 0 14px var(--energy-9),
+      0 0 36px rgba(255, 138, 52, .38);
   }
   100% {
+    opacity: 1;
     background-color: var(--projection-color);
     box-shadow:
-      0 0 10px currentColor,
-      0 0 24px currentColor,
-      0 0 52px rgba(255, 180, 100, .22);
+      0 0 calc(8px * var(--glow-strength)) var(--projection-color),
+      0 0 calc(20px * var(--glow-strength)) var(--projection-color),
+      0 0 calc(42px * var(--glow-strength)) rgba(255, 138, 52, .18);
   }
 }
 
 @keyframes solid-energy-down {
-  0% { background-color: var(--projection-color); }
-  45% { background-color: var(--energy-7); }
-  75% { background-color: var(--energy-4); }
-  100% { background-color: var(--energy-0); }
+  0% {
+    opacity: 1;
+    background-color: var(--projection-color);
+  }
+  45% {
+    opacity: 1;
+    background-color: var(--energy-8);
+    box-shadow: 0 0 22px var(--energy-8);
+  }
+  100% {
+    opacity: 0;
+    background-color: var(--energy-0);
+    box-shadow: none;
+  }
 }
 
 @keyframes line-energy-up {
   0% {
+    opacity: 0;
     border-color: var(--energy-0);
     box-shadow: none;
   }
   60% {
+    opacity: 1;
     border-color: var(--energy-7);
     box-shadow: 0 0 14px var(--energy-7);
   }
   100% {
+    opacity: 1;
     border-color: var(--projection-color);
     box-shadow: 0 0 calc(8px * var(--glow-strength)) var(--projection-color);
   }
@@ -152,10 +197,16 @@
 
 @keyframes line-energy-down {
   0% {
+    opacity: 1;
     border-color: var(--projection-color);
     box-shadow: 0 0 calc(8px * var(--glow-strength)) var(--projection-color);
   }
+  45% {
+    border-color: var(--energy-7);
+    box-shadow: 0 0 16px var(--energy-7);
+  }
   100% {
+    opacity: 0;
     border-color: var(--energy-0);
     box-shadow: none;
   }
@@ -195,17 +246,13 @@
   PRESENCE
 ==================================================*/
 
-.present {
+.present,
+.leaving {
   opacity: 1;
 }
 
-.leaving,
 .gone {
   opacity: 0;
-}
-
-.body.present {
-  filter: blur(0);
 }
 
 /*==================================================
@@ -223,17 +270,16 @@
 }
 
 .priority {
-  background-color: var(--live-energy, var(--projection-color));
+  background-color: var(--projection-color);
   box-shadow:
-    0 0 calc(8px * var(--glow-strength)) var(--live-energy, var(--projection-color)),
-    0 0 calc(20px * var(--glow-strength)) var(--live-energy, var(--projection-color)),
+    0 0 calc(8px * var(--glow-strength)) var(--projection-color),
+    0 0 calc(20px * var(--glow-strength)) var(--projection-color),
     0 0 calc(42px * var(--glow-strength)) rgba(255, 138, 52, .18);
 }
 
 .frame {
-  border-color: var(--live-energy, var(--projection-color));
-  box-shadow:
-    0 0 calc(8px * var(--glow-strength)) var(--live-energy, var(--projection-color));
+  border-color: var(--projection-color);
+  box-shadow: 0 0 calc(8px * var(--glow-strength)) var(--projection-color);
 }
 
 /*==================================================
@@ -272,7 +318,12 @@
 
   .part,
   .priority,
-  .present {
+  .present,
+  .leaving {
     opacity: 1;
+  }
+
+  .gone {
+    opacity: 0;
   }
 }
