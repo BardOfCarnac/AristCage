@@ -23,9 +23,16 @@
 
 /*==================================================
   PROJECTION PROFILES
+
+  Each object has its own colour ladder. Nothing is
+  allowed to overshoot into yellow or white unless
+  that is the object's actual final colour.
 ==================================================*/
 
 .frame {
+  --projection-step-0: var(--energy-0);
+  --projection-step-1: var(--energy-1);
+  --projection-step-2: var(--energy-2);
   --projection-color: var(--energy-3);
   --resolve-speed: .75s;
   --dismiss-speed: .55s;
@@ -33,6 +40,9 @@
 }
 
 .priority {
+  --projection-step-0: var(--energy-0);
+  --projection-step-1: var(--energy-2);
+  --projection-step-2: var(--energy-4);
   --projection-color: var(--red);
   --resolve-speed: .65s;
   --dismiss-speed: .55s;
@@ -40,6 +50,9 @@
 }
 
 .meta {
+  --projection-step-0: var(--energy-0);
+  --projection-step-1: var(--energy-2);
+  --projection-step-2: var(--energy-4);
   --projection-color: var(--orange);
   --resolve-speed: .5s;
   --dismiss-speed: .38s;
@@ -47,6 +60,9 @@
 }
 
 .headline {
+  --projection-step-0: var(--energy-0);
+  --projection-step-1: var(--energy-3);
+  --projection-step-2: var(--energy-7);
   --projection-color: var(--white);
   --resolve-speed: .42s;
   --dismiss-speed: .32s;
@@ -54,6 +70,9 @@
 }
 
 .tags {
+  --projection-step-0: var(--energy-0);
+  --projection-step-1: var(--energy-2);
+  --projection-step-2: var(--energy-5);
   --projection-color: var(--amber);
   --resolve-speed: .55s;
   --dismiss-speed: .4s;
@@ -61,6 +80,9 @@
 }
 
 .body {
+  --projection-step-0: var(--energy-0);
+  --projection-step-1: var(--energy-3);
+  --projection-step-2: var(--energy-6);
   --projection-color: var(--gold);
   --resolve-speed: .7s;
   --dismiss-speed: .5s;
@@ -68,29 +90,29 @@
 }
 
 /*==================================================
-  ENERGY STATES
+  TEXT ENERGY
 ==================================================*/
 
 @keyframes energy-up {
   0% {
     opacity: 0;
-    color: var(--energy-0);
+    color: var(--projection-step-0);
     text-shadow: none;
-    filter: brightness(.35);
+    filter: brightness(.45);
   }
-  35% {
-    opacity: .72;
-    color: var(--energy-6);
-    text-shadow: 0 0 4px currentColor;
-    filter: brightness(1.6);
+  34% {
+    opacity: .45;
+    color: var(--projection-step-1);
+    text-shadow: 0 0 3px currentColor;
+    filter: brightness(.7);
   }
-  72% {
-    opacity: 1;
-    color: var(--energy-9);
+  68% {
+    opacity: .82;
+    color: var(--projection-step-2);
     text-shadow:
-      0 0 calc(10px * var(--glow-strength)) currentColor,
-      0 0 calc(28px * var(--glow-strength)) currentColor;
-    filter: brightness(1.25);
+      0 0 calc(4px * var(--glow-strength)) currentColor,
+      0 0 calc(10px * var(--glow-strength)) currentColor;
+    filter: brightness(.9);
   }
   100% {
     opacity: 1;
@@ -111,44 +133,47 @@
       0 0 calc(18px * var(--glow-strength)) currentColor;
     filter: brightness(1);
   }
-  35% {
-    opacity: 1;
-    color: var(--energy-8);
+  34% {
+    opacity: .82;
+    color: var(--projection-step-2);
     text-shadow:
-      0 0 calc(12px * var(--glow-strength)) currentColor,
-      0 0 calc(34px * var(--glow-strength)) currentColor;
-    filter: brightness(1.45);
+      0 0 calc(4px * var(--glow-strength)) currentColor,
+      0 0 calc(10px * var(--glow-strength)) currentColor;
+    filter: brightness(.9);
   }
-  72% {
-    opacity: .55;
-    color: var(--energy-3);
-    text-shadow: 0 0 5px currentColor;
-    filter: brightness(.75);
+  68% {
+    opacity: .45;
+    color: var(--projection-step-1);
+    text-shadow: 0 0 3px currentColor;
+    filter: brightness(.7);
   }
   100% {
     opacity: 0;
-    color: var(--energy-0);
+    color: var(--projection-step-0);
     text-shadow: none;
-    filter: brightness(.25);
+    filter: brightness(.45);
   }
 }
+
+/*==================================================
+  SOLID ENERGY
+==================================================*/
 
 @keyframes solid-energy-up {
   0% {
     opacity: 0;
-    background-color: var(--energy-0);
+    background-color: var(--projection-step-0);
     box-shadow: none;
   }
-  50% {
-    opacity: 1;
-    background-color: var(--energy-7);
-    box-shadow: 0 0 18px var(--energy-7);
+  34% {
+    opacity: .45;
+    background-color: var(--projection-step-1);
+    box-shadow: 0 0 4px currentColor;
   }
-  78% {
-    background-color: var(--energy-9);
-    box-shadow:
-      0 0 14px var(--energy-9),
-      0 0 36px rgba(255, 138, 52, .38);
+  68% {
+    opacity: .82;
+    background-color: var(--projection-step-2);
+    box-shadow: 0 0 calc(10px * var(--glow-strength)) var(--projection-step-2);
   }
   100% {
     opacity: 1;
@@ -156,7 +181,7 @@
     box-shadow:
       0 0 calc(8px * var(--glow-strength)) var(--projection-color),
       0 0 calc(20px * var(--glow-strength)) var(--projection-color),
-      0 0 calc(42px * var(--glow-strength)) rgba(255, 138, 52, .18);
+      0 0 calc(42px * var(--glow-strength)) rgba(255, 56, 40, .18);
   }
 }
 
@@ -164,29 +189,46 @@
   0% {
     opacity: 1;
     background-color: var(--projection-color);
+    box-shadow:
+      0 0 calc(8px * var(--glow-strength)) var(--projection-color),
+      0 0 calc(20px * var(--glow-strength)) var(--projection-color);
   }
-  45% {
-    opacity: 1;
-    background-color: var(--energy-8);
-    box-shadow: 0 0 22px var(--energy-8);
+  34% {
+    opacity: .82;
+    background-color: var(--projection-step-2);
+    box-shadow: 0 0 calc(10px * var(--glow-strength)) var(--projection-step-2);
+  }
+  68% {
+    opacity: .45;
+    background-color: var(--projection-step-1);
+    box-shadow: 0 0 4px currentColor;
   }
   100% {
     opacity: 0;
-    background-color: var(--energy-0);
+    background-color: var(--projection-step-0);
     box-shadow: none;
   }
 }
 
+/*==================================================
+  LINE ENERGY
+==================================================*/
+
 @keyframes line-energy-up {
   0% {
     opacity: 0;
-    border-color: var(--energy-0);
+    border-color: var(--projection-step-0);
     box-shadow: none;
   }
-  60% {
-    opacity: 1;
-    border-color: var(--energy-7);
-    box-shadow: 0 0 14px var(--energy-7);
+  34% {
+    opacity: .45;
+    border-color: var(--projection-step-1);
+    box-shadow: 0 0 3px var(--projection-step-1);
+  }
+  68% {
+    opacity: .82;
+    border-color: var(--projection-step-2);
+    box-shadow: 0 0 calc(6px * var(--glow-strength)) var(--projection-step-2);
   }
   100% {
     opacity: 1;
@@ -201,13 +243,19 @@
     border-color: var(--projection-color);
     box-shadow: 0 0 calc(8px * var(--glow-strength)) var(--projection-color);
   }
-  45% {
-    border-color: var(--energy-7);
-    box-shadow: 0 0 16px var(--energy-7);
+  34% {
+    opacity: .82;
+    border-color: var(--projection-step-2);
+    box-shadow: 0 0 calc(6px * var(--glow-strength)) var(--projection-step-2);
+  }
+  68% {
+    opacity: .45;
+    border-color: var(--projection-step-1);
+    box-shadow: 0 0 3px var(--projection-step-1);
   }
   100% {
     opacity: 0;
-    border-color: var(--energy-0);
+    border-color: var(--projection-step-0);
     box-shadow: none;
   }
 }
@@ -216,30 +264,30 @@
 .headline.energy-up,
 .tags.energy-up,
 .body.energy-up {
-  animation: energy-up var(--resolve-speed, .55s) ease-out both;
+  animation: energy-up var(--resolve-speed, .55s) linear both;
 }
 
 .meta.energy-down,
 .headline.energy-down,
 .tags.energy-down,
 .body.energy-down {
-  animation: energy-down var(--dismiss-speed, .45s) ease-in both;
+  animation: energy-down var(--dismiss-speed, .45s) linear both;
 }
 
 .priority.energy-up {
-  animation: solid-energy-up var(--resolve-speed, .55s) ease-out both;
+  animation: solid-energy-up var(--resolve-speed, .55s) linear both;
 }
 
 .priority.energy-down {
-  animation: solid-energy-down var(--dismiss-speed, .45s) ease-in both;
+  animation: solid-energy-down var(--dismiss-speed, .45s) linear both;
 }
 
 .frame.energy-up {
-  animation: line-energy-up var(--resolve-speed, .55s) ease-out both;
+  animation: line-energy-up var(--resolve-speed, .55s) linear both;
 }
 
 .frame.energy-down {
-  animation: line-energy-down var(--dismiss-speed, .45s) ease-in both;
+  animation: line-energy-down var(--dismiss-speed, .45s) linear both;
 }
 
 /*==================================================
@@ -256,7 +304,7 @@
 }
 
 /*==================================================
-  ENERGY EXPRESSION
+  RESTING ENERGY EXPRESSION
 ==================================================*/
 
 .meta,
@@ -274,7 +322,7 @@
   box-shadow:
     0 0 calc(8px * var(--glow-strength)) var(--projection-color),
     0 0 calc(20px * var(--glow-strength)) var(--projection-color),
-    0 0 calc(42px * var(--glow-strength)) rgba(255, 138, 52, .18);
+    0 0 calc(42px * var(--glow-strength)) rgba(255, 56, 40, .18);
 }
 
 .frame {
