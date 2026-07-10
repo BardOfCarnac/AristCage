@@ -3,10 +3,6 @@
 ==================================================*/
 
 const Projection = (() => {
-
-  const RESOLVE_STAGGER = 60;
-  const DISMISS_TIME = 450;
-
   const lifecycleClasses = [
     "entering",
     "present",
@@ -16,13 +12,40 @@ const Projection = (() => {
     "energy-down"
   ];
 
+  const timers = new WeakMap();
+
+  function clearTimer(object) {
+    const timer = timers.get(object);
+    if (timer) window.clearTimeout(timer);
+    timers.delete(object);
+  }
+
+  function schedule(object, callback, delay) {
+    clearTimer(object);
+
+    if (NCN_CONFIG.motion.reduced || delay <= 0) {
+      callback();
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      timers.delete(object);
+      callback();
+    }, delay);
+
+    timers.set(object, timer);
+  }
+
   function clean(object) {
+    if (!object) return;
+    clearTimer(object);
     object.classList.remove(...lifecycleClasses);
   }
 
   function enter(object) {
     if (!object) return;
 
+    clearTimer(object);
     object.classList.remove("leaving", "gone", "energy-down");
     object.classList.add("entering", "present");
 
@@ -35,17 +58,19 @@ const Projection = (() => {
   function leave(object) {
     if (!object) return;
 
+    clearTimer(object);
     object.classList.remove("entering", "energy-up", "present");
     object.classList.add("leaving", "energy-down");
   }
 
   function resolve(objects) {
     const items = objects.filter(Boolean);
+    const stagger = NCN_CONFIG.motion.reduced
+      ? 0
+      : NCN_CONFIG.motion.resolveStagger;
 
     items.forEach((object, index) => {
-      setTimeout(() => {
-        enter(object);
-      }, index * RESOLVE_STAGGER);
+      schedule(object, () => enter(object), index * stagger);
     });
   }
 
@@ -59,14 +84,22 @@ const Projection = (() => {
 
     items.forEach(leave);
 
-    setTimeout(() => {
+    const finish = () => {
       items.forEach(object => {
+        clearTimer(object);
         object.classList.remove("leaving", "energy-down");
         object.classList.add("gone");
       });
 
       if (typeof onComplete === "function") onComplete();
-    }, DISMISS_TIME);
+    };
+
+    if (NCN_CONFIG.motion.reduced) {
+      finish();
+      return;
+    }
+
+    window.setTimeout(finish, NCN_CONFIG.motion.dismissDuration);
   }
 
   return {
@@ -76,5 +109,4 @@ const Projection = (() => {
     resolve,
     dismiss
   };
-
 })();
