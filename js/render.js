@@ -50,6 +50,7 @@ function entryMarkup(entry) {
   data-entry-id="${escapeHTML(entry.id)}"
 >
   <div class="projection-plate">
+    <div class="card-field"></div>
     <div class="part frame"></div>
     <div class="part priority priority-${Number(entry.priority) || 1}"></div>
 
