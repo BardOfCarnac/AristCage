@@ -5,7 +5,6 @@
 .part,
 .priority {
   opacity: 0;
-
   transition:
     opacity .45s ease,
     color .35s ease,
@@ -14,7 +13,16 @@
     box-shadow .35s ease,
     filter .35s ease,
     transform .12s linear;
+}
 
+.part.entering,
+.part.leaving,
+.part.energy-up,
+.part.energy-down,
+.priority.entering,
+.priority.leaving,
+.priority.energy-up,
+.priority.energy-down {
   will-change: opacity, color, background-color, box-shadow, filter, transform;
 }
 
@@ -95,51 +103,64 @@
   90%  { color: var(--energy-1); }
   100% { color: var(--energy-0); }
 }
+
 @keyframes solid-energy-up {
   0% {
     background-color: var(--energy-0);
-    box-shadow: 0 0 2px rgba(255,56,40,.08);
+    box-shadow: 0 0 2px rgba(255, 56, 40, .08);
   }
-
   45% {
     background-color: var(--energy-4);
-    box-shadow: 0 0 6px rgba(255,56,40,.28);
+    box-shadow: 0 0 6px rgba(255, 56, 40, .28);
   }
-
   75% {
     background-color: var(--energy-7);
     box-shadow:
       0 0 10px currentColor,
-      0 0 20px rgba(255,138,52,.28);
+      0 0 20px rgba(255, 138, 52, .28);
   }
-
   100% {
     background-color: var(--projection-color);
     box-shadow:
       0 0 10px currentColor,
       0 0 24px currentColor,
-      0 0 52px rgba(255,180,100,.22);
+      0 0 52px rgba(255, 180, 100, .22);
   }
 }
 
 @keyframes solid-energy-down {
+  0% { background-color: var(--projection-color); }
+  45% { background-color: var(--energy-7); }
+  75% { background-color: var(--energy-4); }
+  100% { background-color: var(--energy-0); }
+}
+
+@keyframes line-energy-up {
   0% {
-    background-color: var(--projection-color);
+    border-color: var(--energy-0);
+    box-shadow: none;
   }
-
-  45% {
-    background-color: var(--energy-7);
+  60% {
+    border-color: var(--energy-7);
+    box-shadow: 0 0 14px var(--energy-7);
   }
-
-  75% {
-    background-color: var(--energy-4);
-  }
-
   100% {
-    background-color: var(--energy-0);
+    border-color: var(--projection-color);
+    box-shadow: 0 0 calc(8px * var(--glow-strength)) var(--projection-color);
   }
 }
-/* Text surfaces */
+
+@keyframes line-energy-down {
+  0% {
+    border-color: var(--projection-color);
+    box-shadow: 0 0 calc(8px * var(--glow-strength)) var(--projection-color);
+  }
+  100% {
+    border-color: var(--energy-0);
+    box-shadow: none;
+  }
+}
+
 .meta.energy-up,
 .headline.energy-up,
 .tags.energy-up,
@@ -153,6 +174,7 @@
 .body.energy-down {
   animation: energy-down var(--dismiss-speed, .45s) ease-in both;
 }
+
 .priority.energy-up {
   animation: solid-energy-up var(--resolve-speed, .55s) ease-out both;
 }
@@ -161,16 +183,6 @@
   animation: solid-energy-down var(--dismiss-speed, .45s) ease-in both;
 }
 
-/* Solid surfaces */
-.priority.energy-up {
-  animation: solid-energy-up var(--resolve-speed, .55s) ease-out both;
-}
-
-.priority.energy-down {
-  animation: solid-energy-down var(--dismiss-speed, .45s) ease-in both;
-}
-
-/* Line surfaces */
 .frame.energy-up {
   animation: line-energy-up var(--resolve-speed, .55s) ease-out both;
 }
@@ -187,7 +199,8 @@
   opacity: 1;
 }
 
-.leaving {
+.leaving,
+.gone {
   opacity: 0;
 }
 
@@ -199,7 +212,6 @@
   ENERGY EXPRESSION
 ==================================================*/
 
-/* Text-like projections */
 .meta,
 .headline,
 .tags,
@@ -210,20 +222,16 @@
     0 0 calc(18px * var(--glow-strength)) currentColor;
 }
 
-/* Solid bar projections */
 .priority {
   background-color: var(--live-energy, var(--projection-color));
-
   box-shadow:
     0 0 calc(8px * var(--glow-strength)) var(--live-energy, var(--projection-color)),
     0 0 calc(20px * var(--glow-strength)) var(--live-energy, var(--projection-color)),
-    0 0 calc(42px * var(--glow-strength)) rgba(255, 138, 52, 0.18);
+    0 0 calc(42px * var(--glow-strength)) rgba(255, 138, 52, .18);
 }
 
-/* Frame / panel-like projections */
 .frame {
   border-color: var(--live-energy, var(--projection-color));
-
   box-shadow:
     0 0 calc(8px * var(--glow-strength)) var(--live-energy, var(--projection-color));
 }
@@ -239,4 +247,32 @@
 .tags,
 .body {
   transform: translateY(var(--projection-y, 0px));
+}
+
+/*==================================================
+  REDUCED MOTION
+==================================================*/
+
+@media (prefers-reduced-motion: reduce) {
+  .part,
+  .priority,
+  .chamber::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .frame,
+  .priority,
+  .meta,
+  .headline,
+  .tags,
+  .body {
+    transform: none !important;
+  }
+
+  .part,
+  .priority,
+  .present {
+    opacity: 1;
+  }
 }
