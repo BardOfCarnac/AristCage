@@ -71,6 +71,73 @@
 }
 
 /*==================================================
+  COMPACT FILTER GROUPS
+==================================================*/
+
+.filter-form {
+  gap: 10px;
+}
+
+.filter-groups {
+  display: grid;
+  gap: 8px;
+}
+
+.filter-group {
+  border: 1px solid rgba(255, 70, 40, .18);
+  background: rgba(0, 0, 0, .14);
+}
+
+.filter-group summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  color: var(--orange);
+  cursor: pointer;
+  list-style: none;
+  font-size: .72rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.filter-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-group summary::after {
+  content: "+";
+  margin-left: auto;
+  color: var(--amber);
+}
+
+.filter-group[open] summary::after {
+  content: "−";
+}
+
+.filter-count {
+  color: rgba(255, 180, 120, .6);
+  font-size: .66rem;
+  letter-spacing: .08em;
+}
+
+.filter-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  padding: 0 12px 12px;
+}
+
+.filter-search input {
+  margin-top: 2px;
+}
+
+.filter-time {
+  padding: 10px 12px;
+}
+
+/*==================================================
   INPUTS
 ==================================================*/
 
@@ -191,5 +258,9 @@
 
   .panel-section {
     padding: 10px;
+  }
+
+  .filter-options {
+    grid-template-columns: 1fr;
   }
 }
