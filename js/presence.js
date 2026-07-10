@@ -24,6 +24,21 @@ function getEntryCoreObjects(entry) {
   ].filter(Boolean);
 }
 
+function getEntryIdentityObjects(entry) {
+  return [
+    entry.querySelector(".meta"),
+    entry.querySelector(".headline")
+  ].filter(Boolean);
+}
+
+function getEntryChangingObjects(entry) {
+  return [
+    entry.querySelector(".frame"),
+    entry.querySelector(".priority"),
+    entry.querySelector(".tags")
+  ].filter(Boolean);
+}
+
 function getEntryBodyObject(entry) {
   return entry.querySelector(".body");
 }
@@ -45,31 +60,37 @@ function getDisplacedProjectionObjects(entries) {
 /*==================================================
   ENTRY CHANGE GROUPS
 
-  The changed card now powers down and resolves as one
-  ordered object group. This prevents the frame from
-  appearing at its resting colour before its contents.
+  The headline and metadata form the persistent story
+  identity. They stay visible while the card frame,
+  priority, tags and body power down and rebuild around
+  them. Displaced stories still use the full projection
+  lifecycle while moving into their new positions.
 ==================================================*/
 
 function getExpandDismissObjects(entry, affectedEntries) {
   return [
-    ...getEntryCoreObjects(entry),
+    ...getEntryChangingObjects(entry),
     ...getDisplacedProjectionObjects(affectedEntries)
   ].filter(Boolean);
 }
 
 function getExpandResolveObjects(entry) {
-  return getVisibleProjectionObjects(entry);
+  return [
+    ...getEntryChangingObjects(entry),
+    getEntryBodyObject(entry)
+  ].filter(Boolean);
 }
 
 function getCollapseDismissObjects(entry, affectedEntries) {
   return [
-    ...getVisibleProjectionObjects(entry),
+    ...getEntryChangingObjects(entry),
+    getEntryBodyObject(entry),
     ...getDisplacedProjectionObjects(affectedEntries)
   ].filter(Boolean);
 }
 
 function getCollapseResolveObjects(entry) {
-  return getEntryCoreObjects(entry);
+  return getEntryChangingObjects(entry);
 }
 
 /*==================================================
