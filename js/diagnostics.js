@@ -1,21 +1,18 @@
 /*==================================================
   PROJECTION DIAGNOSTICS
-
-  Enable with ?debug=1, Ctrl/Cmd+Shift+D, or triple-tap
-  the NCN mark. The preference is retained locally.
 ==================================================*/
 
 const NCN_DIAGNOSTICS_KEY = "ncn-diagnostics";
 const NCN_DIAGNOSTIC_LAYERS = [
-  { name: "Header", depth: 32, parallax: 0 },
+  { name: "Header", depth: 1.25 },
+  { name: "Corners", profile: "corners" },
   { name: "Headline", profile: "headline" },
   { name: "Meta", profile: "meta" },
-  { name: "Priority", profile: "priority" },
   { name: "Tags", profile: "tags" },
   { name: "Body", profile: "body" },
+  { name: "Priority", profile: "priority" },
   { name: "Frame", profile: "frame" },
-  { name: "Backing field", depth: -24, parallax: 0 },
-  { name: "Chamber", depth: -48, parallax: 0 }
+  { name: "Chamber", depth: -1 }
 ];
 
 let diagnosticsPanel;
@@ -39,9 +36,7 @@ function setDiagnosticsEnabled(enabled) {
 }
 
 function toggleDiagnostics() {
-  setDiagnosticsEnabled(
-    !document.documentElement.classList.contains("diagnostics-on")
-  );
+  setDiagnosticsEnabled(!document.documentElement.classList.contains("diagnostics-on"));
 }
 
 function energySpectrumMarkup() {
@@ -56,13 +51,15 @@ function energySpectrumMarkup() {
 function diagnosticLayerMarkup(layer) {
   const profile = layer.profile ? NCN_PROJECTION_PROFILE[layer.profile] : null;
   const depth = profile?.depth ?? layer.depth;
-  const parallax = profile?.scrollFactor ?? layer.parallax;
+  const scale = profile?.structural
+    ? 0.99 + Math.min(depth, 1.1) * 0.01
+    : 1;
 
   return `
     <div class="diagnostics-layer">
       <strong>${layer.name}</strong>
-      <span class="diagnostics-value">Z ${depth}</span>
-      <span class="diagnostics-value">P ${Number(parallax).toFixed(2)}</span>
+      <span class="diagnostics-value">D ${Number(depth).toFixed(2)}</span>
+      <span class="diagnostics-value">S ${scale.toFixed(4)}</span>
     </div>
   `;
 }
@@ -72,23 +69,15 @@ function createDiagnosticsInterface() {
   panel.className = "diagnostics-panel";
   panel.setAttribute("aria-label", "Projection diagnostics");
   panel.innerHTML = `
-    <div class="diagnostics-title">
-      <span>Projection Diagnostics</span>
-      <span>DEV</span>
-    </div>
-
+    <div class="diagnostics-title"><span>Projection Diagnostics</span><span>DEV</span></div>
     <section class="diagnostics-section">
       <div class="diagnostics-heading">Energy spectrum 0–10</div>
       <div class="diagnostics-spectrum">${energySpectrumMarkup()}</div>
     </section>
-
     <section class="diagnostics-section">
-      <div class="diagnostics-heading">Layer stack · Z depth / P parallax</div>
-      <div class="diagnostics-layer-list">
-        ${NCN_DIAGNOSTIC_LAYERS.map(diagnosticLayerMarkup).join("")}
-      </div>
+      <div class="diagnostics-heading">Layer stack · D depth / S scale</div>
+      <div class="diagnostics-layer-list">${NCN_DIAGNOSTIC_LAYERS.map(diagnosticLayerMarkup).join("")}</div>
     </section>
-
     <section class="diagnostics-section">
       <div class="diagnostics-heading">Live viewport values</div>
       <div class="diagnostics-live">
@@ -97,7 +86,6 @@ function createDiagnosticsInterface() {
         <div><span>Scroll Y</span><strong data-debug-scroll>0</strong></div>
       </div>
     </section>
-
     <section class="diagnostics-section">
       <div class="diagnostics-heading">Axis reference</div>
       <div class="diagnostics-axis" aria-label="X Y Z axis reference">
@@ -106,8 +94,7 @@ function createDiagnosticsInterface() {
         <span class="diagnostics-axis-label y">Y</span>
         <span class="diagnostics-axis-label z">Z</span>
       </div>
-    </section>
-  `;
+    </section>`;
 
   const toggle = document.createElement("button");
   toggle.type = "button";
@@ -116,7 +103,6 @@ function createDiagnosticsInterface() {
   toggle.addEventListener("click", toggleDiagnostics);
 
   document.body.append(panel, toggle);
-
   diagnosticsPanel = panel;
   diagnosticsLiveEntry = panel.querySelector("[data-debug-entry]");
   diagnosticsLiveOffset = panel.querySelector("[data-debug-offset]");
@@ -142,8 +128,7 @@ function findDiagnosticEntry() {
 }
 
 function updateDiagnosticsLiveValues() {
-  if (!document.documentElement.classList.contains("diagnostics-on")) return;
-  if (!diagnosticsPanel) return;
+  if (!document.documentElement.classList.contains("diagnostics-on") || !diagnosticsPanel) return;
 
   const entry = findDiagnosticEntry();
   const rect = entry?.getBoundingClientRect();

@@ -17,6 +17,7 @@ function dismiss(objects, onComplete) {
 function getEntryCoreObjects(entry) {
   return [
     entry.querySelector(".frame"),
+    entry.querySelector(".corners"),
     entry.querySelector(".priority"),
     entry.querySelector(".meta"),
     entry.querySelector(".headline"),
@@ -24,16 +25,10 @@ function getEntryCoreObjects(entry) {
   ].filter(Boolean);
 }
 
-function getEntryIdentityObjects(entry) {
-  return [
-    entry.querySelector(".meta"),
-    entry.querySelector(".headline")
-  ].filter(Boolean);
-}
-
 function getEntryChangingObjects(entry) {
   return [
     entry.querySelector(".frame"),
+    entry.querySelector(".corners"),
     entry.querySelector(".priority"),
     entry.querySelector(".tags")
   ].filter(Boolean);
@@ -59,12 +54,6 @@ function getDisplacedProjectionObjects(entries) {
 
 /*==================================================
   ENTRY CHANGE GROUPS
-
-  The headline and metadata form the persistent story
-  identity. They stay visible while the card frame,
-  priority, tags and body power down and rebuild around
-  them. Displaced stories still use the full projection
-  lifecycle while moving into their new positions.
 ==================================================*/
 
 function getExpandDismissObjects(entry, affectedEntries) {

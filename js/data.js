@@ -71,11 +71,16 @@ const NCN_ENTRIES = [
   }
 ];
 
+/*
+  Higher depth means nearer to the viewer and therefore more parallax.
+  Visual energy, colour and line treatment remain CSS concerns.
+*/
 const NCN_PROJECTION_PROFILE = {
-  frame: { depth: 18, scrollFactor: 0.25, energy: 0.25 },
-  priority: { depth: 12, scrollFactor: 0.45, energy: 0.55 },
-  meta: { depth: 8, scrollFactor: 0.6, energy: 0.6 },
-  tags: { depth: 10, scrollFactor: 0.7, energy: 0.65 },
-  headline: { depth: 5, scrollFactor: 1, energy: 1 },
-  body: { depth: 14, scrollFactor: 0.18, energy: 0.55 }
+  frame: { depth: 0.25, structural: true },
+  priority: { depth: 0.45 },
+  body: { depth: 0.65 },
+  tags: { depth: 0.82 },
+  meta: { depth: 0.88 },
+  headline: { depth: 1.0 },
+  corners: { depth: 1.1, structural: true }
 };
