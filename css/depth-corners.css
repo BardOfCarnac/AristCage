@@ -1,0 +1,53 @@
+/*==================================================
+  NORMALIZED STRUCTURAL DEPTH
+==================================================*/
+
+.projection-plate .frame,
+.projection-plate .corners {
+  transform:
+    translateY(var(--projection-y, 0px))
+    scale(var(--projection-scale, 1));
+}
+
+/* The corner layer uses the same red-family line-energy cycle as the frame,
+   but resolves brighter and nearer. */
+.corners {
+  --projection-step-0: var(--energy-0);
+  --projection-step-1: var(--energy-2);
+  --projection-step-2: var(--energy-4);
+  --projection-color: var(--energy-5);
+  --resolve-speed: .58s;
+  --dismiss-speed: .42s;
+  --glow-strength: .8;
+}
+
+.corners.energy-up {
+  animation: line-energy-up var(--resolve-speed) linear both;
+}
+
+.corners.energy-down {
+  animation: line-energy-down var(--dismiss-speed) linear both;
+}
+
+.corners.present,
+.corners.leaving {
+  opacity: 1;
+}
+
+.corners.gone {
+  opacity: 0;
+}
+
+/* line-energy animates border colour on the container. The individual
+   brackets inherit that colour through currentColor. */
+.corners {
+  color: var(--projection-color);
+}
+
+.corners .corner {
+  border-color: currentColor;
+}
+
+html.diagnostics-on .corners {
+  outline: 1px dashed #ff9b4a !important;
+}
