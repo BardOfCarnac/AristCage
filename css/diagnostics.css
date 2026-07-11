@@ -1,0 +1,213 @@
+/*==================================================
+  PROJECTION DIAGNOSTICS
+
+  Hidden unless the document receives .diagnostics-on.
+==================================================*/
+
+.diagnostics-panel,
+.diagnostics-toggle {
+  display: none;
+}
+
+html.diagnostics-on .diagnostics-panel,
+html.diagnostics-on .diagnostics-toggle {
+  display: block;
+}
+
+.diagnostics-toggle {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  z-index: 10002;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 80, 50, .7);
+  background: rgba(0, 0, 0, .88);
+  color: var(--orange);
+  font: 600 .62rem/1 var(--font-main);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.diagnostics-panel {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  z-index: 10001;
+  width: min(360px, calc(100vw - 74px));
+  max-height: min(62vh, 580px);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid rgba(255, 70, 40, .55);
+  background: rgba(2, 2, 4, .94);
+  box-shadow: 0 0 24px rgba(255, 40, 20, .18);
+  color: var(--amber);
+  font: .68rem/1.35 var(--font-main);
+  letter-spacing: .04em;
+}
+
+.diagnostics-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: var(--white);
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.diagnostics-section + .diagnostics-section {
+  margin-top: 11px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(255, 70, 40, .22);
+}
+
+.diagnostics-heading {
+  margin-bottom: 6px;
+  color: var(--orange);
+  font-size: .62rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.diagnostics-spectrum {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(16px, 1fr));
+  gap: 2px;
+}
+
+.diagnostics-swatch {
+  min-width: 0;
+}
+
+.diagnostics-colour {
+  height: 20px;
+  border: 1px solid rgba(255, 255, 255, .16);
+}
+
+.diagnostics-swatch span {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: rgba(255, 220, 180, .64);
+  font-size: .5rem;
+  text-align: center;
+  text-overflow: clip;
+}
+
+.diagnostics-layer-list {
+  display: grid;
+  gap: 3px;
+}
+
+.diagnostics-layer {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.diagnostics-layer strong {
+  color: var(--white);
+  font-weight: 500;
+}
+
+.diagnostics-value {
+  color: var(--orange);
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnostics-live {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.diagnostics-live div {
+  padding: 5px;
+  border: 1px solid rgba(255, 70, 40, .18);
+  background: rgba(255, 40, 20, .025);
+}
+
+.diagnostics-live span {
+  display: block;
+  color: rgba(255, 190, 130, .62);
+  font-size: .52rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.diagnostics-live strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--white);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnostics-axis {
+  position: relative;
+  width: 70px;
+  height: 56px;
+  margin-top: 4px;
+}
+
+.diagnostics-axis::before,
+.diagnostics-axis::after,
+.diagnostics-axis-x {
+  content: "";
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  transform-origin: left center;
+}
+
+.diagnostics-axis::before {
+  width: 34px;
+  border-top: 2px solid #7cff80;
+  transform: rotate(0deg);
+}
+
+.diagnostics-axis::after {
+  width: 34px;
+  border-top: 2px solid #72a7ff;
+  transform: rotate(-90deg);
+}
+
+.diagnostics-axis-x {
+  width: 30px;
+  border-top: 2px solid #ff7b68;
+  transform: rotate(-36deg);
+}
+
+.diagnostics-axis-label {
+  position: absolute;
+  font-size: .55rem;
+  font-weight: 700;
+}
+
+.diagnostics-axis-label.x { left: 48px; bottom: 0; color: #7cff80; }
+.diagnostics-axis-label.y { left: 4px; top: 0; color: #72a7ff; }
+.diagnostics-axis-label.z { right: 2px; top: 11px; color: #ff7b68; }
+
+/* Temporary layer identification. */
+html.diagnostics-on .card-field { outline: 1px dashed #ff8b3d !important; }
+html.diagnostics-on .frame { outline: 1px dashed #67f0ff !important; }
+html.diagnostics-on .priority { outline: 1px dashed #ff304f !important; }
+html.diagnostics-on .meta { outline: 1px dashed #80ff73 !important; }
+html.diagnostics-on .headline { outline: 1px dashed #5aa7ff !important; }
+html.diagnostics-on .tags { outline: 1px dashed #df71ff !important; }
+html.diagnostics-on .body { outline: 1px dashed #ffe45e !important; }
+html.diagnostics-on .rail { outline: 1px dashed #ffffff !important; }
+html.diagnostics-on .chamber { outline: 1px dashed #8a6cff !important; }
+
+@media (max-width: 600px) {
+  .diagnostics-panel {
+    width: calc(100vw - 70px);
+    max-height: 48vh;
+  }
+
+  .diagnostics-spectrum {
+    grid-template-columns: repeat(6, minmax(18px, 1fr));
+  }
+}
