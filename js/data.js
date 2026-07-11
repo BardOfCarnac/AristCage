@@ -78,9 +78,9 @@ const NCN_ENTRIES = [
 const NCN_PROJECTION_PROFILE = {
   frame: { depth: 0.25, structural: true },
   priority: { depth: 0.45 },
+  corners: { depth: 0.55, structural: true },
   body: { depth: 0.65 },
   tags: { depth: 0.82 },
   meta: { depth: 0.88 },
-  headline: { depth: 1.0 },
-  corners: { depth: 1.1, structural: true }
+  headline: { depth: 1.0 }
 };
