@@ -19,6 +19,7 @@
   --resolve-speed: .58s;
   --dismiss-speed: .42s;
   --glow-strength: .8;
+  border-color: var(--projection-color);
 }
 
 .corners.energy-up {
@@ -38,14 +39,9 @@
   opacity: 0;
 }
 
-/* line-energy animates border colour on the container. The individual
-   brackets inherit that colour through currentColor. */
-.corners {
-  color: var(--projection-color);
-}
-
+/* The animated container border colour is inherited by each bracket. */
 .corners .corner {
-  border-color: currentColor;
+  border-color: inherit;
 }
 
 html.diagnostics-on .corners {
