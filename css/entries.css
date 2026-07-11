@@ -109,6 +109,7 @@
 /*==================================================
   EXPANSION
 ==================================================*/
+
 .expansion-zone {
   display: none;
   margin: 12px 10px 0 0;
@@ -127,13 +128,20 @@
   line-height: 1.55;
   max-width: 38ch;
 }
+
 .entry.expanded .body,
 .entry.panel .body {
   padding-top: 12px;
 }
-.entry:not(.expanded):not(.panel) .meta {
+
+.entry:not(.panel) .meta {
   display: none;
 }
-.entry:not(.expanded):not(.panel) .entry-content > .meta {
-  display: none !important;
+
+.empty-state {
+  padding: 24px 0;
+  color: var(--orange);
+  font-size: .8rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
 }
