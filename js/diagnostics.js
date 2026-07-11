@@ -5,11 +5,11 @@
 const NCN_DIAGNOSTICS_KEY = "ncn-diagnostics";
 const NCN_DIAGNOSTIC_LAYERS = [
   { name: "Header", depth: 1.25 },
-  { name: "Corners", profile: "corners" },
   { name: "Headline", profile: "headline" },
   { name: "Meta", profile: "meta" },
   { name: "Tags", profile: "tags" },
   { name: "Body", profile: "body" },
+  { name: "Corners", profile: "corners" },
   { name: "Priority", profile: "priority" },
   { name: "Frame", profile: "frame" },
   { name: "Chamber", depth: -1 }
@@ -51,15 +51,15 @@ function energySpectrumMarkup() {
 function diagnosticLayerMarkup(layer) {
   const profile = layer.profile ? NCN_PROJECTION_PROFILE[layer.profile] : null;
   const depth = profile?.depth ?? layer.depth;
-  const scale = profile?.structural
-    ? 0.99 + Math.min(depth, 1.1) * 0.01
+  const scaleX = profile?.structural
+    ? 0.965 + Math.min(depth, 1.1) * 0.035
     : 1;
 
   return `
     <div class="diagnostics-layer">
       <strong>${layer.name}</strong>
       <span class="diagnostics-value">D ${Number(depth).toFixed(2)}</span>
-      <span class="diagnostics-value">S ${scale.toFixed(4)}</span>
+      <span class="diagnostics-value">X ${scaleX.toFixed(4)}</span>
     </div>
   `;
 }
@@ -75,7 +75,7 @@ function createDiagnosticsInterface() {
       <div class="diagnostics-spectrum">${energySpectrumMarkup()}</div>
     </section>
     <section class="diagnostics-section">
-      <div class="diagnostics-heading">Layer stack · D depth / S scale</div>
+      <div class="diagnostics-heading">Layer stack · D depth / X horizontal scale</div>
       <div class="diagnostics-layer-list">${NCN_DIAGNOSTIC_LAYERS.map(diagnosticLayerMarkup).join("")}</div>
     </section>
     <section class="diagnostics-section">

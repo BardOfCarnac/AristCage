@@ -6,11 +6,11 @@
 .projection-plate .corners {
   transform:
     translateY(var(--projection-y, 0px))
-    scale(var(--projection-scale, 1));
+    scaleX(var(--projection-scale-x, 1));
 }
 
-/* The corner layer uses the same red-family line-energy cycle as the frame,
-   but resolves brighter and nearer. */
+/* The corner layer is brighter than the rear frame, but remains behind the
+   text cluster. Its colour cycle applies to the corner strokes only. */
 .corners {
   --projection-step-0: var(--energy-0);
   --projection-step-1: var(--energy-2);
@@ -19,15 +19,55 @@
   --resolve-speed: .58s;
   --dismiss-speed: .42s;
   --glow-strength: .8;
-  border-color: var(--projection-color);
+  color: var(--projection-color);
+  border: 0;
+  box-shadow: none;
+}
+
+@keyframes corner-energy-up {
+  0% {
+    opacity: 0;
+    color: var(--projection-step-0);
+  }
+  34% {
+    opacity: .45;
+    color: var(--projection-step-1);
+  }
+  68% {
+    opacity: .82;
+    color: var(--projection-step-2);
+  }
+  100% {
+    opacity: 1;
+    color: var(--projection-color);
+  }
+}
+
+@keyframes corner-energy-down {
+  0% {
+    opacity: 1;
+    color: var(--projection-color);
+  }
+  34% {
+    opacity: .82;
+    color: var(--projection-step-2);
+  }
+  68% {
+    opacity: .45;
+    color: var(--projection-step-1);
+  }
+  100% {
+    opacity: 0;
+    color: var(--projection-step-0);
+  }
 }
 
 .corners.energy-up {
-  animation: line-energy-up var(--resolve-speed) linear both;
+  animation: corner-energy-up var(--resolve-speed) linear both;
 }
 
 .corners.energy-down {
-  animation: line-energy-down var(--dismiss-speed) linear both;
+  animation: corner-energy-down var(--dismiss-speed) linear both;
 }
 
 .corners.present,
@@ -39,9 +79,8 @@
   opacity: 0;
 }
 
-/* The animated container border colour is inherited by each bracket. */
 .corners .corner {
-  border-color: inherit;
+  border-color: currentColor;
 }
 
 html.diagnostics-on .corners {

@@ -24,11 +24,11 @@ function applyPartProjection(entry, partName, offset) {
 
   const depth = profile.depth;
   const movement = offset * depth * NCN_CONFIG.projection.travel;
-  const structuralScale = profile.structural
-    ? 0.99 + Math.min(depth, 1.1) * 0.01
+  const structuralScaleX = profile.structural
+    ? 0.965 + Math.min(depth, 1.1) * 0.035
     : 1;
 
   part.style.setProperty("--projection-y", `${movement}px`);
   part.style.setProperty("--projection-depth", depth.toFixed(2));
-  part.style.setProperty("--projection-scale", structuralScale.toFixed(4));
+  part.style.setProperty("--projection-scale-x", structuralScaleX.toFixed(4));
 }
