@@ -6,6 +6,10 @@ function resolve(objects) {
   Projection.resolve(objects);
 }
 
+function reveal(objects) {
+  Projection.reveal(objects);
+}
+
 function dismiss(objects, onComplete) {
   Projection.dismiss(objects, onComplete);
 }
@@ -29,8 +33,7 @@ function getEntryChangingObjects(entry) {
   return [
     entry.querySelector(".frame"),
     entry.querySelector(".corners"),
-    entry.querySelector(".priority"),
-    entry.querySelector(".tags")
+    entry.querySelector(".priority")
   ].filter(Boolean);
 }
 
@@ -83,12 +86,17 @@ function getCollapseResolveObjects(entry) {
 }
 
 /*==================================================
-  INITIAL LOAD
+  INITIAL / IMMEDIATE LOAD
 ==================================================*/
 
-function activatePresence() {
-  resolve(
-    [...document.querySelectorAll(".entry")]
-      .flatMap(getVisibleProjectionObjects)
-  );
+function activatePresence(immediate = false) {
+  const objects = [...document.querySelectorAll(".entry")]
+    .flatMap(getVisibleProjectionObjects);
+
+  if (immediate) {
+    reveal(objects);
+    return;
+  }
+
+  resolve(objects);
 }
