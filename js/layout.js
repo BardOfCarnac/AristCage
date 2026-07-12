@@ -4,12 +4,12 @@
 
 let NCN_LAYOUT_TRANSITIONING = false;
 
-function getAffectedEntries(changedEntry) {
+function getAffectedEntries(changedEntry, excludedEntry = null) {
   const changedTop = changedEntry.getBoundingClientRect().top;
 
   return [...document.querySelectorAll(".entry")]
     .filter(entry => {
-      if (entry === changedEntry) return false;
+      if (entry === changedEntry || entry === excludedEntry) return false;
       return entry.getBoundingClientRect().top > changedTop;
     });
 }
@@ -42,9 +42,9 @@ function expandEntryLayout(entry, onComplete) {
   });
 }
 
-function collapseEntryLayout(entry, onComplete) {
+function collapseEntryLayout(entry, onComplete, excludedEntry = null) {
   const entryId = entry.dataset.entryId;
-  const affectedEntries = getAffectedEntries(entry);
+  const affectedEntries = getAffectedEntries(entry, excludedEntry);
 
   dismiss(getCollapseDismissObjects(entry, affectedEntries), () => {
     collapseEntry(entryId);
@@ -78,7 +78,7 @@ function toggleEntryLayout(changedEntry) {
   if (openEntry && openEntry !== changedEntry) {
     collapseEntryLayout(openEntry, () => {
       expandEntryLayout(changedEntry, finish);
-    });
+    }, changedEntry);
     return;
   }
 
