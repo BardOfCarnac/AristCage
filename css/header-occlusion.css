@@ -1,0 +1,37 @@
+/*==================================================
+  HEADER / FEED OCCLUSION
+==================================================*/
+
+.rail {
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, .98), rgba(0, 0, 0, .94));
+}
+
+.rail-occlusion {
+  position: sticky;
+  top: var(--rail-height, 64px);
+  z-index: 999;
+  height: 38px;
+  margin-bottom: -38px;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, .96) 0%,
+      rgba(0, 0, 0, .72) 32%,
+      rgba(0, 0, 0, .28) 68%,
+      transparent 100%
+    );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-occlusion {
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, .98) 0%,
+        rgba(0, 0, 0, .66) 42%,
+        transparent 100%
+      );
+  }
+}

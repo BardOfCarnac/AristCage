@@ -11,7 +11,7 @@ const NCN_FILTER_OPTIONS = {
 
 const NCN_STATE = {
   activePanel: null,
-  expandedEntries: new Set(),
+  expandedEntryId: null,
   filters: {
     search: "",
     time: "Now",
@@ -27,23 +27,21 @@ const NCN_STATE = {
 ==================================================*/
 
 function isExpanded(id) {
-  return NCN_STATE.expandedEntries.has(id);
+  return NCN_STATE.expandedEntryId === id;
 }
 
 function expandEntry(id) {
-  NCN_STATE.expandedEntries.add(id);
+  NCN_STATE.expandedEntryId = id;
 }
 
 function collapseEntry(id) {
-  NCN_STATE.expandedEntries.delete(id);
+  if (NCN_STATE.expandedEntryId === id) {
+    NCN_STATE.expandedEntryId = null;
+  }
 }
 
-function toggleEntry(id) {
-  if (isExpanded(id)) {
-    collapseEntry(id);
-  } else {
-    expandEntry(id);
-  }
+function clearExpandedEntry() {
+  NCN_STATE.expandedEntryId = null;
 }
 
 /*==================================================
