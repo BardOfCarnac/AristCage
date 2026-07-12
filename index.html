@@ -21,7 +21,16 @@
 
 <body>
   <div class="viewer">
-    <div class="chamber" aria-hidden="true"></div>
+    <div class="chamber" aria-hidden="true">
+      <div class="chamber-scene">
+        <div class="chamber-wall chamber-wall-top"></div>
+        <div class="chamber-wall chamber-wall-right"></div>
+        <div class="chamber-wall chamber-wall-bottom"></div>
+        <div class="chamber-wall chamber-wall-left"></div>
+        <div class="chamber-rear"></div>
+        <div class="chamber-sheen"></div>
+      </div>
+    </div>
 
     <header class="rail">
       <div class="rail-mark">NCN</div>
@@ -45,6 +54,7 @@
   </div>
 
   <script src="js/config.js"></script>
+  <script src="js/chamber.js"></script>
   <script src="js/data.js"></script>
   <script src="js/state.js"></script>
   <script src="js/render.js"></script>
