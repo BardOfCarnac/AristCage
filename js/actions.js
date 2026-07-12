@@ -2,17 +2,40 @@
   FILTER ACTIONS
 ==================================================*/
 
-function transitionFilteredFeed(updateState) {
-  const currentObjects = [...document.querySelectorAll(".entry")]
+function getResultProjectionObjects() {
+  return [...document.querySelectorAll(".entry:not(.panel)")]
     .flatMap(getVisibleProjectionObjects)
     .filter(Boolean);
+}
+
+function syncFilterFormFromState(form) {
+  const search = form.elements.search;
+  const time = form.elements.time;
+
+  if (search) search.value = NCN_STATE.filters.search;
+
+  if (time) {
+    [...time].forEach(input => {
+      input.checked = input.value === NCN_STATE.filters.time;
+    });
+  }
+
+  ["category", "area", "priority", "sourceType"].forEach(group => {
+    form.querySelectorAll(`[name="${group}"]`).forEach(input => {
+      input.checked = NCN_STATE.filters[group].has(input.value);
+    });
+  });
+}
+
+function transitionFilteredFeed(updateState) {
+  const currentObjects = getResultProjectionObjects();
 
   dismiss(currentObjects, () => {
     updateState();
     clearExpandedEntry();
-    render();
+    renderResultsOnly();
     updateProjection();
-    activatePresence();
+    resolve(getResultProjectionObjects());
   });
 }
 
@@ -46,7 +69,9 @@ document.addEventListener("reset", event => {
   if (!filterForm) return;
 
   event.preventDefault();
-  transitionFilteredFeed(resetFilters);
+  resetFilters();
+  syncFilterFormFromState(filterForm);
+  transitionFilteredFeed(() => {});
 });
 
 document.addEventListener("click", event => {
