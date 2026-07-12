@@ -1,96 +1,164 @@
 /*==================================================
-  CHAMBER
+  SHALLOW DEVICE CHAMBER
+
+  The chamber is a fixed spatial reference. It does not
+  react to scroll; only restrained viewer movement changes
+  its apparent perspective.
 ==================================================*/
 
 .chamber {
+  --chamber-view-x: 0;
+  --chamber-view-y: 0;
+  --chamber-depth: clamp(22px, 4.2vw, 54px);
+  --chamber-edge: clamp(18px, 4.5vw, 58px);
 
-    position: fixed;
-
-    inset: 0;
-
-    z-index: 0;
-
-    pointer-events: none;
-
-    overflow: hidden;
-
-    background:
-
-        radial-gradient(
-            circle at 50% 15%,
-            rgba(255,70,40,.08),
-            transparent 35%
-        ),
-
-        radial-gradient(
-            ellipse at center,
-            transparent 40%,
-            rgba(0,0,0,.92)
-        ),
-
-        repeating-linear-gradient(
-
-            to bottom,
-
-            rgba(255,60,40,.02) 0,
-            rgba(255,60,40,.02) 1px,
-
-            transparent 1px,
-            transparent 5px
-        );
-
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  perspective: 720px;
+  perspective-origin:
+    calc(50% + var(--chamber-view-x) * 1.2%)
+    calc(50% + var(--chamber-view-y) * 1.2%);
+  background: #010102;
 }
 
-/*==================================================
-  DEPTH GLOW
-==================================================*/
-
-.chamber::after {
-
-    content: "";
-
-    position: absolute;
-
-    inset: 0;
-
-    background:
-
-        radial-gradient(
-
-            ellipse at center,
-
-            rgba(255,120,60,.03),
-
-            transparent 70%
-        );
-
-    animation:
-
-        chamberPulse 18s ease-in-out infinite;
-
+.chamber-scene {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform:
+    rotateX(calc(var(--chamber-view-y) * -0.32deg))
+    rotateY(calc(var(--chamber-view-x) * 0.32deg));
+  transform-origin: center;
+  transition: transform 140ms ease-out;
 }
 
-/*==================================================
-  CHAMBER ANIMATION
-==================================================*/
+.chamber-wall,
+.chamber-rear,
+.chamber-sheen {
+  position: absolute;
+  pointer-events: none;
+}
 
-@keyframes chamberPulse {
+/* Rear surface: deliberately shallow, approximately the
+   perceived back of the device rather than a distant tunnel. */
+.chamber-rear {
+  inset: var(--chamber-edge);
+  transform:
+    translate3d(
+      calc(var(--chamber-view-x) * -0.55px),
+      calc(var(--chamber-view-y) * -0.55px),
+      calc(var(--chamber-depth) * -1)
+    )
+    scale(.985);
+  border: 1px solid rgba(255, 70, 40, .065);
+  background:
+    radial-gradient(
+      ellipse at calc(50% + var(--chamber-view-x) * 1.5%) calc(42% + var(--chamber-view-y) * 1.5%),
+      rgba(255, 78, 42, .052),
+      rgba(255, 40, 24, .012) 43%,
+      rgba(0, 0, 0, .72) 100%
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 70, 40, .018) 0,
+      rgba(255, 70, 40, .018) 1px,
+      transparent 1px,
+      transparent 6px
+    ),
+    #020203;
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, .92),
+    0 0 38px rgba(255, 46, 24, .035);
+}
 
-    0%,
-    100% {
+/* The four walls are trapezoids joining the screen edge to
+   the smaller rear plane. Their gradients become visible as
+   the viewing angle shifts. */
+.chamber-wall {
+  opacity: .78;
+  backface-visibility: hidden;
+}
 
-        opacity: .5;
+.chamber-wall-top {
+  inset: 0 0 auto;
+  height: var(--chamber-edge);
+  clip-path: polygon(0 0, 100% 0, calc(100% - var(--chamber-edge)) 100%, var(--chamber-edge) 100%);
+  background:
+    linear-gradient(to bottom, rgba(255, 70, 40, .085), rgba(255, 70, 40, .012) 34%, rgba(0, 0, 0, .72)),
+    linear-gradient(90deg, transparent, rgba(255, 110, 70, .025), transparent);
+  transform: translateY(calc(var(--chamber-view-y) * .26px));
+}
 
-        transform: scale(1);
+.chamber-wall-bottom {
+  inset: auto 0 0;
+  height: var(--chamber-edge);
+  clip-path: polygon(var(--chamber-edge) 0, calc(100% - var(--chamber-edge)) 0, 100% 100%, 0 100%);
+  background:
+    linear-gradient(to top, rgba(255, 70, 40, .065), rgba(255, 70, 40, .01) 34%, rgba(0, 0, 0, .78)),
+    linear-gradient(90deg, transparent, rgba(255, 110, 70, .02), transparent);
+  transform: translateY(calc(var(--chamber-view-y) * .34px));
+}
 
-    }
+.chamber-wall-left {
+  inset: 0 auto 0 0;
+  width: var(--chamber-edge);
+  clip-path: polygon(0 0, 100% var(--chamber-edge), 100% calc(100% - var(--chamber-edge)), 0 100%);
+  background:
+    linear-gradient(to right, rgba(255, 70, 40, .075), rgba(255, 70, 40, .012) 36%, rgba(0, 0, 0, .76)),
+    linear-gradient(transparent, rgba(255, 110, 70, .022), transparent);
+  transform: translateX(calc(var(--chamber-view-x) * .34px));
+}
 
-    50% {
+.chamber-wall-right {
+  inset: 0 0 0 auto;
+  width: var(--chamber-edge);
+  clip-path: polygon(100% 0, 0 var(--chamber-edge), 0 calc(100% - var(--chamber-edge)), 100% 100%);
+  background:
+    linear-gradient(to left, rgba(255, 70, 40, .075), rgba(255, 70, 40, .012) 36%, rgba(0, 0, 0, .76)),
+    linear-gradient(transparent, rgba(255, 110, 70, .022), transparent);
+  transform: translateX(calc(var(--chamber-view-x) * .34px));
+}
 
-        opacity: .9;
+.chamber-sheen {
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse at calc(50% + var(--chamber-view-x) * 2%) calc(45% + var(--chamber-view-y) * 2%),
+      rgba(255, 112, 68, .028),
+      transparent 60%
+    ),
+    linear-gradient(
+      115deg,
+      transparent 18%,
+      rgba(255, 90, 55, .014) 42%,
+      transparent 67%
+    );
+  mix-blend-mode: screen;
+}
 
-        transform: scale(1.02);
+@media (hover: none) and (pointer: coarse) {
+  .chamber {
+    --chamber-depth: clamp(20px, 7vw, 38px);
+    --chamber-edge: clamp(18px, 7.5vw, 38px);
+  }
+}
 
-    }
+@media (prefers-reduced-motion: reduce) {
+  .chamber {
+    --chamber-view-x: 0 !important;
+    --chamber-view-y: 0 !important;
+  }
 
+  .chamber-scene {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .chamber-wall,
+  .chamber-rear {
+    transform: none !important;
+  }
 }
