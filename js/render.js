@@ -21,6 +21,14 @@ function escapeHTML(value = "") {
   RENDER
 ==================================================*/
 
+function visibleEntryMarkup() {
+  const visibleEntries = getVisibleEntries();
+
+  return visibleEntries.length
+    ? visibleEntries.map(entryMarkup).join("")
+    : `<div class="empty-state">No transmissions match the current filter.</div>`;
+}
+
 function render() {
   const output = [];
 
@@ -28,12 +36,13 @@ function render() {
     output.push(createPanelEntry(NCN_STATE.activePanel));
   }
 
-  const visibleEntries = getVisibleEntries();
-  output.push(...visibleEntries);
+  const panelMarkup = output.map(entryMarkup).join("");
+  feed.innerHTML = panelMarkup + visibleEntryMarkup();
+}
 
-  feed.innerHTML = output.length
-    ? output.map(entryMarkup).join("")
-    : `<div class="empty-state">No transmissions match the current filter.</div>`;
+function renderResultsOnly() {
+  feed.querySelectorAll(".entry:not(.panel), .empty-state").forEach(node => node.remove());
+  feed.insertAdjacentHTML("beforeend", visibleEntryMarkup());
 }
 
 /*==================================================
