@@ -30,19 +30,29 @@ function visibleEntryMarkup() {
 }
 
 function render() {
-  const output = [];
+  const panelMarkup = NCN_STATE.activePanel
+    ? entryMarkup(createPanelEntry(NCN_STATE.activePanel))
+    : "";
 
-  if (NCN_STATE.activePanel) {
-    output.push(createPanelEntry(NCN_STATE.activePanel));
-  }
-
-  const panelMarkup = output.map(entryMarkup).join("");
   feed.innerHTML = panelMarkup + visibleEntryMarkup();
 }
 
 function renderResultsOnly() {
   feed.querySelectorAll(".entry:not(.panel), .empty-state").forEach(node => node.remove());
   feed.insertAdjacentHTML("beforeend", visibleEntryMarkup());
+}
+
+function renderPanelOnly() {
+  feed.querySelector(".entry.panel")?.remove();
+
+  if (!NCN_STATE.activePanel) return null;
+
+  feed.insertAdjacentHTML(
+    "afterbegin",
+    entryMarkup(createPanelEntry(NCN_STATE.activePanel))
+  );
+
+  return feed.querySelector(".entry.panel");
 }
 
 /*==================================================
