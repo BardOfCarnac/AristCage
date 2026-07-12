@@ -14,22 +14,50 @@ function dismiss(objects, onComplete) {
   Projection.dismiss(objects, onComplete);
 }
 
+function glowDown(objects) {
+  const items = objects.filter(Boolean);
+  return new Promise(resolvePromise => {
+    Projection.dismiss(items, resolvePromise);
+  });
+}
+
+function glowUp(objects) {
+  const items = objects.filter(Boolean);
+  Projection.resolve(items);
+
+  if (NCN_CONFIG.motion.reduced || !items.length) {
+    return Promise.resolve();
+  }
+
+  const delay = NCN_CONFIG.motion.dismissDuration
+    + Math.max(0, items.length - 1) * NCN_CONFIG.motion.resolveStagger;
+
+  return new Promise(resolvePromise => {
+    window.setTimeout(resolvePromise, delay);
+  });
+}
+
+function showImmediately(objects) {
+  Projection.reveal(objects.filter(Boolean));
+}
+
+function cleanProjectionObjects(objects) {
+  objects.filter(Boolean).forEach(object => Projection.clean(object));
+}
+
 /*==================================================
-  PROJECTION OBJECT HELPERS
+  PROJECTION GROUPS
 ==================================================*/
 
-function getEntryCoreObjects(entry) {
+function getEntryIdentityObjects(entry) {
   return [
-    entry.querySelector(".frame"),
-    entry.querySelector(".corners"),
-    entry.querySelector(".priority"),
     entry.querySelector(".meta"),
     entry.querySelector(".headline"),
     entry.querySelector(".tags")
   ].filter(Boolean);
 }
 
-function getEntryChangingObjects(entry) {
+function getEntryStructureObjects(entry) {
   return [
     entry.querySelector(".frame"),
     entry.querySelector(".corners"),
@@ -37,52 +65,21 @@ function getEntryChangingObjects(entry) {
   ].filter(Boolean);
 }
 
-function getEntryBodyObject(entry) {
-  return entry.querySelector(".body");
+function getEntryBodyObjects(entry) {
+  return [entry.querySelector(".body")].filter(Boolean);
 }
 
 function getVisibleProjectionObjects(entry) {
-  const objects = getEntryCoreObjects(entry);
+  const objects = [
+    ...getEntryIdentityObjects(entry),
+    ...getEntryStructureObjects(entry)
+  ];
 
   if (entry.classList.contains("expanded") || entry.classList.contains("panel")) {
-    objects.push(getEntryBodyObject(entry));
+    objects.push(...getEntryBodyObjects(entry));
   }
 
-  return objects.filter(Boolean);
-}
-
-function getDisplacedProjectionObjects(entries) {
-  return entries.flatMap(getVisibleProjectionObjects).filter(Boolean);
-}
-
-/*==================================================
-  ENTRY CHANGE GROUPS
-==================================================*/
-
-function getExpandDismissObjects(entry, affectedEntries) {
-  return [
-    ...getEntryChangingObjects(entry),
-    ...getDisplacedProjectionObjects(affectedEntries)
-  ].filter(Boolean);
-}
-
-function getExpandResolveObjects(entry) {
-  return [
-    ...getEntryChangingObjects(entry),
-    getEntryBodyObject(entry)
-  ].filter(Boolean);
-}
-
-function getCollapseDismissObjects(entry, affectedEntries) {
-  return [
-    ...getEntryChangingObjects(entry),
-    getEntryBodyObject(entry),
-    ...getDisplacedProjectionObjects(affectedEntries)
-  ].filter(Boolean);
-}
-
-function getCollapseResolveObjects(entry) {
-  return getEntryChangingObjects(entry);
+  return objects;
 }
 
 /*==================================================
@@ -94,7 +91,7 @@ function activatePresence(immediate = false) {
     .flatMap(getVisibleProjectionObjects);
 
   if (immediate) {
-    reveal(objects);
+    showImmediately(objects);
     return;
   }
 

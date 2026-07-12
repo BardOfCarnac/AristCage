@@ -1,4 +1,11 @@
 /*==================================================
+  TRANSITION LOCKS
+==================================================*/
+
+let NCN_FILTER_TRANSITIONING = false;
+let NCN_PANEL_TRANSITIONING = false;
+
+/*==================================================
   FILTER ACTIONS
 ==================================================*/
 
@@ -27,29 +34,68 @@ function syncFilterFormFromState(form) {
   });
 }
 
-function transitionFilteredFeed(updateState) {
-  const currentObjects = getResultProjectionObjects();
+async function transitionFilteredFeed(updateState, form = null) {
+  if (NCN_FILTER_TRANSITIONING || NCN_LAYOUT_TRANSITIONING || NCN_PANEL_TRANSITIONING) return;
+  NCN_FILTER_TRANSITIONING = true;
 
-  dismiss(currentObjects, () => {
+  try {
+    await glowDown(getResultProjectionObjects());
+
     updateState();
     clearExpandedEntry();
+
+    if (form) syncFilterFormFromState(form);
+
     renderResultsOnly();
+    await waitForLayout();
     updateProjection();
-    resolve(getResultProjectionObjects());
-  });
+
+    await glowUp(getResultProjectionObjects());
+  } finally {
+    NCN_FILTER_TRANSITIONING = false;
+  }
 }
 
 function applyFilterForm(form) {
   const formData = new FormData(form);
 
-  transitionFilteredFeed(() => {
+  return transitionFilteredFeed(() => {
     NCN_STATE.filters.search = String(formData.get("search") || "");
     NCN_STATE.filters.time = String(formData.get("time") || "Now");
 
     ["category", "area", "priority", "sourceType"].forEach(group => {
       NCN_STATE.filters[group] = new Set(formData.getAll(group).map(String));
     });
-  });
+  }, form);
+}
+
+/*==================================================
+  PANEL ACTIONS
+==================================================*/
+
+async function transitionPanel(name) {
+  if (NCN_PANEL_TRANSITIONING || NCN_FILTER_TRANSITIONING || NCN_LAYOUT_TRANSITIONING) return;
+  NCN_PANEL_TRANSITIONING = true;
+
+  try {
+    const currentPanel = feed.querySelector(".entry.panel");
+
+    if (currentPanel) {
+      await glowDown(getVisibleProjectionObjects(currentPanel));
+    }
+
+    togglePanel(name);
+    const nextPanel = renderPanelOnly();
+
+    await waitForLayout();
+    updateProjection();
+
+    if (nextPanel) {
+      await glowUp(getVisibleProjectionObjects(nextPanel));
+    }
+  } finally {
+    NCN_PANEL_TRANSITIONING = false;
+  }
 }
 
 /*==================================================
@@ -69,19 +115,14 @@ document.addEventListener("reset", event => {
   if (!filterForm) return;
 
   event.preventDefault();
-  resetFilters();
-  syncFilterFormFromState(filterForm);
-  transitionFilteredFeed(() => {});
+  transitionFilteredFeed(resetFilters, filterForm);
 });
 
 document.addEventListener("click", event => {
   const panelButton = event.target.closest("[data-panel]");
 
   if (panelButton) {
-    togglePanel(panelButton.dataset.panel);
-    render();
-    updateProjection();
-    activatePresence();
+    transitionPanel(panelButton.dataset.panel);
     return;
   }
 
