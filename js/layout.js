@@ -25,6 +25,16 @@ function resolveDisplacedEntries(entries) {
   window.setTimeout(run, NCN_CONFIG.motion.displacedResolveDelay);
 }
 
+function stabilizeEntry(entry) {
+  reveal(getVisibleProjectionObjects(entry));
+}
+
+function afterLayoutSettles(callback) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(callback);
+  });
+}
+
 function expandEntryLayout(entry, onComplete) {
   const entryId = entry.dataset.entryId;
   const affectedEntries = getAffectedEntries(entry);
@@ -76,8 +86,15 @@ function toggleEntryLayout(changedEntry) {
   const openEntry = document.querySelector(".entry.expanded:not(.panel)");
 
   if (openEntry && openEntry !== changedEntry) {
+    stabilizeEntry(changedEntry);
+
     collapseEntryLayout(openEntry, () => {
-      expandEntryLayout(changedEntry, finish);
+      stabilizeEntry(changedEntry);
+
+      afterLayoutSettles(() => {
+        stabilizeEntry(changedEntry);
+        expandEntryLayout(changedEntry, finish);
+      });
     }, changedEntry);
     return;
   }
