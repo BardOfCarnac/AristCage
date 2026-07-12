@@ -12,10 +12,10 @@ function applyFilterForm(form) {
     NCN_STATE.filters[group] = new Set(formData.getAll(group).map(String));
   });
 
-  NCN_STATE.expandedEntries.clear();
+  clearExpandedEntry();
   render();
   updateProjection();
-  activatePresence();
+  activatePresence(true);
 }
 
 /*==================================================
@@ -36,10 +36,10 @@ document.addEventListener("reset", event => {
 
   event.preventDefault();
   resetFilters();
-  NCN_STATE.expandedEntries.clear();
+  clearExpandedEntry();
   render();
   updateProjection();
-  activatePresence();
+  activatePresence(true);
 });
 
 document.addEventListener("click", event => {
