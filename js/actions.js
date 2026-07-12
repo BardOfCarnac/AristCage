@@ -15,7 +15,7 @@ function applyFilterForm(form) {
   NCN_STATE.expandedEntries.clear();
   render();
   updateProjection();
-  activatePresence();
+  settlePresence();
 }
 
 /*==================================================
@@ -39,7 +39,7 @@ document.addEventListener("reset", event => {
   NCN_STATE.expandedEntries.clear();
   render();
   updateProjection();
-  activatePresence();
+  settlePresence();
 });
 
 document.addEventListener("click", event => {

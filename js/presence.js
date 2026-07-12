@@ -29,8 +29,7 @@ function getEntryChangingObjects(entry) {
   return [
     entry.querySelector(".frame"),
     entry.querySelector(".corners"),
-    entry.querySelector(".priority"),
-    entry.querySelector(".tags")
+    entry.querySelector(".priority")
   ].filter(Boolean);
 }
 
@@ -54,6 +53,10 @@ function getDisplacedProjectionObjects(entries) {
 
 /*==================================================
   ENTRY CHANGE GROUPS
+
+  Headline and classification tags are persistent story
+  identity. They remain visible while the structural frame,
+  corners, priority bar and body change around them.
 ==================================================*/
 
 function getExpandDismissObjects(entry, affectedEntries) {
@@ -83,7 +86,7 @@ function getCollapseResolveObjects(entry) {
 }
 
 /*==================================================
-  INITIAL LOAD
+  INITIAL LOAD / IMMEDIATE SETTLE
 ==================================================*/
 
 function activatePresence() {
@@ -91,4 +94,19 @@ function activatePresence() {
     [...document.querySelectorAll(".entry")]
       .flatMap(getVisibleProjectionObjects)
   );
+}
+
+function settlePresence() {
+  [...document.querySelectorAll(".entry")]
+    .flatMap(getVisibleProjectionObjects)
+    .forEach(object => {
+      object.classList.remove(
+        "entering",
+        "leaving",
+        "energy-up",
+        "energy-down",
+        "gone"
+      );
+      object.classList.add("present");
+    });
 }
