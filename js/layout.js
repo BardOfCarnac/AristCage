@@ -2,7 +2,7 @@
   LAYOUT
 ==================================================*/
 
-const NCN_TRANSITIONING_ENTRIES = new WeakSet();
+let NCN_LAYOUT_TRANSITIONING = false;
 
 function getAffectedEntries(changedEntry) {
   const changedTop = changedEntry.getBoundingClientRect().top;
@@ -25,44 +25,62 @@ function resolveDisplacedEntries(entries) {
   window.setTimeout(run, NCN_CONFIG.motion.displacedResolveDelay);
 }
 
-function toggleEntryLayout(changedEntry) {
-  if (NCN_TRANSITIONING_ENTRIES.has(changedEntry)) return;
+function expandEntryLayout(entry, onComplete) {
+  const entryId = entry.dataset.entryId;
+  const affectedEntries = getAffectedEntries(entry);
 
-  NCN_TRANSITIONING_ENTRIES.add(changedEntry);
-
-  const entryId = changedEntry.dataset.entryId;
-  const affectedEntries = getAffectedEntries(changedEntry);
-  const expanding = !isExpanded(entryId);
-
-  const finish = () => {
-    NCN_TRANSITIONING_ENTRIES.delete(changedEntry);
-  };
-
-  if (expanding) {
-    dismiss(getExpandDismissObjects(changedEntry, affectedEntries), () => {
-      expandEntry(entryId);
-      changedEntry.classList.add("expanded");
-
-      requestAnimationFrame(() => {
-        updateProjection();
-        resolve(getExpandResolveObjects(changedEntry));
-        resolveDisplacedEntries(affectedEntries);
-        finish();
-      });
-    });
-
-    return;
-  }
-
-  dismiss(getCollapseDismissObjects(changedEntry, affectedEntries), () => {
-    collapseEntry(entryId);
-    changedEntry.classList.remove("expanded");
+  dismiss(getExpandDismissObjects(entry, affectedEntries), () => {
+    expandEntry(entryId);
+    entry.classList.add("expanded");
 
     requestAnimationFrame(() => {
       updateProjection();
-      resolve(getCollapseResolveObjects(changedEntry));
+      resolve(getExpandResolveObjects(entry));
       resolveDisplacedEntries(affectedEntries);
-      finish();
+      if (typeof onComplete === "function") onComplete();
     });
   });
+}
+
+function collapseEntryLayout(entry, onComplete) {
+  const entryId = entry.dataset.entryId;
+  const affectedEntries = getAffectedEntries(entry);
+
+  dismiss(getCollapseDismissObjects(entry, affectedEntries), () => {
+    collapseEntry(entryId);
+    entry.classList.remove("expanded");
+
+    requestAnimationFrame(() => {
+      updateProjection();
+      resolve(getCollapseResolveObjects(entry));
+      resolveDisplacedEntries(affectedEntries);
+      if (typeof onComplete === "function") onComplete();
+    });
+  });
+}
+
+function toggleEntryLayout(changedEntry) {
+  if (NCN_LAYOUT_TRANSITIONING) return;
+  NCN_LAYOUT_TRANSITIONING = true;
+
+  const entryId = changedEntry.dataset.entryId;
+  const finish = () => {
+    NCN_LAYOUT_TRANSITIONING = false;
+  };
+
+  if (isExpanded(entryId)) {
+    collapseEntryLayout(changedEntry, finish);
+    return;
+  }
+
+  const openEntry = document.querySelector(".entry.expanded:not(.panel)");
+
+  if (openEntry && openEntry !== changedEntry) {
+    collapseEntryLayout(openEntry, () => {
+      expandEntryLayout(changedEntry, finish);
+    });
+    return;
+  }
+
+  expandEntryLayout(changedEntry, finish);
 }
