@@ -42,6 +42,12 @@ const Projection = (() => {
     object.classList.remove(...lifecycleClasses);
   }
 
+  function show(object) {
+    if (!object) return;
+    clean(object);
+    object.classList.add("present");
+  }
+
   function enter(object) {
     if (!object) return;
 
@@ -74,6 +80,10 @@ const Projection = (() => {
     });
   }
 
+  function reveal(objects) {
+    objects.filter(Boolean).forEach(show);
+  }
+
   function dismiss(objects, onComplete) {
     const items = objects.filter(Boolean);
 
@@ -104,9 +114,11 @@ const Projection = (() => {
 
   return {
     clean,
+    show,
     enter,
     leave,
     resolve,
+    reveal,
     dismiss
   };
 })();
