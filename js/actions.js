@@ -2,20 +2,31 @@
   FILTER ACTIONS
 ==================================================*/
 
+function transitionFilteredFeed(updateState) {
+  const currentObjects = [...document.querySelectorAll(".entry")]
+    .flatMap(getVisibleProjectionObjects)
+    .filter(Boolean);
+
+  dismiss(currentObjects, () => {
+    updateState();
+    clearExpandedEntry();
+    render();
+    updateProjection();
+    activatePresence();
+  });
+}
+
 function applyFilterForm(form) {
   const formData = new FormData(form);
 
-  NCN_STATE.filters.search = String(formData.get("search") || "");
-  NCN_STATE.filters.time = String(formData.get("time") || "Now");
+  transitionFilteredFeed(() => {
+    NCN_STATE.filters.search = String(formData.get("search") || "");
+    NCN_STATE.filters.time = String(formData.get("time") || "Now");
 
-  ["category", "area", "priority", "sourceType"].forEach(group => {
-    NCN_STATE.filters[group] = new Set(formData.getAll(group).map(String));
+    ["category", "area", "priority", "sourceType"].forEach(group => {
+      NCN_STATE.filters[group] = new Set(formData.getAll(group).map(String));
+    });
   });
-
-  clearExpandedEntry();
-  render();
-  updateProjection();
-  activatePresence(true);
 }
 
 /*==================================================
@@ -35,11 +46,7 @@ document.addEventListener("reset", event => {
   if (!filterForm) return;
 
   event.preventDefault();
-  resetFilters();
-  clearExpandedEntry();
-  render();
-  updateProjection();
-  activatePresence(true);
+  transitionFilteredFeed(resetFilters);
 });
 
 document.addEventListener("click", event => {
