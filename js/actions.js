@@ -2,17 +2,21 @@
   FILTER ACTIONS
 ==================================================*/
 
-function transitionFilteredFeed(updateState) {
-  const currentObjects = [...document.querySelectorAll(".entry")]
+function getResultProjectionObjects() {
+  return [...document.querySelectorAll(".entry:not(.panel)")]
     .flatMap(getVisibleProjectionObjects)
     .filter(Boolean);
+}
+
+function transitionFilteredFeed(updateState) {
+  const currentObjects = getResultProjectionObjects();
 
   dismiss(currentObjects, () => {
     updateState();
     clearExpandedEntry();
-    render();
+    renderResultsOnly();
     updateProjection();
-    activatePresence();
+    resolve(getResultProjectionObjects());
   });
 }
 
@@ -46,7 +50,9 @@ document.addEventListener("reset", event => {
   if (!filterForm) return;
 
   event.preventDefault();
-  transitionFilteredFeed(resetFilters);
+  resetFilters();
+  filterForm.reset();
+  transitionFilteredFeed(() => {});
 });
 
 document.addEventListener("click", event => {
