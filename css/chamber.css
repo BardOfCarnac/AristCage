@@ -1,4 +1,16 @@
 /*==================================================
+  CHAMBER TEMPORARILY DISABLED
+
+  The implementation is retained below for later redesign,
+  but removed from rendering while article and panel
+  transitions are stabilised.
+==================================================*/
+
+.chamber {
+  display: none !important;
+}
+
+/*==================================================
   OPAQUE DEVICE CHAMBER
 
   A shallow five-plane cavity. The rear panel remains
