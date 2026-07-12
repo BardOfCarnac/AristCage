@@ -1,0 +1,6 @@
+/* Temporary chamber kill switch.
+   The chamber implementation remains in the repository for later redesign,
+   but is removed from rendering while feed transitions are stabilised. */
+.chamber {
+  display: none !important;
+}
