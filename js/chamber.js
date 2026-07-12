@@ -1,9 +1,9 @@
 /*==================================================
-  SHALLOW CHAMBER VIEW CONTROL
+  OPAQUE CHAMBER VIEW CONTROL
 
-  The chamber is independent of page scroll. Desktop pointer
-  movement and mobile device orientation adjust only the view
-  angle of the fixed cavity behind the projected feed.
+  The chamber is independent of page scroll. Pointer or
+  device orientation moves the rear plane strongly and
+  reveals only one wall from each opposing pair.
 ==================================================*/
 
 (() => {
@@ -12,8 +12,8 @@
 
   const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
   const coarsePointerQuery = window.matchMedia("(hover: none) and (pointer: coarse)");
-  const MAX_VIEW = 4;
-  const EASING = 0.14;
+  const DEAD_ZONE = 0.035;
+  const EASING = 0.24;
 
   let targetX = 0;
   let targetY = 0;
@@ -32,11 +32,21 @@
       targetX = 0;
       targetY = 0;
     } else {
-      targetX = clamp(x, -MAX_VIEW, MAX_VIEW);
-      targetY = clamp(y, -MAX_VIEW, MAX_VIEW);
+      targetX = clamp(x, -1, 1);
+      targetY = clamp(y, -1, 1);
     }
 
     ensureAnimation();
+  }
+
+  function updateVisibleWalls(x, y) {
+    chamber.classList.toggle("show-left", x < -DEAD_ZONE);
+    chamber.classList.toggle("show-right", x > DEAD_ZONE);
+
+    /* Positive Y means the top of the cavity is exposed;
+       the opposing bottom wall is therefore outside the view. */
+    chamber.classList.toggle("show-top", y > DEAD_ZONE);
+    chamber.classList.toggle("show-bottom", y < -DEAD_ZONE);
   }
 
   function renderFrame() {
@@ -44,11 +54,12 @@
     currentX += (targetX - currentX) * EASING;
     currentY += (targetY - currentY) * EASING;
 
-    if (Math.abs(targetX - currentX) < 0.002) currentX = targetX;
-    if (Math.abs(targetY - currentY) < 0.002) currentY = targetY;
+    if (Math.abs(targetX - currentX) < 0.001) currentX = targetX;
+    if (Math.abs(targetY - currentY) < 0.001) currentY = targetY;
 
-    chamber.style.setProperty("--chamber-view-x", currentX.toFixed(3));
-    chamber.style.setProperty("--chamber-view-y", currentY.toFixed(3));
+    chamber.style.setProperty("--view-x", currentX.toFixed(4));
+    chamber.style.setProperty("--view-y", currentY.toFixed(4));
+    updateVisibleWalls(currentX, currentY);
 
     if (currentX !== targetX || currentY !== targetY) {
       animationFrame = requestAnimationFrame(renderFrame);
@@ -62,8 +73,8 @@
   function handlePointerMove(event) {
     if (coarsePointerQuery.matches || motionQuery.matches) return;
 
-    const x = ((event.clientX / window.innerWidth) - 0.5) * MAX_VIEW * 2;
-    const y = ((event.clientY / window.innerHeight) - 0.5) * MAX_VIEW * 2;
+    const x = ((event.clientX / window.innerWidth) - 0.5) * 2;
+    const y = ((event.clientY / window.innerHeight) - 0.5) * 2;
     setTarget(x, y);
   }
 
@@ -84,7 +95,8 @@
     const gammaDelta = event.gamma - orientationBaseline.gamma;
     const betaDelta = event.beta - orientationBaseline.beta;
 
-    setTarget(gammaDelta * 0.18, betaDelta * 0.12);
+    /* Roughly eighteen degrees of physical tilt reaches full chamber travel. */
+    setTarget(gammaDelta / 18, betaDelta / 18);
   }
 
   async function startOrientation() {
@@ -102,7 +114,6 @@
 
       window.addEventListener("deviceorientation", handleOrientation, true);
     } catch (error) {
-      // Pointer/static fallback remains available when orientation access fails.
       console.info("NCN chamber orientation unavailable.", error);
     }
   }
@@ -114,10 +125,7 @@
 
   window.addEventListener("pointermove", handlePointerMove, { passive: true });
   document.documentElement.addEventListener("pointerleave", handlePointerLeave);
-
-  // Mobile browsers may require a user gesture before orientation access.
   document.addEventListener("pointerdown", startOrientation, { once: true, passive: true });
-
   window.addEventListener("orientationchange", resetView);
   window.addEventListener("resize", resetView);
 
