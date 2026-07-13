@@ -63,6 +63,7 @@ function entryMarkup(entry) {
   const isPanel = entry.type === "panel";
   const expanded = isPanel || isExpanded(entry.id);
   const body = isPanel ? entry.body : escapeHTML(entry.body);
+  const bodyClass = isPanel ? "body panel-body" : "part body gone";
 
   return `
 <article
@@ -70,22 +71,22 @@ function entryMarkup(entry) {
   data-entry-id="${escapeHTML(entry.id)}"
 >
   <div class="projection-plate">
-    <div class="part frame"></div>
-    <div class="part corners" aria-hidden="true">
+    <div class="part frame gone"></div>
+    <div class="part corners gone" aria-hidden="true">
       <i class="corner corner-tl"></i>
       <i class="corner corner-tr"></i>
       <i class="corner corner-bl"></i>
       <i class="corner corner-br"></i>
     </div>
-    <div class="part priority priority-${Number(entry.priority) || 1}"></div>
+    <div class="part priority priority-${Number(entry.priority) || 1} gone"></div>
 
     <div class="entry-content">
-      <div class="part meta">${escapeHTML(entry.meta)}</div>
-      <h2 class="part headline">${escapeHTML(entry.headline)}</h2>
-      <div class="part tags">${escapeHTML(entry.tags)}</div>
+      <div class="part meta gone">${escapeHTML(entry.meta)}</div>
+      <h2 class="part headline gone">${escapeHTML(entry.headline)}</h2>
+      <div class="part tags gone">${escapeHTML(entry.tags)}</div>
 
       <div class="expansion-zone">
-        <div class="part body">${body}</div>
+        <div class="${bodyClass}">${body}</div>
       </div>
     </div>
   </div>
@@ -105,7 +106,7 @@ function ncnSelectMarkup(name, label, values, selectedValue = values[0], prefix 
   const id = controlId(prefix, name);
 
   return `
-<div class="control-row">
+<div class="control-row panel-control gone">
   <span class="control-label" id="${id}-label">${escapeHTML(label)}</span>
   <div class="ncn-select" data-name="${escapeHTML(name)}" data-mode="single">
     <input class="ncn-select-input" type="hidden" name="${escapeHTML(name)}" value="${escapeHTML(selectedValue)}">
@@ -147,7 +148,7 @@ function ncnMultiSelectMarkup(name, label, values, selectedValues, prefix = "fil
   const selected = new Set(selectedValues);
 
   return `
-<div class="control-row">
+<div class="control-row panel-control gone">
   <span class="control-label" id="${id}-label">${escapeHTML(label)}</span>
   <div class="ncn-select ncn-multiselect" data-name="${escapeHTML(name)}" data-mode="multiple" data-total="${values.length}">
     <button
@@ -199,7 +200,7 @@ function controlInputMarkup(name, label, options = {}) {
   } = options;
 
   return `
-<label class="control-row control-row-input">
+<label class="control-row control-row-input panel-control gone">
   <span class="control-label">${escapeHTML(label)}</span>
   <input
     class="control-input ${escapeHTML(inputClass)}"
@@ -214,7 +215,7 @@ function controlInputMarkup(name, label, options = {}) {
 
 function controlTextareaMarkup(name, label, placeholder = "") {
   return `
-<label class="control-block">
+<label class="control-block panel-control gone">
   <span class="control-label">${escapeHTML(label)}</span>
   <textarea class="control-textarea" name="${escapeHTML(name)}" placeholder="${escapeHTML(placeholder)}"></textarea>
 </label>`;
@@ -246,7 +247,7 @@ function createPanelEntry(type) {
     ${ncnMultiSelectMarkup("sourceType", "Source", NCN_FILTER_OPTIONS.sourceType, NCN_STATE.filters.sourceType)}
     ${ncnSelectMarkup("time", "Time", ["Now", "Last Day", "All Time"], NCN_STATE.filters.time, "filter")}
   </div>
-  <div class="panel-actions control-actions">
+  <div class="panel-actions control-actions panel-control gone">
     <button type="submit">Apply Filters</button>
     <button type="reset" class="secondary-action">Reset</button>
     <span class="panel-note filter-status">Selections remain local until applied.</span>
@@ -277,7 +278,7 @@ function createPanelEntry(type) {
     })}
   </div>
   ${controlTextareaMarkup("body", "Signal body", "Body text")}
-  <div class="panel-actions control-actions">
+  <div class="panel-actions control-actions panel-control gone">
     <button type="button">Transmit</button>
     <span class="panel-note">Submission transport is not connected yet.</span>
   </div>
