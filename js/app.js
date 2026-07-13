@@ -29,6 +29,7 @@ function watchRailHeight() {
 
 function boot() {
   render();
+  initializeSlotLayout();
   updateProjection();
   activatePresence();
   watchRailHeight();
