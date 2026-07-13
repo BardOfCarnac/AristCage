@@ -150,6 +150,11 @@
   max-width: 38ch;
 }
 
+/* Panel bodies are layout containers. Their child controls own projection state. */
+.entry.panel .body {
+  opacity: 1;
+}
+
 .entry.expanded .body,
 .entry.panel .body {
   padding-top: 12px;
