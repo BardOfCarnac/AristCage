@@ -2,35 +2,136 @@
   NCN PROJECTED CONTROLS
 ==================================================*/
 
-function closeNCNSelect(control, { restoreFocus = false } = {}) {
+const NCN_SELECTOR_SCENES = new WeakMap();
+let NCN_SELECTOR_TRANSITIONING = false;
+
+function waitForSelectorAnimation(duration = 360) {
+  return new Promise(resolve => window.setTimeout(resolve, duration));
+}
+
+function uniqueObjects(objects) {
+  return [...new Set(objects.filter(Boolean))];
+}
+
+function getSelectorSceneObjects(control) {
+  const activeRow = control?.closest(".panel-control");
+  const panel = control?.closest(".entry.panel");
+
+  const otherControls = panel
+    ? [...panel.querySelectorAll(".panel-control")].filter(object => object !== activeRow)
+    : [];
+
+  const feedObjects = typeof getProjectionObjectsForEntries === "function"
+    ? getProjectionObjectsForEntries([
+        ...document.querySelectorAll("#feed .entry:not(.panel)")
+      ])
+    : [];
+
+  return uniqueObjects([
+    ...otherControls,
+    ...feedObjects
+  ]);
+}
+
+function sizeNCNSelectMenu(control) {
+  const trigger = control?.querySelector(".ncn-select-trigger");
+  if (!trigger) return;
+
+  const rect = trigger.getBoundingClientRect();
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  const availableBelow = Math.max(120, viewportHeight - rect.bottom - 16);
+  const availableAbove = Math.max(120, rect.top - 16);
+  const openUp = availableBelow < 190 && availableAbove > availableBelow;
+
+  control.classList.toggle("opens-up", openUp);
+  control.style.setProperty(
+    "--selector-max-height",
+    `${Math.min(330, openUp ? availableAbove : availableBelow)}px`
+  );
+}
+
+async function closeNCNSelect(control, { restoreFocus = false } = {}) {
   if (!control || !control.classList.contains("is-open")) return;
 
-  control.classList.remove("is-open");
-
   const trigger = control.querySelector(".ncn-select-trigger");
+  const sceneObjects = NCN_SELECTOR_SCENES.get(control) || [];
+
+  NCN_SELECTOR_TRANSITIONING = true;
+  control.classList.remove("selector-resolving");
+  control.classList.add("selector-closing");
+
+  await waitForSelectorAnimation(250);
+
+  control.classList.remove(
+    "is-open",
+    "opens-up",
+    "selector-visible",
+    "selector-closing"
+  );
+  control.style.removeProperty("--selector-max-height");
   trigger?.setAttribute("aria-expanded", "false");
+
+  if (sceneObjects.length && typeof glowUp === "function") {
+    await glowUp(sceneObjects);
+  }
+
+  NCN_SELECTOR_SCENES.delete(control);
+  NCN_SELECTOR_TRANSITIONING = false;
 
   if (restoreFocus) trigger?.focus();
 }
 
-function closeAllNCNSelects(except = null) {
-  document.querySelectorAll(".ncn-select.is-open").forEach(control => {
-    if (control !== except) closeNCNSelect(control);
-  });
+async function closeAllNCNSelects(except = null) {
+  const openControls = [
+    ...document.querySelectorAll(".ncn-select.is-open")
+  ].filter(control => control !== except);
+
+  for (const control of openControls) {
+    await closeNCNSelect(control);
+  }
 }
 
-function openNCNSelect(control) {
-  if (!control) return;
+async function openNCNSelect(control) {
+  if (!control || NCN_SELECTOR_TRANSITIONING) return;
 
-  closeAllNCNSelects(control);
-  control.classList.add("is-open");
+  const alreadyOpen = document.querySelector(".ncn-select.is-open");
+  if (alreadyOpen && alreadyOpen !== control) {
+    await closeNCNSelect(alreadyOpen);
+  }
+
+  NCN_SELECTOR_TRANSITIONING = true;
+
+  const sceneObjects = getSelectorSceneObjects(control);
+  NCN_SELECTOR_SCENES.set(control, sceneObjects);
+
+  if (sceneObjects.length && typeof glowDown === "function") {
+    await glowDown(sceneObjects);
+  }
+
+  sizeNCNSelectMenu(control);
 
   const trigger = control.querySelector(".ncn-select-trigger");
+  const options = getNCNSelectOptions(control);
+
+  options.forEach((option, index) => {
+    option.style.setProperty("--selector-option-index", index);
+  });
+
+  control.classList.add("is-open", "selector-resolving");
   trigger?.setAttribute("aria-expanded", "true");
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => control.classList.add("selector-visible"));
+  });
+
+  await waitForSelectorAnimation(360 + Math.min(options.length, 8) * 28);
+
+  control.classList.remove("selector-resolving");
+  NCN_SELECTOR_TRANSITIONING = false;
 
   const selected = control.querySelector(".ncn-select-option[aria-selected='true']");
   const first = control.querySelector(".ncn-select-option");
-  requestAnimationFrame(() => (selected || first)?.focus());
+  (selected || first)?.focus();
 }
 
 function isMultipleNCNSelect(control) {
@@ -88,7 +189,7 @@ function syncNCNControls(root = document) {
   root.querySelectorAll(".ncn-select").forEach(refreshNCNSelect);
 }
 
-function setSingleNCNSelectValue(control, option) {
+async function setSingleNCNSelectValue(control, option) {
   const value = option.dataset.value || option.textContent.trim();
   const input = control.querySelector(".ncn-select-input[type='hidden']");
 
@@ -98,7 +199,7 @@ function setSingleNCNSelectValue(control, option) {
   }
 
   refreshNCNSelect(control);
-  closeNCNSelect(control, { restoreFocus: true });
+  await closeNCNSelect(control, { restoreFocus: true });
 }
 
 function toggleMultiNCNSelectValue(control, option) {
@@ -108,16 +209,20 @@ function toggleMultiNCNSelectValue(control, option) {
   input.checked = !input.checked;
   input.dispatchEvent(new Event("change", { bubbles: true }));
   refreshNCNSelect(control);
+
+  option.classList.remove("selection-pulse");
+  void option.offsetWidth;
+  option.classList.add("selection-pulse");
   option.focus();
 }
 
-function activateNCNSelectOption(control, option) {
+async function activateNCNSelectOption(control, option) {
   if (!control || !option) return;
 
   if (isMultipleNCNSelect(control)) {
     toggleMultiNCNSelectValue(control, option);
   } else {
-    setSingleNCNSelectValue(control, option);
+    await setSingleNCNSelectValue(control, option);
   }
 }
 
@@ -142,20 +247,22 @@ document.addEventListener("click", event => {
 
   if (trigger) {
     const control = trigger.closest(".ncn-select");
-    control.classList.contains("is-open")
+    void (control.classList.contains("is-open")
       ? closeNCNSelect(control)
-      : openNCNSelect(control);
+      : openNCNSelect(control));
     return;
   }
 
   const option = event.target.closest(".ncn-select-option");
 
   if (option) {
-    activateNCNSelectOption(option.closest(".ncn-select"), option);
+    void activateNCNSelectOption(option.closest(".ncn-select"), option);
     return;
   }
 
-  if (!event.target.closest(".ncn-select")) closeAllNCNSelects();
+  if (!event.target.closest(".ncn-select")) {
+    void closeAllNCNSelects();
+  }
 });
 
 document.addEventListener("keydown", event => {
@@ -168,7 +275,7 @@ document.addEventListener("keydown", event => {
 
     if (openControl) {
       event.preventDefault();
-      closeNCNSelect(openControl, { restoreFocus: true });
+      void closeNCNSelect(openControl, { restoreFocus: true });
     }
     return;
   }
@@ -180,7 +287,7 @@ document.addEventListener("keydown", event => {
 
   if (trigger && ["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) {
     event.preventDefault();
-    openNCNSelect(control);
+    void openNCNSelect(control);
     return;
   }
 
@@ -200,8 +307,13 @@ document.addEventListener("keydown", event => {
     getNCNSelectOptions(control).at(-1)?.focus();
   } else if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
-    activateNCNSelectOption(control, option);
+    void activateNCNSelectOption(control, option);
   } else if (event.key === "Tab") {
-    closeNCNSelect(control);
+    void closeNCNSelect(control);
   }
+});
+
+window.addEventListener("resize", () => {
+  const openControl = document.querySelector(".ncn-select.is-open");
+  if (openControl) sizeNCNSelectMenu(openControl);
 });
