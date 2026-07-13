@@ -45,7 +45,7 @@ function getMultiInputForOption(option) {
   return option.closest(".ncn-select-option-wrap")?.querySelector(".ncn-multi-input") || null;
 }
 
-function multiSelectSummary(control) {
+function getNCNMultiSelectSummary(control) {
   const checked = [...control.querySelectorAll(".ncn-multi-input:checked")];
   const total = Number(control.dataset.total) || control.querySelectorAll(".ncn-multi-input").length;
 
@@ -67,7 +67,7 @@ function refreshNCNSelect(control) {
       option.setAttribute("aria-selected", input?.checked ? "true" : "false");
     });
 
-    if (valueNode) valueNode.textContent = multiSelectSummary(control);
+    if (valueNode) valueNode.textContent = getNCNMultiSelectSummary(control);
     return;
   }
 
