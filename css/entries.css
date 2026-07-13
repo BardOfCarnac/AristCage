@@ -4,15 +4,7 @@
 
 .entry {
   position: relative;
-  grid-column: 1;
-  grid-row: var(--slot-start, auto) / span var(--slot-span, 2);
-  min-height: 0;
-  height: calc(var(--slot-span, 2) * var(--slot-height));
-}
-
-.entry.slot-measuring {
-  grid-row: auto !important;
-  height: auto !important;
+  margin-bottom: 12px;
 }
 
 /*==================================================
@@ -22,14 +14,8 @@
 .projection-plate {
   position: relative;
   min-height: 92px;
-  height: calc(100% - 12px);
-  margin-bottom: 12px;
   padding: 13px 14px 14px 46px;
   transform-style: preserve-3d;
-}
-
-.entry.slot-measuring .projection-plate {
-  height: auto;
 }
 
 /*==================================================
