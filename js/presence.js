@@ -1,5 +1,5 @@
 /*==================================================
-  PRESENCE
+  PRESENCE AND PROJECTION GROUPS
 ==================================================*/
 
 function resolve(objects) {
@@ -15,34 +15,23 @@ function dismiss(objects, onComplete) {
 }
 
 function glowDown(objects) {
-  const items = objects.filter(Boolean);
-  return new Promise(resolvePromise => {
-    Projection.dismiss(items, resolvePromise);
-  });
+  return Projection.glowDown(objects);
 }
 
 function glowUp(objects) {
-  const items = objects.filter(Boolean);
-  Projection.resolve(items);
-
-  if (NCN_CONFIG.motion.reduced || !items.length) {
-    return Promise.resolve();
-  }
-
-  const delay = NCN_CONFIG.motion.dismissDuration
-    + Math.max(0, items.length - 1) * NCN_CONFIG.motion.resolveStagger;
-
-  return new Promise(resolvePromise => {
-    window.setTimeout(resolvePromise, delay);
-  });
+  return Projection.glowUp(objects);
 }
 
 function showImmediately(objects) {
-  Projection.reveal(objects.filter(Boolean));
+  Projection.reveal(objects);
+}
+
+function hideImmediately(objects) {
+  Projection.conceal(objects);
 }
 
 function cleanProjectionObjects(objects) {
-  objects.filter(Boolean).forEach(object => Projection.clean(object));
+  [...new Set(objects.filter(Boolean))].forEach(object => Projection.clean(object));
 }
 
 /*==================================================
@@ -50,6 +39,8 @@ function cleanProjectionObjects(objects) {
 ==================================================*/
 
 function getEntryIdentityObjects(entry) {
+  if (!entry) return [];
+
   return [
     entry.querySelector(".meta"),
     entry.querySelector(".headline"),
@@ -58,6 +49,8 @@ function getEntryIdentityObjects(entry) {
 }
 
 function getEntryStructureObjects(entry) {
+  if (!entry) return [];
+
   return [
     entry.querySelector(".frame"),
     entry.querySelector(".corners"),
@@ -66,10 +59,13 @@ function getEntryStructureObjects(entry) {
 }
 
 function getEntryBodyObjects(entry) {
+  if (!entry) return [];
   return [entry.querySelector(".body")].filter(Boolean);
 }
 
 function getVisibleProjectionObjects(entry) {
+  if (!entry) return [];
+
   const objects = [
     ...getEntryIdentityObjects(entry),
     ...getEntryStructureObjects(entry)
@@ -82,13 +78,20 @@ function getVisibleProjectionObjects(entry) {
   return objects;
 }
 
+function getProjectionObjectsForEntries(entries) {
+  return [...new Set(
+    entries.flatMap(getVisibleProjectionObjects).filter(Boolean)
+  )];
+}
+
 /*==================================================
-  INITIAL / IMMEDIATE LOAD
+  INITIAL LOAD
 ==================================================*/
 
 function activatePresence(immediate = false) {
-  const objects = [...document.querySelectorAll(".entry")]
-    .flatMap(getVisibleProjectionObjects);
+  const objects = getProjectionObjectsForEntries([
+    ...document.querySelectorAll(".entry")
+  ]);
 
   if (immediate) {
     showImmediately(objects);
