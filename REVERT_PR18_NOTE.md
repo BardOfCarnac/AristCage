@@ -1,1 +1,0 @@
-Temporary note for reverting PR #18. This file will be removed before merge.
