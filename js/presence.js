@@ -63,27 +63,8 @@ function getEntryStructureObjects(entry) {
 }
 
 function getPanelControlObjects(entry) {
-  const body = entry?.querySelector(".body");
-  if (!body) return [];
-
-  // The panel body is only a layout container. Its controls are independent
-  // projection objects and must not inherit generic article .part behaviour.
-  Projection.clean(body);
-  body.classList.remove("part");
-  body.style.opacity = "";
-
-  const controls = [
-    ...body.querySelectorAll(
-      ".control-row, .control-block, .control-actions"
-    )
-  ];
-
-  controls.forEach(control => {
-    control.classList.remove("part");
-    control.classList.add("panel-control");
-  });
-
-  return controls;
+  if (!entry) return [];
+  return [...entry.querySelectorAll(".panel-control")];
 }
 
 function getEntryBodyObjects(entry) {
