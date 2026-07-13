@@ -1,18 +1,19 @@
 /*==================================================
-  TRANSITION LOCKS
-==================================================*/
-
-let NCN_FILTER_TRANSITIONING = false;
-let NCN_PANEL_TRANSITIONING = false;
-
-/*==================================================
   FILTER ACTIONS
 ==================================================*/
 
+function getResultEntries() {
+  return [...feed.querySelectorAll(".entry:not(.panel)")];
+}
+
 function getResultProjectionObjects() {
-  return [...document.querySelectorAll(".entry:not(.panel)")]
-    .flatMap(getVisibleProjectionObjects)
-    .filter(Boolean);
+  return getProjectionObjectsForEntries(getResultEntries());
+}
+
+function getFeedProjectionObjects() {
+  return getProjectionObjectsForEntries([
+    ...feed.querySelectorAll(".entry")
+  ]);
 }
 
 function syncFilterFormFromState(form) {
@@ -35,25 +36,21 @@ function syncFilterFormFromState(form) {
 }
 
 async function transitionFilteredFeed(updateState, form = null) {
-  if (NCN_FILTER_TRANSITIONING || NCN_LAYOUT_TRANSITIONING || NCN_PANEL_TRANSITIONING) return;
-  NCN_FILTER_TRANSITIONING = true;
+  const panel = feed.querySelector(".entry.panel");
 
-  try {
-    await glowDown(getResultProjectionObjects());
+  await runProjectionTransaction({
+    name: "filter-results",
+    keep: () => panel ? getVisibleProjectionObjects(panel) : [],
+    dismiss: getResultProjectionObjects,
+    commit: () => {
+      updateState();
+      clearExpandedEntry();
 
-    updateState();
-    clearExpandedEntry();
-
-    if (form) syncFilterFormFromState(form);
-
-    renderResultsOnly();
-    await waitForLayout();
-    updateProjection();
-
-    await glowUp(getResultProjectionObjects());
-  } finally {
-    NCN_FILTER_TRANSITIONING = false;
-  }
+      if (form) syncFilterFormFromState(form);
+      renderResultsOnly();
+    },
+    resolve: getResultProjectionObjects
+  });
 }
 
 function applyFilterForm(form) {
@@ -74,32 +71,19 @@ function applyFilterForm(form) {
 ==================================================*/
 
 async function transitionPanel(name) {
-  if (NCN_PANEL_TRANSITIONING || NCN_FILTER_TRANSITIONING || NCN_LAYOUT_TRANSITIONING) return;
-  NCN_PANEL_TRANSITIONING = true;
-
-  try {
-    const currentPanel = feed.querySelector(".entry.panel");
-
-    if (currentPanel) {
-      await glowDown(getVisibleProjectionObjects(currentPanel));
-    }
-
-    togglePanel(name);
-    const nextPanel = renderPanelOnly();
-
-    await waitForLayout();
-    updateProjection();
-
-    if (nextPanel) {
-      await glowUp(getVisibleProjectionObjects(nextPanel));
-    }
-  } finally {
-    NCN_PANEL_TRANSITIONING = false;
-  }
+  await runProjectionTransaction({
+    name: `panel:${name}`,
+    dismiss: getFeedProjectionObjects,
+    commit: () => {
+      togglePanel(name);
+      renderPanelOnly();
+    },
+    resolve: getFeedProjectionObjects
+  });
 }
 
 /*==================================================
-  ACTIONS
+  EVENTS
 ==================================================*/
 
 document.addEventListener("submit", event => {
@@ -107,7 +91,7 @@ document.addEventListener("submit", event => {
   if (!filterForm) return;
 
   event.preventDefault();
-  applyFilterForm(filterForm);
+  void applyFilterForm(filterForm);
 });
 
 document.addEventListener("reset", event => {
@@ -115,14 +99,14 @@ document.addEventListener("reset", event => {
   if (!filterForm) return;
 
   event.preventDefault();
-  transitionFilteredFeed(resetFilters, filterForm);
+  void transitionFilteredFeed(resetFilters, filterForm);
 });
 
 document.addEventListener("click", event => {
   const panelButton = event.target.closest("[data-panel]");
 
   if (panelButton) {
-    transitionPanel(panelButton.dataset.panel);
+    void transitionPanel(panelButton.dataset.panel);
     return;
   }
 
@@ -133,8 +117,7 @@ document.addEventListener("click", event => {
   const entry = event.target.closest(".entry");
 
   if (!entry || entry.classList.contains("panel")) return;
-
-  toggleEntryLayout(entry);
+  void toggleEntryLayout(entry);
 });
 
 /*==================================================

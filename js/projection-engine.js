@@ -1,5 +1,8 @@
 /*==================================================
-  PROJECTION ENGINE
+  PROJECTION ENGINE V3
+
+  Projection owns visibility only. It knows nothing about
+  articles, panels, filters, or layout geometry.
 ==================================================*/
 
 const Projection = (() => {
@@ -12,33 +15,21 @@ const Projection = (() => {
     "energy-down"
   ];
 
-  const timers = new WeakMap();
+  const activeTransitions = new WeakMap();
 
-  function clearTimer(object) {
-    const timer = timers.get(object);
-    if (timer) window.clearTimeout(timer);
-    timers.delete(object);
+  function uniqueObjects(objects = []) {
+    return [...new Set(objects.filter(Boolean))];
   }
 
-  function schedule(object, callback, delay) {
-    clearTimer(object);
-
-    if (NCN_CONFIG.motion.reduced || delay <= 0) {
-      callback();
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      timers.delete(object);
-      callback();
-    }, delay);
-
-    timers.set(object, timer);
+  function cancelTransition(object) {
+    const cancel = activeTransitions.get(object);
+    if (cancel) cancel();
+    activeTransitions.delete(object);
   }
 
   function clean(object) {
     if (!object) return;
-    clearTimer(object);
+    cancelTransition(object);
     object.classList.remove(...lifecycleClasses);
   }
 
@@ -48,77 +39,145 @@ const Projection = (() => {
     object.classList.add("present");
   }
 
-  function enter(object) {
+  function hide(object) {
     if (!object) return;
+    clean(object);
+    object.classList.add("gone");
+  }
 
-    clearTimer(object);
-    object.classList.remove("leaving", "gone", "energy-down");
-    object.classList.add("entering", "present");
+  function animationFallbackMs(object) {
+    const style = getComputedStyle(object);
+    const durations = style.animationDuration.split(",").map(parseTime);
+    const delays = style.animationDelay.split(",").map(parseTime);
+    const count = Math.max(durations.length, delays.length, 1);
+    let longest = 0;
 
-    requestAnimationFrame(() => {
-      object.classList.remove("entering");
-      object.classList.add("energy-up");
+    for (let index = 0; index < count; index += 1) {
+      longest = Math.max(
+        longest,
+        (durations[index % durations.length] || 0) +
+        (delays[index % delays.length] || 0)
+      );
+    }
+
+    return Math.max(longest + 120, 900);
+  }
+
+  function parseTime(value) {
+    const text = String(value || "0s").trim();
+    if (text.endsWith("ms")) return parseFloat(text) || 0;
+    if (text.endsWith("s")) return (parseFloat(text) || 0) * 1000;
+    return 0;
+  }
+
+  function waitForAnimation(object) {
+    if (NCN_CONFIG.motion.reduced) return Promise.resolve();
+
+    return new Promise(resolvePromise => {
+      let settled = false;
+      let fallbackTimer;
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        object.removeEventListener("animationend", onAnimationEnd);
+        object.removeEventListener("animationcancel", onAnimationEnd);
+        window.clearTimeout(fallbackTimer);
+        activeTransitions.delete(object);
+        resolvePromise();
+      };
+
+      const onAnimationEnd = event => {
+        if (event.target === object) finish();
+      };
+
+      object.addEventListener("animationend", onAnimationEnd);
+      object.addEventListener("animationcancel", onAnimationEnd);
+      fallbackTimer = window.setTimeout(finish, animationFallbackMs(object));
+      activeTransitions.set(object, finish);
     });
   }
 
-  function leave(object) {
+  async function transitionObjectToGone(object) {
     if (!object) return;
 
-    clearTimer(object);
-    object.classList.remove("entering", "energy-up", "present");
+    clean(object);
     object.classList.add("leaving", "energy-down");
+    await waitForAnimation(object);
+
+    object.classList.remove("leaving", "energy-down");
+    object.classList.add("gone");
   }
 
-  function resolve(objects) {
-    const items = objects.filter(Boolean);
+  async function transitionObjectToPresent(object, delay = 0) {
+    if (!object) return;
+
+    if (!NCN_CONFIG.motion.reduced && delay > 0) {
+      await new Promise(resolvePromise => window.setTimeout(resolvePromise, delay));
+    }
+
+    clean(object);
+    object.classList.add("entering");
+
+    await new Promise(resolvePromise => {
+      requestAnimationFrame(() => {
+        object.classList.remove("entering");
+        object.classList.add("energy-up");
+        resolvePromise();
+      });
+    });
+
+    await waitForAnimation(object);
+    object.classList.remove("energy-up");
+    object.classList.add("present");
+  }
+
+  async function glowDown(objects) {
+    const items = uniqueObjects(objects);
+    await Promise.all(items.map(transitionObjectToGone));
+  }
+
+  async function glowUp(objects) {
+    const items = uniqueObjects(objects);
     const stagger = NCN_CONFIG.motion.reduced
       ? 0
       : NCN_CONFIG.motion.resolveStagger;
 
-    items.forEach((object, index) => {
-      schedule(object, () => enter(object), index * stagger);
-    });
+    await Promise.all(
+      items.map((object, index) =>
+        transitionObjectToPresent(object, index * stagger)
+      )
+    );
   }
 
   function reveal(objects) {
-    objects.filter(Boolean).forEach(show);
+    uniqueObjects(objects).forEach(show);
+  }
+
+  function conceal(objects) {
+    uniqueObjects(objects).forEach(hide);
+  }
+
+  /* Compatibility wrappers for initial-load code. */
+  function resolve(objects) {
+    void glowUp(objects);
   }
 
   function dismiss(objects, onComplete) {
-    const items = objects.filter(Boolean);
-
-    if (!items.length) {
+    glowDown(objects).then(() => {
       if (typeof onComplete === "function") onComplete();
-      return;
-    }
-
-    items.forEach(leave);
-
-    const finish = () => {
-      items.forEach(object => {
-        clearTimer(object);
-        object.classList.remove("leaving", "energy-down");
-        object.classList.add("gone");
-      });
-
-      if (typeof onComplete === "function") onComplete();
-    };
-
-    if (NCN_CONFIG.motion.reduced) {
-      finish();
-      return;
-    }
-
-    window.setTimeout(finish, NCN_CONFIG.motion.dismissDuration);
+    });
   }
 
   return {
     clean,
     show,
-    enter,
-    leave,
-    resolve,
+    hide,
     reveal,
+    conceal,
+    glowDown,
+    glowUp,
+    resolve,
     dismiss
   };
 })();
