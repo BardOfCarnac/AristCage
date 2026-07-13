@@ -1,0 +1,177 @@
+/*==================================================
+  SELECTOR FOCUS TRANSACTION
+==================================================*/
+
+.ncn-select.is-open {
+  z-index: 120;
+}
+
+.ncn-select.is-open .ncn-select-menu {
+  max-height: var(--selector-max-height, min(48vh, 330px));
+  background:
+    linear-gradient(180deg, rgba(30, 3, 2, .995), rgba(2, 0, 0, .998));
+  box-shadow:
+    0 0 20px rgba(255, 50, 30, .28),
+    0 0 48px rgba(255, 25, 15, .12),
+    inset 0 0 30px rgba(255, 45, 25, .045);
+  isolation: isolate;
+}
+
+.ncn-select.opens-up .ncn-select-menu {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+/* The menu does not merely become visible: its apparatus resolves first. */
+.ncn-select.selector-resolving .ncn-select-menu {
+  opacity: 0;
+  transform: translateY(-6px) scaleY(.985);
+}
+
+.ncn-select.opens-up.selector-resolving .ncn-select-menu {
+  transform: translateY(6px) scaleY(.985);
+}
+
+.ncn-select.selector-visible .ncn-select-menu {
+  animation: selector-frame-up .26s linear both;
+}
+
+.ncn-select.selector-closing .ncn-select-menu {
+  pointer-events: none;
+  animation: selector-frame-down .22s linear both;
+}
+
+.ncn-select.is-open .ncn-select-option {
+  opacity: 0;
+  color: var(--energy-1);
+  text-shadow: none;
+}
+
+.ncn-select.selector-visible .ncn-select-option {
+  animation: selector-option-up .32s linear both;
+  animation-delay: calc(var(--selector-option-index, 0) * 28ms + 90ms);
+}
+
+.ncn-select.selector-closing .ncn-select-option {
+  animation: selector-option-down .18s linear both;
+  animation-delay: calc((7 - min(var(--selector-option-index, 0), 7)) * 10ms);
+}
+
+.ncn-select-option.selection-pulse {
+  animation: selector-selection-pulse .24s linear both !important;
+}
+
+@keyframes selector-frame-up {
+  0% {
+    opacity: 0;
+    border-color: var(--energy-0);
+    box-shadow: none;
+    transform: translateY(-5px) scaleY(.985);
+  }
+  48% {
+    opacity: .58;
+    border-color: var(--energy-2);
+    box-shadow: 0 0 6px var(--energy-2);
+  }
+  100% {
+    opacity: 1;
+    border-color: rgba(255, 70, 40, .5);
+    box-shadow:
+      0 0 20px rgba(255, 50, 30, .28),
+      0 0 48px rgba(255, 25, 15, .12),
+      inset 0 0 30px rgba(255, 45, 25, .045);
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes selector-frame-down {
+  0% {
+    opacity: 1;
+    border-color: rgba(255, 70, 40, .5);
+    transform: translateY(0) scaleY(1);
+  }
+  55% {
+    opacity: .46;
+    border-color: var(--energy-2);
+  }
+  100% {
+    opacity: 0;
+    border-color: var(--energy-0);
+    box-shadow: none;
+    transform: translateY(-5px) scaleY(.985);
+  }
+}
+
+@keyframes selector-option-up {
+  0% {
+    opacity: 0;
+    color: var(--energy-0);
+    text-shadow: none;
+    filter: brightness(.45);
+  }
+  45% {
+    opacity: .55;
+    color: var(--energy-3);
+    text-shadow: 0 0 4px currentColor;
+    filter: brightness(.72);
+  }
+  78% {
+    opacity: .88;
+    color: var(--energy-5);
+    text-shadow: 0 0 8px currentColor;
+    filter: brightness(.92);
+  }
+  100% {
+    opacity: 1;
+    color: var(--amber);
+    text-shadow: 0 0 10px rgba(255, 160, 90, .4);
+    filter: brightness(1);
+  }
+}
+
+@keyframes selector-option-down {
+  0% {
+    opacity: 1;
+    color: var(--amber);
+    text-shadow: 0 0 10px rgba(255, 160, 90, .4);
+  }
+  55% {
+    opacity: .45;
+    color: var(--energy-2);
+    text-shadow: 0 0 3px currentColor;
+  }
+  100% {
+    opacity: 0;
+    color: var(--energy-0);
+    text-shadow: none;
+  }
+}
+
+@keyframes selector-selection-pulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  48% {
+    color: var(--white);
+    filter: brightness(1.35);
+    text-shadow:
+      0 0 6px currentColor,
+      0 0 14px currentColor;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ncn-select.selector-visible .ncn-select-menu,
+  .ncn-select.selector-closing .ncn-select-menu,
+  .ncn-select.selector-visible .ncn-select-option,
+  .ncn-select.selector-closing .ncn-select-option,
+  .ncn-select-option.selection-pulse {
+    animation: none !important;
+  }
+
+  .ncn-select.is-open .ncn-select-menu,
+  .ncn-select.is-open .ncn-select-option {
+    opacity: 1;
+    transform: none;
+  }
+}
