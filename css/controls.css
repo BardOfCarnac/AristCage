@@ -1,30 +1,112 @@
 /*==================================================
-  COMPACT CONTROL ROWS
+  NCN CONTROL PANEL
 ==================================================*/
+
+.ncn-control-panel {
+  gap: 11px;
+}
 
 .control-stack {
   display: grid;
-  border-top: 1px solid rgba(255, 70, 40, .18);
+  border-top: 1px solid rgba(255, 70, 40, .2);
+  box-shadow:
+    inset 0 0 24px rgba(255, 35, 20, .018),
+    0 0 14px rgba(255, 35, 20, .025);
 }
 
 .control-row {
   position: relative;
   display: grid;
   grid-template-columns: minmax(7.5rem, .8fr) minmax(0, 1.2fr);
-  align-items: center;
+  align-items: stretch;
   min-height: 46px;
-  border-right: 1px solid rgba(255, 70, 40, .18);
-  border-bottom: 1px solid rgba(255, 70, 40, .18);
-  border-left: 1px solid rgba(255, 70, 40, .18);
-  background: rgba(0, 0, 0, .14);
+  border-right: 1px solid rgba(255, 70, 40, .2);
+  border-bottom: 1px solid rgba(255, 70, 40, .2);
+  border-left: 1px solid rgba(255, 70, 40, .2);
+  background:
+    linear-gradient(90deg, rgba(255, 55, 35, .026), transparent 42%),
+    rgba(0, 0, 0, .16);
+}
+
+.control-row:focus-within {
+  z-index: 50;
+  border-color: rgba(255, 105, 55, .38);
+  box-shadow:
+    0 0 12px rgba(255, 55, 30, .08),
+    inset 0 0 14px rgba(255, 55, 30, .024);
 }
 
 .control-label {
+  display: flex;
+  align-items: center;
+  min-width: 0;
   padding: 10px 12px;
   color: var(--orange);
   font-size: .68rem;
   letter-spacing: .16em;
+  line-height: 1.2;
   text-transform: uppercase;
+}
+
+.control-row > .control-label {
+  border-right: 1px solid rgba(255, 70, 40, .16);
+}
+
+/*==================================================
+  TEXT CONTROLS
+==================================================*/
+
+.panel-fields .control-input,
+.panel-fields .control-textarea {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgba(255, 70, 40, .012);
+  color: var(--amber);
+  font-family: var(--font-main);
+  outline: none;
+}
+
+.panel-fields .control-input {
+  min-height: 45px;
+  padding: 9px 12px;
+  font-size: .88rem;
+  letter-spacing: .04em;
+}
+
+.control-block {
+  display: grid;
+  border: 1px solid rgba(255, 70, 40, .2);
+  background:
+    linear-gradient(135deg, rgba(255, 55, 35, .025), transparent 55%),
+    rgba(0, 0, 0, .16);
+}
+
+.control-block > .control-label {
+  min-height: 38px;
+  border-bottom: 1px solid rgba(255, 70, 40, .16);
+}
+
+.panel-fields .control-textarea {
+  min-height: 112px;
+  padding: 11px 12px;
+  resize: vertical;
+  font-size: .92rem;
+  line-height: 1.5;
+}
+
+.panel-fields .control-input::placeholder,
+.panel-fields .control-textarea::placeholder {
+  color: rgba(255, 180, 120, .4);
+  letter-spacing: .04em;
+}
+
+.panel-fields .control-input:focus,
+.panel-fields .control-textarea:focus {
+  color: var(--white);
+  background: rgba(255, 70, 40, .035);
+  box-shadow: inset 0 0 16px rgba(255, 60, 35, .035);
 }
 
 /*==================================================
@@ -34,6 +116,14 @@
 .ncn-select {
   position: relative;
   min-width: 0;
+}
+
+.ncn-select.is-open {
+  z-index: 60;
+}
+
+.ncn-select-input {
+  display: none !important;
 }
 
 .ncn-select-trigger {
@@ -46,8 +136,7 @@
   min-height: 45px;
   padding: 9px 12px;
   border: 0;
-  border-left: 1px solid rgba(255, 70, 40, .16);
-  background: rgba(255, 70, 40, .015);
+  background: rgba(255, 70, 40, .012);
   color: var(--amber);
   cursor: pointer;
   font: inherit;
@@ -88,19 +177,19 @@
 
 .ncn-select-menu {
   position: absolute;
-  z-index: 40;
+  z-index: 70;
   top: calc(100% + 4px);
   right: 0;
   left: 0;
   display: grid;
-  max-height: min(46vh, 320px);
+  max-height: min(48vh, 330px);
   overflow-y: auto;
-  border: 1px solid rgba(255, 70, 40, .42);
+  border: 1px solid rgba(255, 70, 40, .46);
   background:
-    linear-gradient(180deg, rgba(35, 4, 2, .98), rgba(3, 0, 0, .985));
+    linear-gradient(180deg, rgba(35, 4, 2, .99), rgba(3, 0, 0, .99));
   box-shadow:
-    0 0 16px rgba(255, 50, 30, .2),
-    inset 0 0 24px rgba(255, 40, 20, .035);
+    0 0 18px rgba(255, 50, 30, .22),
+    inset 0 0 26px rgba(255, 40, 20, .04);
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
@@ -115,11 +204,15 @@
   transform: translateY(0);
 }
 
+.ncn-select-option-wrap {
+  position: relative;
+}
+
 .ncn-select-option {
   position: relative;
   width: 100%;
   min-height: 42px;
-  padding: 9px 30px 9px 12px;
+  padding: 9px 32px 9px 12px;
   border: 0;
   border-bottom: 1px solid rgba(255, 70, 40, .12);
   background: transparent;
@@ -131,7 +224,8 @@
   text-align: left;
 }
 
-.ncn-select-option:last-child {
+.ncn-select-option-wrap:last-child .ncn-select-option,
+.ncn-select-menu > .ncn-select-option:last-child {
   border-bottom: 0;
 }
 
@@ -141,6 +235,12 @@
   background: rgba(255, 70, 40, .07);
   outline: none;
   text-shadow: 0 0 10px currentColor;
+}
+
+.ncn-select-option[aria-selected="true"] {
+  color: var(--white);
+  background:
+    linear-gradient(90deg, rgba(255, 70, 40, .08), transparent 58%);
 }
 
 .ncn-select-option[aria-selected="true"]::after {
@@ -155,39 +255,57 @@
   transform: translateY(-50%) rotate(45deg);
 }
 
+.ncn-multiselect .ncn-select-option[aria-selected="true"]::after {
+  width: 8px;
+  height: 5px;
+  border-top: 0;
+  border-right: 1px solid var(--orange);
+  border-bottom: 1px solid var(--orange);
+  border-left: 0;
+  transform: translateY(-65%) rotate(45deg);
+}
+
 /*==================================================
-  CONTROL PANEL COMPACTION
+  ACTION STRIP
 ==================================================*/
 
-.submit-form {
-  gap: 11px;
+.control-actions {
+  padding-top: 2px;
 }
 
-.submit-form textarea {
-  min-height: 112px;
+.control-actions .panel-note {
+  flex: 1 1 15rem;
+  line-height: 1.35;
 }
 
-.filter-groups {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+.filter-status {
+  text-align: right;
 }
 
-.filter-group summary {
-  min-height: 42px;
-  padding: 8px 10px;
-}
-
-.filter-options {
-  padding: 0 10px 10px;
-}
+/*==================================================
+  RESPONSIVE
+==================================================*/
 
 @media (max-width: 600px) {
   .control-row {
-    grid-template-columns: 7.2rem minmax(0, 1fr);
+    grid-template-columns: 6.9rem minmax(0, 1fr);
   }
 
-  .filter-groups {
-    grid-template-columns: 1fr;
+  .control-label {
+    padding: 9px 10px;
+    font-size: .64rem;
+    letter-spacing: .13em;
+  }
+
+  .ncn-select-trigger,
+  .panel-fields .control-input {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .filter-status {
+    flex-basis: 100%;
+    text-align: left;
   }
 }
 

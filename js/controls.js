@@ -1,5 +1,5 @@
 /*==================================================
-  NCN PROJECTED SELECT CONTROLS
+  NCN PROJECTED CONTROLS
 ==================================================*/
 
 function closeNCNSelect(control, { restoreFocus = false } = {}) {
@@ -33,29 +33,96 @@ function openNCNSelect(control) {
   requestAnimationFrame(() => (selected || first)?.focus());
 }
 
-function setNCNSelectValue(control, option) {
-  if (!control || !option) return;
+function isMultipleNCNSelect(control) {
+  return control?.dataset.mode === "multiple";
+}
 
-  const value = option.dataset.value || option.textContent.trim();
-  const input = control.querySelector("input[type='hidden']");
+function getNCNSelectOptions(control) {
+  return [...control.querySelectorAll(".ncn-select-option")];
+}
+
+function getMultiInputForOption(option) {
+  return option.closest(".ncn-select-option-wrap")?.querySelector(".ncn-multi-input") || null;
+}
+
+function multiSelectSummary(control) {
+  const checked = [...control.querySelectorAll(".ncn-multi-input:checked")];
+  const total = Number(control.dataset.total) || control.querySelectorAll(".ncn-multi-input").length;
+
+  if (checked.length === total) return `All ${total}`;
+  if (!checked.length) return "None";
+  if (checked.length === 1) return checked[0].value;
+  return `${checked.length} selected`;
+}
+
+function refreshNCNSelect(control) {
+  if (!control) return;
+
   const valueNode = control.querySelector(".ncn-select-value");
+  const options = getNCNSelectOptions(control);
+
+  if (isMultipleNCNSelect(control)) {
+    options.forEach(option => {
+      const input = getMultiInputForOption(option);
+      option.setAttribute("aria-selected", input?.checked ? "true" : "false");
+    });
+
+    if (valueNode) valueNode.textContent = multiSelectSummary(control);
+    return;
+  }
+
+  const input = control.querySelector(".ncn-select-input[type='hidden']");
+  const selectedValue = input?.value || "";
+
+  options.forEach(option => {
+    option.setAttribute(
+      "aria-selected",
+      option.dataset.value === selectedValue ? "true" : "false"
+    );
+  });
+
+  if (valueNode) valueNode.textContent = selectedValue;
+}
+
+function syncNCNControls(root = document) {
+  root.querySelectorAll(".ncn-select").forEach(refreshNCNSelect);
+}
+
+function setSingleNCNSelectValue(control, option) {
+  const value = option.dataset.value || option.textContent.trim();
+  const input = control.querySelector(".ncn-select-input[type='hidden']");
 
   if (input) {
     input.value = value;
     input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
-  if (valueNode) valueNode.textContent = value;
-
-  control.querySelectorAll(".ncn-select-option").forEach(item => {
-    item.setAttribute("aria-selected", item === option ? "true" : "false");
-  });
-
+  refreshNCNSelect(control);
   closeNCNSelect(control, { restoreFocus: true });
 }
 
+function toggleMultiNCNSelectValue(control, option) {
+  const input = getMultiInputForOption(option);
+  if (!input) return;
+
+  input.checked = !input.checked;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  refreshNCNSelect(control);
+  option.focus();
+}
+
+function activateNCNSelectOption(control, option) {
+  if (!control || !option) return;
+
+  if (isMultipleNCNSelect(control)) {
+    toggleMultiNCNSelectValue(control, option);
+  } else {
+    setSingleNCNSelectValue(control, option);
+  }
+}
+
 function moveNCNSelectFocus(control, direction) {
-  const options = [...control.querySelectorAll(".ncn-select-option")];
+  const options = getNCNSelectOptions(control);
   if (!options.length) return;
 
   const current = options.indexOf(document.activeElement);
@@ -65,6 +132,10 @@ function moveNCNSelectFocus(control, direction) {
 
   options[next].focus();
 }
+
+/*==================================================
+  EVENTS
+==================================================*/
 
 document.addEventListener("click", event => {
   const trigger = event.target.closest(".ncn-select-trigger");
@@ -80,7 +151,7 @@ document.addEventListener("click", event => {
   const option = event.target.closest(".ncn-select-option");
 
   if (option) {
-    setNCNSelectValue(option.closest(".ncn-select"), option);
+    activateNCNSelectOption(option.closest(".ncn-select"), option);
     return;
   }
 
@@ -123,13 +194,13 @@ document.addEventListener("keydown", event => {
     moveNCNSelectFocus(control, -1);
   } else if (event.key === "Home") {
     event.preventDefault();
-    control.querySelector(".ncn-select-option")?.focus();
+    getNCNSelectOptions(control)[0]?.focus();
   } else if (event.key === "End") {
     event.preventDefault();
-    [...control.querySelectorAll(".ncn-select-option")].at(-1)?.focus();
+    getNCNSelectOptions(control).at(-1)?.focus();
   } else if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
-    setNCNSelectValue(control, option);
+    activateNCNSelectOption(control, option);
   } else if (event.key === "Tab") {
     closeNCNSelect(control);
   }
