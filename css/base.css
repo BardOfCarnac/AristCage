@@ -45,23 +45,16 @@ body {
 }
 
 /*==================================================
-  FEED / SLOT GRID
+  FEED
 ==================================================*/
 
 .feed {
-  --slot-height: 46px;
-
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-auto-rows: var(--slot-height);
-  grid-auto-flow: row;
-
   width: min(var(--feed-width), 88vw);
-  margin: 0 auto;
-  padding: 18px 0 90px;
-}
 
-.empty-state {
-  grid-column: 1;
-  grid-row: auto / span 2;
+  margin: 0 auto;
+
+  padding:
+    18px
+    0
+    90px;
 }
