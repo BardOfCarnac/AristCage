@@ -12,7 +12,6 @@
   top: var(--rail-height, 64px);
   z-index: 999;
   height: 38px;
-  margin-bottom: -38px;
   pointer-events: none;
   background:
     linear-gradient(
