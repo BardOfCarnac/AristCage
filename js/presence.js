@@ -38,6 +38,10 @@ function cleanProjectionObjects(objects) {
   PROJECTION GROUPS
 ==================================================*/
 
+function isRenderedProjectionObject(object) {
+  return Boolean(object) && getComputedStyle(object).display !== "none";
+}
+
 function getEntryIdentityObjects(entry) {
   if (!entry) return [];
 
@@ -75,7 +79,7 @@ function getVisibleProjectionObjects(entry) {
     objects.push(...getEntryBodyObjects(entry));
   }
 
-  return objects;
+  return objects.filter(isRenderedProjectionObject);
 }
 
 function getProjectionObjectsForEntries(entries) {
