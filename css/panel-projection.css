@@ -10,6 +10,16 @@
   --resolve-speed: .58s;
   --dismiss-speed: .42s;
   --glow-strength: .55;
+
+  opacity: 0;
+  transition: opacity .2s ease;
+}
+
+.panel-control.entering,
+.panel-control.leaving,
+.panel-control.energy-up,
+.panel-control.energy-down {
+  will-change: opacity, color, filter, text-shadow;
 }
 
 .panel-control.energy-up {
@@ -34,5 +44,14 @@
   .panel-control {
     animation: none !important;
     transition: none !important;
+  }
+
+  .panel-control.present,
+  .panel-control.leaving {
+    opacity: 1;
+  }
+
+  .panel-control.gone {
+    opacity: 0;
   }
 }

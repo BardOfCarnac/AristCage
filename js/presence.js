@@ -66,8 +66,8 @@ function getPanelControlObjects(entry) {
   const body = entry?.querySelector(".body");
   if (!body) return [];
 
-  // The panel body is only a layout container. Its controls are the
-  // projections, otherwise a projected parent would mask their glow-up.
+  // The panel body is only a layout container. Its controls are independent
+  // projection objects and must not inherit generic article .part behaviour.
   Projection.clean(body);
   body.classList.remove("part");
   body.style.opacity = "";
@@ -79,7 +79,8 @@ function getPanelControlObjects(entry) {
   ];
 
   controls.forEach(control => {
-    control.classList.add("part", "panel-control");
+    control.classList.remove("part");
+    control.classList.add("panel-control");
   });
 
   return controls;
