@@ -62,8 +62,36 @@ function getEntryStructureObjects(entry) {
   ].filter(Boolean);
 }
 
+function getPanelControlObjects(entry) {
+  const body = entry?.querySelector(".body");
+  if (!body) return [];
+
+  // The panel body is only a layout container. Its controls are the
+  // projections, otherwise a projected parent would mask their glow-up.
+  Projection.clean(body);
+  body.classList.remove("part");
+  body.style.opacity = "";
+
+  const controls = [
+    ...body.querySelectorAll(
+      ".control-row, .control-block, .control-actions"
+    )
+  ];
+
+  controls.forEach(control => {
+    control.classList.add("part", "panel-control");
+  });
+
+  return controls;
+}
+
 function getEntryBodyObjects(entry) {
   if (!entry) return [];
+
+  if (entry.classList.contains("panel")) {
+    return getPanelControlObjects(entry);
+  }
+
   return [entry.querySelector(".body")].filter(Boolean);
 }
 
