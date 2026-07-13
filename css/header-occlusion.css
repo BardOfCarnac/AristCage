@@ -11,14 +11,16 @@
   position: sticky;
   top: var(--rail-height, 64px);
   z-index: 999;
-  height: 38px;
+  height: 19px;
   pointer-events: none;
   background:
     linear-gradient(
       to bottom,
-      rgba(0, 0, 0, .96) 0%,
-      rgba(0, 0, 0, .72) 32%,
-      rgba(0, 0, 0, .28) 68%,
+      rgba(42, 3, 3, .94) 0%,
+      rgba(105, 8, 8, .72) 28%,
+      rgba(201, 26, 20, .42) 54%,
+      rgba(255, 56, 40, .22) 74%,
+      rgba(255, 106, 40, .08) 88%,
       transparent 100%
     );
 }
@@ -28,8 +30,9 @@
     background:
       linear-gradient(
         to bottom,
-        rgba(0, 0, 0, .98) 0%,
-        rgba(0, 0, 0, .66) 42%,
+        rgba(42, 3, 3, .96) 0%,
+        rgba(148, 16, 13, .58) 46%,
+        rgba(255, 106, 40, .12) 82%,
         transparent 100%
       );
   }
