@@ -21,18 +21,15 @@ function syncFilterFormFromState(form) {
   const time = form.elements.time;
 
   if (search) search.value = NCN_STATE.filters.search;
-
-  if (time) {
-    [...time].forEach(input => {
-      input.checked = input.value === NCN_STATE.filters.time;
-    });
-  }
+  if (time) time.value = NCN_STATE.filters.time;
 
   ["category", "area", "priority", "sourceType"].forEach(group => {
     form.querySelectorAll(`[name="${group}"]`).forEach(input => {
       input.checked = NCN_STATE.filters[group].has(input.value);
     });
   });
+
+  syncNCNControls(form);
 }
 
 async function transitionFilteredFeed(updateState, form = null) {
