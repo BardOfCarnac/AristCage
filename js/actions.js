@@ -47,6 +47,7 @@ async function transitionFilteredFeed(updateState, form = null) {
     if (form) syncFilterFormFromState(form);
 
     renderResultsOnly();
+    initializeSlotLayout();
     await waitForLayout();
     updateProjection();
 
@@ -78,21 +79,18 @@ async function transitionPanel(name) {
   NCN_PANEL_TRANSITIONING = true;
 
   try {
-    const currentPanel = feed.querySelector(".entry.panel");
+    const currentEntries = getSlotEntries();
+    const currentObjects = currentEntries.flatMap(getVisibleProjectionObjects);
 
-    if (currentPanel) {
-      await glowDown(getVisibleProjectionObjects(currentPanel));
-    }
+    await glowDown(currentObjects);
 
     togglePanel(name);
-    const nextPanel = renderPanelOnly();
+    renderPanelOnly();
+    initializeSlotLayout();
 
     await waitForLayout();
     updateProjection();
-
-    if (nextPanel) {
-      await glowUp(getVisibleProjectionObjects(nextPanel));
-    }
+    await glowUp(getSlotEntries().flatMap(getVisibleProjectionObjects));
   } finally {
     NCN_PANEL_TRANSITIONING = false;
   }
@@ -145,4 +143,7 @@ window.addEventListener("scroll", updateProjection, {
   passive: true
 });
 
-window.addEventListener("resize", updateProjection);
+window.addEventListener("resize", () => {
+  initializeSlotLayout();
+  updateProjection();
+});
