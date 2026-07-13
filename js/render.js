@@ -134,6 +134,44 @@ function filterGroup(group, label) {
 }
 
 /*==================================================
+  PROJECTED SELECT MARKUP
+==================================================*/
+
+function ncnSelectMarkup(name, label, values, selectedValue = values[0]) {
+  const controlId = `ncn-select-${name}`;
+
+  return `
+<div class="control-row">
+  <span class="control-label" id="${controlId}-label">${escapeHTML(label)}</span>
+  <div class="ncn-select" data-name="${escapeHTML(name)}">
+    <input type="hidden" name="${escapeHTML(name)}" value="${escapeHTML(selectedValue)}">
+    <button
+      class="ncn-select-trigger"
+      type="button"
+      aria-haspopup="listbox"
+      aria-expanded="false"
+      aria-labelledby="${controlId}-label ${controlId}-value"
+    >
+      <span class="ncn-select-value" id="${controlId}-value">${escapeHTML(selectedValue)}</span>
+      <span class="ncn-select-caret" aria-hidden="true"></span>
+    </button>
+    <div class="ncn-select-menu" role="listbox" aria-labelledby="${controlId}-label">
+      ${values.map(value => `
+        <button
+          class="ncn-select-option"
+          type="button"
+          role="option"
+          tabindex="-1"
+          data-value="${escapeHTML(value)}"
+          aria-selected="${value === selectedValue ? "true" : "false"}"
+        >${escapeHTML(value)}</button>
+      `).join("")}
+    </div>
+  </div>
+</div>`;
+}
+
+/*==================================================
   PANEL
 ==================================================*/
 
@@ -178,17 +216,14 @@ function createPanelEntry(type) {
     meta: "Submission",
     tags: "Headline // Classification // Source // Body",
     body: `
-<form class="panel-fields panel-form" aria-label="Submit report">
-  <fieldset class="panel-section">
-    <legend>Report</legend>
-    <label class="field-label">Headline<input name="headline" placeholder="Headline" required></label>
-    <label class="field-label">Signal body<textarea name="body" placeholder="Body text"></textarea></label>
-  </fieldset>
-  <div class="panel-grid compact-grid">
-    <label class="field-label">Category<select name="category">${NCN_FILTER_OPTIONS.category.map(value => `<option>${value}</option>`).join("")}</select></label>
-    <label class="field-label">Area<select name="area">${NCN_FILTER_OPTIONS.area.map(value => `<option>${value}</option>`).join("")}</select></label>
-    <label class="field-label">Source type<select name="sourceType">${NCN_FILTER_OPTIONS.sourceType.map(value => `<option>${value}</option>`).join("")}</select></label>
-    <label class="field-label">Priority<select name="priority">${NCN_FILTER_OPTIONS.priority.map(value => `<option>${value}</option>`).join("")}</select></label>
+<form class="panel-fields panel-form submit-form" aria-label="Submit report">
+  <label class="field-label">Headline<input name="headline" placeholder="Headline" required></label>
+  <label class="field-label">Signal body<textarea name="body" placeholder="Body text"></textarea></label>
+  <div class="control-stack" aria-label="Report classification">
+    ${ncnSelectMarkup("category", "Category", NCN_FILTER_OPTIONS.category)}
+    ${ncnSelectMarkup("area", "Area", NCN_FILTER_OPTIONS.area)}
+    ${ncnSelectMarkup("sourceType", "Source type", NCN_FILTER_OPTIONS.sourceType)}
+    ${ncnSelectMarkup("priority", "Priority", NCN_FILTER_OPTIONS.priority)}
   </div>
   <label class="field-label">Source<input name="source" placeholder="Name, outlet, scanner or anonymous handle"></label>
   <div class="panel-actions">
