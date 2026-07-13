@@ -1,0 +1,199 @@
+/*==================================================
+  COMPACT CONTROL ROWS
+==================================================*/
+
+.control-stack {
+  display: grid;
+  border-top: 1px solid rgba(255, 70, 40, .18);
+}
+
+.control-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(7.5rem, .8fr) minmax(0, 1.2fr);
+  align-items: center;
+  min-height: 46px;
+  border-right: 1px solid rgba(255, 70, 40, .18);
+  border-bottom: 1px solid rgba(255, 70, 40, .18);
+  border-left: 1px solid rgba(255, 70, 40, .18);
+  background: rgba(0, 0, 0, .14);
+}
+
+.control-label {
+  padding: 10px 12px;
+  color: var(--orange);
+  font-size: .68rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+/*==================================================
+  PROJECTED SELECT
+==================================================*/
+
+.ncn-select {
+  position: relative;
+  min-width: 0;
+}
+
+.ncn-select-trigger {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 45px;
+  padding: 9px 12px;
+  border: 0;
+  border-left: 1px solid rgba(255, 70, 40, .16);
+  background: rgba(255, 70, 40, .015);
+  color: var(--amber);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.ncn-select-trigger:hover,
+.ncn-select-trigger:focus-visible,
+.ncn-select.is-open .ncn-select-trigger {
+  color: var(--white);
+  background: rgba(255, 70, 40, .045);
+  box-shadow:
+    inset 8px 0 14px -14px var(--orange),
+    0 0 12px rgba(255, 90, 40, .1);
+  outline: none;
+}
+
+.ncn-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .88rem;
+  letter-spacing: .05em;
+}
+
+.ncn-select-caret {
+  width: 8px;
+  height: 8px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform .18s ease;
+}
+
+.ncn-select.is-open .ncn-select-caret {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+
+.ncn-select-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  display: grid;
+  max-height: min(46vh, 320px);
+  overflow-y: auto;
+  border: 1px solid rgba(255, 70, 40, .42);
+  background:
+    linear-gradient(180deg, rgba(35, 4, 2, .98), rgba(3, 0, 0, .985));
+  box-shadow:
+    0 0 16px rgba(255, 50, 30, .2),
+    inset 0 0 24px rgba(255, 40, 20, .035);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity .16s ease,
+    transform .16s ease;
+}
+
+.ncn-select.is-open .ncn-select-menu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.ncn-select-option {
+  position: relative;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 30px 9px 12px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 70, 40, .12);
+  background: transparent;
+  color: var(--amber);
+  cursor: pointer;
+  font: inherit;
+  font-size: .84rem;
+  letter-spacing: .05em;
+  text-align: left;
+}
+
+.ncn-select-option:last-child {
+  border-bottom: 0;
+}
+
+.ncn-select-option:hover,
+.ncn-select-option:focus-visible {
+  color: var(--white);
+  background: rgba(255, 70, 40, .07);
+  outline: none;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.ncn-select-option[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--orange);
+  box-shadow: 0 0 8px var(--orange);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+/*==================================================
+  CONTROL PANEL COMPACTION
+==================================================*/
+
+.submit-form {
+  gap: 11px;
+}
+
+.submit-form textarea {
+  min-height: 112px;
+}
+
+.filter-groups {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.filter-group summary {
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.filter-options {
+  padding: 0 10px 10px;
+}
+
+@media (max-width: 600px) {
+  .control-row {
+    grid-template-columns: 7.2rem minmax(0, 1fr);
+  }
+
+  .filter-groups {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ncn-select-menu,
+  .ncn-select-caret {
+    transition: none;
+  }
+}
