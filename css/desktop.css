@@ -1,17 +1,4 @@
 /*==================================================
-  SHARED ACTIVE HEADLINE ENERGY
-==================================================*/
-
-.headline {
-  --projection-color: var(--warm-white);
-}
-
-.entry.active .headline,
-.entry.expanded .headline {
-  --projection-color: var(--white);
-}
-
-/*==================================================
   DESKTOP SPLIT VIEW
 ==================================================*/
 
