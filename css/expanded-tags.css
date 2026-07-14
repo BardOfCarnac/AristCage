@@ -1,0 +1,6 @@
+.expanded-tags {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 158, 66, .14);
+  max-width: 38ch;
+}

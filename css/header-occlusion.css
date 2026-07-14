@@ -1,56 +1,26 @@
-/*==================================================
-  HEADER / FEED OCCLUSION
-==================================================*/
+/* HEADER / FEED OCCLUSION */
 
 .rail {
-  background:
-    linear-gradient(to bottom, rgba(0, 0, 0, .98), rgba(0, 0, 0, .94));
+  background: linear-gradient(to bottom, rgba(0, 0, 0, .98), rgba(0, 0, 0, .94));
 }
 
-/*
-  A narrow black fade immediately beneath the rail.
-
-  The layer does not recolour or alter whole entries. It simply covers the
-  small slice of content that physically passes behind it, so the rest of the
-  article remains untouched. With no content underneath, it reads as ordinary
-  black space.
-
-  Add `occlusion-effect-off` to <html> to disable the fade while retaining the
-  same spacing beneath the rail.
-*/
 .rail-occlusion {
-  position: sticky;
-  top: calc(var(--rail-height, 64px) - 5px);
+  position: fixed;
+  top: calc(var(--rail-height, 64px) - 4px);
+  left: 0;
+  right: 0;
   z-index: 999;
-  height: 16px;
+  height: 12px;
   pointer-events: none;
-  background:
-    linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 1) 0%,
-      rgba(0, 0, 0, .92) 24%,
-      rgba(0, 0, 0, .58) 58%,
-      rgba(0, 0, 0, .18) 84%,
-      transparent 100%
-    );
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 1) 0%,
+    rgba(0, 0, 0, .82) 28%,
+    rgba(0, 0, 0, .38) 66%,
+    transparent 100%
+  );
 }
 
 html.occlusion-effect-off .rail-occlusion {
-  background: transparent;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rail-occlusion {
-    background:
-      linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 1) 0%,
-        rgba(0, 0, 0, .72) 52%,
-        transparent 100%
-      );
-  }
-
-  html.occlusion-effect-off .rail-occlusion {
-    background: transparent;
-  }
+  display: none;
 }
