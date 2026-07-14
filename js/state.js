@@ -12,6 +12,7 @@ const NCN_FILTER_OPTIONS = {
 const NCN_STATE = {
   activePanel: null,
   expandedEntryId: null,
+  selectedEntryId: null,
   filters: {
     search: "",
     time: "Now",
@@ -42,6 +43,14 @@ function collapseEntry(id) {
 
 function clearExpandedEntry() {
   NCN_STATE.expandedEntryId = null;
+}
+
+function selectEntry(id) {
+  NCN_STATE.selectedEntryId = id;
+}
+
+function clearSelectedEntry() {
+  NCN_STATE.selectedEntryId = null;
 }
 
 /*==================================================
