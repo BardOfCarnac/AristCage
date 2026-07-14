@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="css/controls.css" />
   <link rel="stylesheet" href="css/selector-focus.css" />
   <link rel="stylesheet" href="css/responsive.css" />
+  <link rel="stylesheet" href="css/desktop.css" />
   <link rel="stylesheet" href="css/diagnostics.css" />
 </head>
 
@@ -50,7 +51,10 @@
     <div class="rail-occlusion" aria-hidden="true"></div>
 
     <main class="app">
-      <section class="feed" id="feed" aria-label="Projected feed"></section>
+      <div class="app-shell">
+        <section class="feed" id="feed" aria-label="Projected feed"></section>
+        <aside class="desktop-inspector" id="desktop-inspector" aria-label="Selected transmission"></aside>
+      </div>
     </main>
   </div>
 
@@ -68,6 +72,7 @@
   <script src="js/app.js"></script>
   <script src="js/header-occlusion.js"></script>
   <script src="js/priority-palette.js"></script>
+  <script src="js/desktop.js"></script>
   <script src="js/diagnostics.js"></script>
 </body>
 </html>
