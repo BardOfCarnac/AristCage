@@ -8,79 +8,42 @@
 }
 
 /*
-  Transparent effect zone. The strip itself paints no ordinary background.
-  Empty black space therefore remains black.
-
-  Add `occlusion-effect-off` to <html> to disable the treatment instantly
-  while preserving the spacing beneath the rail.
+  This element defines coordinates only. It never paints anything.
+  Pulling it 3px beneath the rail keeps the effect visually attached
+  to the title bar while preserving a small black breathing space.
 */
 .rail-occlusion {
   position: sticky;
-  top: var(--rail-height, 64px);
+  top: calc(var(--rail-height, 64px) - 3px);
   z-index: 999;
   height: 19px;
   pointer-events: none;
-  isolation: isolate;
   background: transparent;
 }
 
-/* Recolour only illuminated pixels passing beneath the zone. */
-.rail-occlusion::before,
-.rail-occlusion::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+/*
+  JavaScript supplies --occlusion-progress from 0 to 1 according to
+  the entry's position inside the invisible zone. The treatment sits
+  on the entry wrapper, so it does not interfere with projection-part
+  glow animations or their own opacity states.
+*/
+.entry.occlusion-active {
+  opacity: calc(1 - var(--occlusion-progress, 0));
+  filter:
+    sepia(var(--occlusion-progress, 0))
+    saturate(calc(1 + (7 * var(--occlusion-progress, 0))))
+    hue-rotate(calc(-18deg * var(--occlusion-progress, 0)))
+    brightness(calc(1 - (.68 * var(--occlusion-progress, 0))));
 }
 
-.rail-occlusion::before {
-  background:
-    linear-gradient(
-      to bottom,
-      var(--energy-0) 0%,
-      var(--energy-2) 30%,
-      var(--energy-4) 56%,
-      var(--energy-6) 78%,
-      var(--energy-8) 100%
-    );
-  mix-blend-mode: color;
-}
-
-/* Reduce luminance towards the rail so the projection disappears into black. */
-.rail-occlusion::after {
-  background:
-    linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, .98) 0%,
-      rgba(0, 0, 0, .78) 28%,
-      rgba(0, 0, 0, .38) 62%,
-      transparent 100%
-    );
-}
-
-html.occlusion-effect-off .rail-occlusion::before,
-html.occlusion-effect-off .rail-occlusion::after {
-  display: none;
+html.occlusion-effect-off .entry.occlusion-active {
+  opacity: 1;
+  filter: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rail-occlusion::before {
-    background:
-      linear-gradient(
-        to bottom,
-        var(--energy-0) 0%,
-        var(--energy-3) 48%,
-        var(--energy-7) 100%
-      );
-  }
-
-  .rail-occlusion::after {
-    background:
-      linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, .98) 0%,
-        rgba(0, 0, 0, .62) 50%,
-        transparent 100%
-      );
+  .entry.occlusion-active {
+    opacity: calc(1 - var(--occlusion-progress, 0));
+    filter: brightness(calc(1 - (.72 * var(--occlusion-progress, 0))));
   }
 }
