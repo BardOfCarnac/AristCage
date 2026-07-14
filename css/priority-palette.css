@@ -1,40 +1,51 @@
 /*==================================================
-  PRIORITY SIGNAL PALETTE
+  PRIORITY ENERGY PALETTE
 
-  Priority is a semantic signal, not an energy level.
-  Every rail still uses the shared projection lifecycle,
-  but settles at the colour assigned to its priority.
+  Priority is expressed as a resting point on the
+  shared red-to-gold projection ladder.
 ==================================================*/
 
 .priority-bulletin {
   --priority-signal: var(--priority-bulletin);
-  --priority-aura: rgb(56 223 255 / .18);
+  --projection-step-0: var(--energy-0);
+  --projection-step-1: var(--energy-1);
+  --projection-step-2: var(--energy-2);
+  --priority-aura: rgb(148 16 13 / .18);
 }
 
 .priority-advisory {
   --priority-signal: var(--priority-advisory);
-  --priority-aura: rgb(0 170 255 / .18);
+  --projection-step-0: var(--energy-0);
+  --projection-step-1: var(--energy-2);
+  --projection-step-2: var(--energy-3);
+  --priority-aura: rgb(201 26 20 / .18);
 }
 
 .priority-alert {
   --priority-signal: var(--priority-alert);
-  --priority-aura: rgb(111 92 255 / .18);
+  --projection-step-0: var(--energy-1);
+  --projection-step-1: var(--energy-3);
+  --projection-step-2: var(--energy-4);
+  --priority-aura: rgb(255 56 40 / .18);
 }
 
 .priority-warning {
   --priority-signal: var(--priority-warning);
-  --priority-aura: rgb(184 77 255 / .18);
+  --projection-step-0: var(--energy-1);
+  --projection-step-1: var(--energy-4);
+  --projection-step-2: var(--energy-5);
+  --priority-aura: rgb(255 106 40 / .18);
 }
 
 .priority-emergency {
   --priority-signal: var(--priority-emergency);
-  --priority-aura: rgb(255 62 181 / .2);
+  --projection-step-0: var(--energy-2);
+  --projection-step-1: var(--energy-5);
+  --projection-step-2: var(--energy-7);
+  --priority-aura: rgb(255 209 122 / .22);
 }
 
 .priority[class*="priority-"] {
-  --projection-step-0: color-mix(in srgb, var(--priority-signal, var(--red)) 14%, black);
-  --projection-step-1: color-mix(in srgb, var(--priority-signal, var(--red)) 32%, black);
-  --projection-step-2: color-mix(in srgb, var(--priority-signal, var(--red)) 68%, black);
   --projection-color: var(--priority-signal, var(--red));
   --glow-strength: .9;
 }
