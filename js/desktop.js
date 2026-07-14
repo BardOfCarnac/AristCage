@@ -18,6 +18,7 @@
 
   function markActiveEntry() {
     feed.querySelectorAll(".entry:not(.panel)").forEach(entry => {
+      entry.classList.remove("expanded");
       entry.classList.toggle(
         "active",
         entry.dataset.entryId === NCN_STATE.expandedEntryId
@@ -44,6 +45,19 @@
     return entryMarkup(story);
   }
 
+  function applyInspectorPriority(entry) {
+    if (!entry) return;
+
+    const rail = entry.querySelector(".priority");
+    if (!rail) return;
+
+    const label = NCN_STATE.activePanel
+      ? (NCN_STATE.activePanel === "filter" ? "alert" : "warning")
+      : String(selectedStory()?.priorityLabel || "bulletin").toLowerCase();
+
+    rail.classList.add(`priority-${label}`);
+  }
+
   function commitInspector() {
     inspector.innerHTML = inspectorMarkup();
 
@@ -51,6 +65,7 @@
     if (!entry) return;
 
     entry.classList.add("expanded", "active");
+    applyInspectorPriority(entry);
     hideImmediately(getVisibleProjectionObjects(entry));
   }
 
