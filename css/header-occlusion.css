@@ -39,6 +39,20 @@ html.occlusion-effect-off .rail-occlusion {
   background: transparent;
 }
 
+/*
+  Desktop has two visual surfaces. The feed scrolls; the inspector does not.
+  Confine the occlusion layer to the left grid column so the inspector remains
+  fully clear at every scroll position.
+*/
+@media (min-width: 601px) {
+  .rail-occlusion {
+    position: fixed;
+    top: calc(var(--rail-height, 64px) - 5px);
+    left: max(2vw, calc((100vw - 1480px) / 2));
+    width: calc((min(1480px, 96vw) - 18px) / 2);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rail-occlusion {
     background:
