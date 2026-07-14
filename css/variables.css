@@ -28,9 +28,21 @@
 --gold:     var(--energy-8);
 --warm-white: var(--energy-9);
 --white:    var(--energy-10);
+
+/*==================================================
+  PRIORITY SIGNAL PALETTE
+==================================================*/
+
+--priority-bulletin:  #38dfff;
+--priority-advisory:  #00aaff;
+--priority-alert:     #6f5cff;
+--priority-warning:   #b84dff;
+--priority-emergency: #ff3eb5;
+
   --feed-width: 760px;
   --feed-unit: 118px;
   --feed-gap: 8px;
 
   --font-main: "Saira", Arial, Helvetica, sans-serif;
---font-display: "Barlow Condensed", Arial, Helvetica, sans-serif;}
+  --font-display: "Barlow Condensed", Arial, Helvetica, sans-serif;
+}
