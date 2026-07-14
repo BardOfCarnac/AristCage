@@ -60,10 +60,12 @@ async function runProjectionTransaction({
     await commit();
     await waitForLayout();
     updateProjection();
-    showImmediately(readProjectionObjects(keep));
+
+    const committedKeepObjects = readProjectionObjects(keep);
+    showImmediately(committedKeepObjects);
 
     const resolveObjects = readProjectionObjects(resolve)
-      .filter(object => !readProjectionObjects(keep).includes(object));
+      .filter(object => !committedKeepObjects.includes(object));
 
     traceTransaction(name, "RESOLVE", resolveObjects);
     await glowUp(resolveObjects);
