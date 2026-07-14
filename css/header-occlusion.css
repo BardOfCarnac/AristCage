@@ -8,42 +8,49 @@
 }
 
 /*
-  This element defines coordinates only. It never paints anything.
-  Pulling it 3px beneath the rail keeps the effect visually attached
-  to the title bar while preserving a small black breathing space.
+  A narrow black fade immediately beneath the rail.
+
+  The layer does not recolour or alter whole entries. It simply covers the
+  small slice of content that physically passes behind it, so the rest of the
+  article remains untouched. With no content underneath, it reads as ordinary
+  black space.
+
+  Add `occlusion-effect-off` to <html> to disable the fade while retaining the
+  same spacing beneath the rail.
 */
 .rail-occlusion {
   position: sticky;
-  top: calc(var(--rail-height, 64px) - 3px);
+  top: calc(var(--rail-height, 64px) - 5px);
   z-index: 999;
-  height: 19px;
+  height: 16px;
   pointer-events: none;
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 1) 0%,
+      rgba(0, 0, 0, .92) 24%,
+      rgba(0, 0, 0, .58) 58%,
+      rgba(0, 0, 0, .18) 84%,
+      transparent 100%
+    );
+}
+
+html.occlusion-effect-off .rail-occlusion {
   background: transparent;
 }
 
-/*
-  JavaScript supplies --occlusion-progress from 0 to 1 according to
-  the entry's position inside the invisible zone. The treatment sits
-  on the entry wrapper, so it does not interfere with projection-part
-  glow animations or their own opacity states.
-*/
-.entry.occlusion-active {
-  opacity: calc(1 - var(--occlusion-progress, 0));
-  filter:
-    sepia(var(--occlusion-progress, 0))
-    saturate(calc(1 + (7 * var(--occlusion-progress, 0))))
-    hue-rotate(calc(-18deg * var(--occlusion-progress, 0)))
-    brightness(calc(1 - (.68 * var(--occlusion-progress, 0))));
-}
-
-html.occlusion-effect-off .entry.occlusion-active {
-  opacity: 1;
-  filter: none;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .entry.occlusion-active {
-    opacity: calc(1 - var(--occlusion-progress, 0));
-    filter: brightness(calc(1 - (.72 * var(--occlusion-progress, 0))));
+  .rail-occlusion {
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, .72) 52%,
+        transparent 100%
+      );
+  }
+
+  html.occlusion-effect-off .rail-occlusion {
+    background: transparent;
   }
 }
