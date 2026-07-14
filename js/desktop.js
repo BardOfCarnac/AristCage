@@ -20,18 +20,6 @@
     return NCN_ENTRIES.find(entry => entry.id === NCN_STATE.selectedEntryId) || null;
   }
 
-  function selectedFeedEntry() {
-    if (!NCN_STATE.selectedEntryId) return null;
-
-    return feed.querySelector(
-      `.entry[data-entry-id="${CSS.escape(NCN_STATE.selectedEntryId)}"]`
-    );
-  }
-
-  function selectedHeadline() {
-    return selectedFeedEntry()?.querySelector(".headline") || null;
-  }
-
   function inspectorProjectionObjects() {
     const entry = inspector.querySelector(".entry");
     return entry ? getVisibleProjectionObjects(entry) : [];
@@ -70,7 +58,7 @@
     const priorityName = String(story.priorityLabel || "Bulletin").toLowerCase();
 
     return `
-<article class="entry inspector-entry active expanded" data-entry-id="inspector-${escapeHTML(story.id)}">
+<article class="entry inspector-entry expanded" data-entry-id="inspector-${escapeHTML(story.id)}">
   <div class="projection-plate">
     <div class="part frame gone"></div>
     <div class="part corners gone" aria-hidden="true">
@@ -122,28 +110,19 @@
   async function changeDesktopView({ entryId = NCN_STATE.selectedEntryId, panel = null } = {}) {
     if (!isDesktop() || NCN_PROJECTION_TRANSITIONING) return;
 
-    const oldHeadline = selectedHeadline();
     const oldInspectorObjects = inspectorProjectionObjects();
 
     await runProjectionTransaction({
       name: panel ? `desktop-panel:${panel}` : `desktop-story:${entryId}`,
-      dismiss: () => [oldHeadline, ...oldInspectorObjects],
+      dismiss: oldInspectorObjects,
       commit: () => {
         NCN_STATE.activePanel = panel;
         if (entryId) selectEntry(entryId);
 
         markFeedSelection();
-
-        if (oldHeadline) showImmediately(oldHeadline);
-
         commitInspector();
-        const newHeadline = selectedHeadline();
-        if (newHeadline && !panel) hideImmediately(newHeadline);
       },
-      resolve: () => [
-        ...(!panel && selectedHeadline() ? [selectedHeadline()] : []),
-        ...inspectorProjectionObjects()
-      ]
+      resolve: inspectorProjectionObjects
     });
   }
 
