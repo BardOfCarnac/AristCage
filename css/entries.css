@@ -7,6 +7,23 @@
   margin-bottom: 12px;
 }
 
+/* Compact story cards behave as projected controls rather than documents. */
+.entry:not(.panel),
+.entry:not(.panel) * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Text becomes selectable only when a story is opened for reading. */
+.entry.expanded:not(.panel) .meta,
+.entry.expanded:not(.panel) .headline,
+.entry.expanded:not(.panel) .tags,
+.entry.expanded:not(.panel) .body,
+.entry.expanded:not(.panel) .body * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /*==================================================
   PROJECTION PLATE
 ==================================================*/
