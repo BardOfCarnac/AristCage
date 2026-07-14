@@ -3,41 +3,44 @@
 :root {
   --bg: #020204;
 
-/*==================================================
-  PROJECTION ENERGY SCALE
-==================================================*/
+  /*==================================================
+    PROJECTION ENERGY SCALE
+  ==================================================*/
 
---energy-0:  #2a0303;  /* Very Dark Red */
---energy-1:  #420505;  /* Dark Red */
---energy-2:  #690808;  /* Crimson */
---energy-3:  #94100d;  /* Bright Crimson */
---energy-4:  #c91a14;  /* Red */
---energy-5:  #ff3828;  /* Red-Orange */
---energy-6:  #ff6a28;  /* Orange */
---energy-7:  #ff9e42;  /* Amber */
---energy-8:  #ffd17a;  /* Gold */
---energy-9:  #fff0c4;  /* Warm White */
---energy-10: #ffffff;  /* Pure White */
+  --energy-0:  #2a0303;  /* Very Dark Red */
+  --energy-1:  #420505;  /* Dark Red */
+  --energy-2:  #690808;  /* Crimson */
+  --energy-3:  #94100d;  /* Bright Crimson */
+  --energy-4:  #c91a14;  /* Red */
+  --energy-5:  #ff3828;  /* Red-Orange */
+  --energy-6:  #ff6a28;  /* Orange */
+  --energy-7:  #ff9e42;  /* Amber */
+  --energy-8:  #ffd17a;  /* Gold */
+  --energy-9:  #fff0c4;  /* Warm White */
+  --energy-10: #ffffff;  /* Pure White */
 
-/* Common aliases */
+  /* Common aliases */
 
---deep-red: var(--energy-0);
---red:      var(--energy-5);
---orange:   var(--energy-6);
---amber:    var(--energy-7);
---gold:     var(--energy-8);
---warm-white: var(--energy-9);
---white:    var(--energy-10);
+  --deep-red: var(--energy-0);
+  --red:      var(--energy-5);
+  --orange:   var(--energy-6);
+  --amber:    var(--energy-7);
+  --gold:     var(--energy-8);
+  --warm-white: var(--energy-9);
+  --white:    var(--energy-10);
 
-/*==================================================
-  PRIORITY SIGNAL PALETTE
-==================================================*/
+  /*==================================================
+    PRIORITY RESTING ENERGY
 
---priority-bulletin:  #38dfff;
---priority-advisory:  #00aaff;
---priority-alert:     #6f5cff;
---priority-warning:   #b84dff;
---priority-emergency: #ff3eb5;
+    Priority remains within the same red-to-gold
+    projection spectrum used by the rest of the viewer.
+  ==================================================*/
+
+  --priority-bulletin:  var(--energy-3);
+  --priority-advisory:  var(--energy-4);
+  --priority-alert:     var(--energy-5);
+  --priority-warning:   var(--energy-6);
+  --priority-emergency: var(--energy-8);
 
   --feed-width: 760px;
   --feed-unit: 118px;
