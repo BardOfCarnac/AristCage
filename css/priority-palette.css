@@ -1,12 +1,7 @@
-/*==================================================
-  PRIORITY ENERGY PALETTE
-
-  Priority is expressed as a resting point on the
-  shared red-to-gold projection ladder.
-==================================================*/
+/* PRIORITY ENERGY PALETTE */
 
 .priority-bulletin {
-  --priority-signal: var(--priority-bulletin);
+  --priority-signal: var(--energy-3);
   --projection-step-0: var(--energy-0);
   --projection-step-1: var(--energy-1);
   --projection-step-2: var(--energy-2);
@@ -14,7 +9,7 @@
 }
 
 .priority-advisory {
-  --priority-signal: var(--priority-advisory);
+  --priority-signal: var(--energy-4);
   --projection-step-0: var(--energy-0);
   --projection-step-1: var(--energy-2);
   --projection-step-2: var(--energy-3);
@@ -22,7 +17,7 @@
 }
 
 .priority-alert {
-  --priority-signal: var(--priority-alert);
+  --priority-signal: var(--energy-5);
   --projection-step-0: var(--energy-1);
   --projection-step-1: var(--energy-3);
   --projection-step-2: var(--energy-4);
@@ -30,7 +25,7 @@
 }
 
 .priority-warning {
-  --priority-signal: var(--priority-warning);
+  --priority-signal: var(--energy-6);
   --projection-step-0: var(--energy-1);
   --projection-step-1: var(--energy-4);
   --projection-step-2: var(--energy-5);
@@ -38,15 +33,19 @@
 }
 
 .priority-emergency {
-  --priority-signal: var(--priority-emergency);
+  --priority-signal: var(--energy-8);
   --projection-step-0: var(--energy-2);
   --projection-step-1: var(--energy-5);
   --projection-step-2: var(--energy-7);
   --priority-aura: rgb(255 209 122 / .22);
 }
 
-.priority[class*="priority-"] {
-  --projection-color: var(--priority-signal, var(--red));
+.priority.priority-bulletin,
+.priority.priority-advisory,
+.priority.priority-alert,
+.priority.priority-warning,
+.priority.priority-emergency {
+  --projection-color: var(--priority-signal);
   --glow-strength: .9;
 }
 
