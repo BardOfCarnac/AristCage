@@ -97,6 +97,15 @@ function getRenderedEntry(entryId) {
   );
 }
 
+function getStableIdentityObjects(entry) {
+  if (!entry) return [];
+  return [entry.querySelector(".meta"), entry.querySelector(".tags")].filter(Boolean);
+}
+
+function getHeadlineObject(entry) {
+  return entry?.querySelector(".headline") || null;
+}
+
 /*==================================================
   ARTICLE TRANSACTIONS
 ==================================================*/
@@ -109,8 +118,9 @@ async function expandArticleWithProjection(entry) {
 
   await runProjectionTransaction({
     name: `expand:${entryId}`,
-    keep: () => getEntryIdentityObjects(entry),
+    keep: () => getStableIdentityObjects(entry),
     dismiss: () => [
+      getHeadlineObject(entry),
       ...getEntryStructureObjects(entry),
       ...getProjectionObjectsForEntries(affectedEntries)
     ],
@@ -120,6 +130,7 @@ async function expandArticleWithProjection(entry) {
       entry.classList.add("expanded");
     },
     resolve: () => [
+      getHeadlineObject(entry),
       ...getEntryStructureObjects(entry),
       ...getEntryBodyObjects(entry),
       ...getProjectionObjectsForEntries(affectedEntries)
@@ -135,8 +146,9 @@ async function collapseArticleWithProjection(entry) {
 
   await runProjectionTransaction({
     name: `collapse:${entryId}`,
-    keep: () => getEntryIdentityObjects(entry),
+    keep: () => getStableIdentityObjects(entry),
     dismiss: () => [
+      getHeadlineObject(entry),
       ...getEntryStructureObjects(entry),
       ...getEntryBodyObjects(entry),
       ...getProjectionObjectsForEntries(affectedEntries)
@@ -146,6 +158,7 @@ async function collapseArticleWithProjection(entry) {
       entry.classList.remove("expanded");
     },
     resolve: () => [
+      getHeadlineObject(entry),
       ...getEntryStructureObjects(entry),
       ...getProjectionObjectsForEntries(affectedEntries)
     ]
@@ -165,8 +178,10 @@ async function switchArticleWithProjection(openEntry, nextEntry) {
 
   await runProjectionTransaction({
     name: `switch:${openId}->${nextId}`,
-    keep: () => getEntryIdentityObjects(keepEntry),
+    keep: () => getStableIdentityObjects(keepEntry),
     dismiss: () => [
+      getHeadlineObject(openEntry),
+      getHeadlineObject(nextEntry),
       ...getEntryStructureObjects(anchorEntry),
       ...(anchorEntry === openEntry ? getEntryBodyObjects(openEntry) : []),
       ...getProjectionObjectsForEntries(affectedEntries)
@@ -186,6 +201,8 @@ async function switchArticleWithProjection(openEntry, nextEntry) {
       );
 
       return [
+        getHeadlineObject(currentOpen),
+        getHeadlineObject(currentNext),
         ...getEntryStructureObjects(currentOpen),
         ...getEntryStructureObjects(currentNext),
         ...getEntryBodyObjects(currentNext),
