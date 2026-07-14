@@ -4,7 +4,7 @@
 
 (() => {
   const inspector = document.querySelector("#desktop-inspector");
-  const desktopQuery = window.matchMedia("(min-width: 980px)");
+  const desktopQuery = window.matchMedia("(min-width: 860px)");
 
   if (!inspector) return;
 
