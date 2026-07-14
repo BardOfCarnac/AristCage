@@ -1,27 +1,11 @@
 /*==================================================
-  DESKTOP
+  WIDE HEADER
+
+  Desktop layout belongs to desktop.css. This file only
+  adjusts shared controls and small-screen presentation.
 ==================================================*/
 
 @media (min-width: 900px) {
-  :root {
-    --feed-width: 1080px;
-    --feed-unit: 132px;
-    --feed-gap: 16px;
-  }
-
-  .feed {
-    width: min(var(--feed-width), 88vw);
-    padding-top: 24px;
-  }
-
-  .entry {
-    width: min(760px, 72%);
-  }
-
-  .entry:nth-child(even) {
-    margin-left: auto;
-  }
-
   .rail {
     padding: 10px 32px;
   }
