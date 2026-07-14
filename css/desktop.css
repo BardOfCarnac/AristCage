@@ -7,9 +7,26 @@
 }
 
 @media (min-width: 601px) {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    overflow: hidden;
+  }
+
+  .viewer {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .app {
     width: min(1480px, 96vw);
+    height: calc(100dvh - var(--rail-height, 64px));
     margin: 0 auto;
+    overflow: hidden;
   }
 
   .app-shell {
@@ -17,16 +34,24 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 18px;
     align-items: start;
+    height: 100%;
+    overflow: hidden;
   }
 
   .feed {
     width: 100%;
-    margin: 0;
+    height: 100%;
     min-width: 0;
+    margin: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
 
   .feed .entry:not(.panel) {
     width: 100%;
+    max-width: none;
   }
 
   .feed .entry:not(.panel) .expansion-zone,
@@ -42,13 +67,22 @@
   .desktop-inspector {
     display: block;
     position: sticky;
-    top: calc(var(--rail-height, 64px) + 18px);
+    top: 0;
+    width: 100%;
     min-width: 0;
     min-height: 420px;
+    overflow: visible;
+  }
+
+  .desktop-inspector .inspector-entry,
+  .desktop-inspector .projection-plate {
+    width: 100%;
+    max-width: none;
   }
 
   .desktop-inspector .inspector-entry {
     margin: 0;
+    justify-self: stretch;
   }
 
   .desktop-inspector .projection-plate {
