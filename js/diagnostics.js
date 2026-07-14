@@ -1,5 +1,8 @@
 /*==================================================
   PROJECTION DIAGNOSTICS
+
+  The activation gestures are always available, but the diagnostics UI and
+  live viewport listeners are created only while diagnostics are enabled.
 ==================================================*/
 
 const NCN_DIAGNOSTICS_KEY = "ncn-diagnostics";
@@ -11,14 +14,15 @@ const NCN_DIAGNOSTIC_LAYERS = [
   { name: "Body", profile: "body" },
   { name: "Corners", profile: "corners" },
   { name: "Priority", profile: "priority" },
-  { name: "Frame", profile: "frame" },
-  { name: "Chamber", depth: -1 }
+  { name: "Frame", profile: "frame" }
 ];
 
 let diagnosticsPanel;
+let diagnosticsToggle;
 let diagnosticsLiveEntry;
 let diagnosticsLiveOffset;
 let diagnosticsLiveScroll;
+let diagnosticsLiveListenersBound = false;
 let diagnosticMarkTapCount = 0;
 let diagnosticMarkTapTimer;
 
@@ -27,16 +31,6 @@ function diagnosticsEnabledFromEnvironment() {
   if (query.get("debug") === "1") return true;
   if (query.get("debug") === "0") return false;
   return window.localStorage.getItem(NCN_DIAGNOSTICS_KEY) === "1";
-}
-
-function setDiagnosticsEnabled(enabled) {
-  document.documentElement.classList.toggle("diagnostics-on", enabled);
-  window.localStorage.setItem(NCN_DIAGNOSTICS_KEY, enabled ? "1" : "0");
-  if (enabled) updateDiagnosticsLiveValues();
-}
-
-function toggleDiagnostics() {
-  setDiagnosticsEnabled(!document.documentElement.classList.contains("diagnostics-on"));
 }
 
 function energySpectrumMarkup() {
@@ -64,7 +58,9 @@ function diagnosticLayerMarkup(layer) {
   `;
 }
 
-function createDiagnosticsInterface() {
+function ensureDiagnosticsInterface() {
+  if (diagnosticsPanel) return;
+
   const panel = document.createElement("aside");
   panel.className = "diagnostics-panel";
   panel.setAttribute("aria-label", "Projection diagnostics");
@@ -99,11 +95,11 @@ function createDiagnosticsInterface() {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "diagnostics-toggle";
-  toggle.textContent = "Dev off";
   toggle.addEventListener("click", toggleDiagnostics);
 
   document.body.append(panel, toggle);
   diagnosticsPanel = panel;
+  diagnosticsToggle = toggle;
   diagnosticsLiveEntry = panel.querySelector("[data-debug-entry]");
   diagnosticsLiveOffset = panel.querySelector("[data-debug-offset]");
   diagnosticsLiveScroll = panel.querySelector("[data-debug-scroll]");
@@ -140,7 +136,42 @@ function updateDiagnosticsLiveValues() {
   diagnosticsLiveScroll.textContent = Math.round(window.scrollY).toString();
 }
 
-function bindDiagnosticsTriggers() {
+function bindDiagnosticsLiveListeners() {
+  if (diagnosticsLiveListenersBound) return;
+  window.addEventListener("scroll", updateDiagnosticsLiveValues, { passive: true });
+  window.addEventListener("resize", updateDiagnosticsLiveValues);
+  diagnosticsLiveListenersBound = true;
+}
+
+function unbindDiagnosticsLiveListeners() {
+  if (!diagnosticsLiveListenersBound) return;
+  window.removeEventListener("scroll", updateDiagnosticsLiveValues);
+  window.removeEventListener("resize", updateDiagnosticsLiveValues);
+  diagnosticsLiveListenersBound = false;
+}
+
+function setDiagnosticsEnabled(enabled) {
+  if (enabled) {
+    ensureDiagnosticsInterface();
+    document.documentElement.classList.add("diagnostics-on");
+    diagnosticsToggle.textContent = "Dev on";
+    window.localStorage.setItem(NCN_DIAGNOSTICS_KEY, "1");
+    bindDiagnosticsLiveListeners();
+    updateDiagnosticsLiveValues();
+    return;
+  }
+
+  document.documentElement.classList.remove("diagnostics-on");
+  if (diagnosticsToggle) diagnosticsToggle.textContent = "Dev off";
+  window.localStorage.setItem(NCN_DIAGNOSTICS_KEY, "0");
+  unbindDiagnosticsLiveListeners();
+}
+
+function toggleDiagnostics() {
+  setDiagnosticsEnabled(!document.documentElement.classList.contains("diagnostics-on"));
+}
+
+function bindDiagnosticsActivationTriggers() {
   document.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "d") {
       event.preventDefault();
@@ -162,11 +193,10 @@ function bindDiagnosticsTriggers() {
       diagnosticMarkTapCount = 0;
     }, 650);
   });
-
-  window.addEventListener("scroll", updateDiagnosticsLiveValues, { passive: true });
-  window.addEventListener("resize", updateDiagnosticsLiveValues);
 }
 
-createDiagnosticsInterface();
-bindDiagnosticsTriggers();
-setDiagnosticsEnabled(diagnosticsEnabledFromEnvironment());
+bindDiagnosticsActivationTriggers();
+
+if (diagnosticsEnabledFromEnvironment()) {
+  setDiagnosticsEnabled(true);
+}
