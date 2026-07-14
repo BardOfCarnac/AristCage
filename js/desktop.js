@@ -16,6 +16,15 @@
     return NCN_ENTRIES.find(entry => entry.id === NCN_STATE.expandedEntryId) || null;
   }
 
+  function feedEntry(entryId) {
+    if (!entryId) return null;
+    return feed.querySelector(`.entry[data-entry-id="${CSS.escape(entryId)}"]`);
+  }
+
+  function feedHeadline(entryId) {
+    return feedEntry(entryId)?.querySelector(".headline") || null;
+  }
+
   function markActiveEntry() {
     feed.querySelectorAll(".entry:not(.panel)").forEach(entry => {
       entry.classList.remove("expanded");
@@ -87,10 +96,26 @@
   async function selectStory(entryId) {
     if (NCN_STATE.expandedEntryId === entryId && !NCN_STATE.activePanel) return;
 
+    const oldId = NCN_STATE.expandedEntryId;
+    const oldHeadline = feedHeadline(oldId);
+
+    if (oldHeadline) {
+      await glowDown([oldHeadline]);
+      feedEntry(oldId)?.classList.remove("active");
+      showImmediately([oldHeadline]);
+    }
+
     NCN_STATE.activePanel = null;
     NCN_STATE.expandedEntryId = entryId;
     markActiveEntry();
-    await renderInspector();
+
+    const nextHeadline = feedHeadline(entryId);
+    if (nextHeadline) hideImmediately([nextHeadline]);
+
+    await Promise.all([
+      nextHeadline ? glowUp([nextHeadline]) : Promise.resolve(),
+      renderInspector()
+    ]);
   }
 
   async function selectPanel(panelName) {
