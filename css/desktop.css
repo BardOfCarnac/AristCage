@@ -1,0 +1,87 @@
+/*==================================================
+  ACTIVE HEADLINE ENERGY
+==================================================*/
+
+.headline {
+  color: var(--warm-white);
+  --projection-color: var(--warm-white);
+}
+
+.entry.active .headline,
+.entry.expanded .headline {
+  color: var(--white);
+  --projection-color: var(--white);
+  text-shadow:
+    0 0 8px rgba(255,255,255,.92),
+    0 0 22px rgba(255,240,196,.64),
+    0 0 44px rgba(255,158,66,.22);
+}
+
+/*==================================================
+  DESKTOP SPLIT VIEW
+==================================================*/
+
+.desktop-inspector {
+  display: none;
+}
+
+@media (min-width: 980px) {
+  .app {
+    width: min(1480px, 94vw);
+    margin: 0 auto;
+  }
+
+  .app-shell {
+    display: grid;
+    grid-template-columns: minmax(360px, 40%) minmax(0, 1fr);
+    gap: clamp(24px, 3vw, 54px);
+    align-items: start;
+  }
+
+  .feed {
+    width: 100%;
+    margin: 0;
+  }
+
+  /* Desktop keeps the feed geometrically stable. */
+  .feed .entry:not(.panel) .expansion-zone,
+  .feed .entry.panel {
+    display: none !important;
+  }
+
+  .desktop-inspector {
+    display: block;
+    position: sticky;
+    top: calc(var(--rail-height, 64px) + 22px);
+    min-width: 0;
+    min-height: 420px;
+  }
+
+  .desktop-inspector .entry {
+    margin: 0;
+  }
+
+  .desktop-inspector .projection-plate {
+    min-height: 420px;
+  }
+
+  .desktop-inspector .entry.expanded .expansion-zone,
+  .desktop-inspector .entry.panel .expansion-zone {
+    display: block;
+  }
+
+  .desktop-inspector .body {
+    max-width: 58ch;
+  }
+
+  .desktop-inspector .inspector-placeholder {
+    min-height: 420px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255,70,40,.14);
+    color: var(--energy-3);
+    font-size: .76rem;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+}
