@@ -1,10 +1,14 @@
 /*==================================================
-  DESKTOP INSPECTOR
+  DESKTOP MODE
+
+  Desktop selection is deliberately separate from mobile
+  expansion. The feed remains compact while a dedicated
+  inspector owns the selected story, Filter or Submit view.
 ==================================================*/
 
 (() => {
   const inspector = document.querySelector("#desktop-inspector");
-  const desktopQuery = window.matchMedia("(min-width: 860px)");
+  const desktopQuery = window.matchMedia("(min-width: 601px)");
 
   if (!inspector) return;
 
@@ -13,17 +17,19 @@
   }
 
   function selectedStory() {
-    return NCN_ENTRIES.find(entry => entry.id === NCN_STATE.expandedEntryId) || null;
+    return NCN_ENTRIES.find(entry => entry.id === NCN_STATE.selectedEntryId) || null;
   }
 
-  function markActiveEntry() {
-    feed.querySelectorAll(".entry:not(.panel)").forEach(entry => {
-      entry.classList.remove("expanded");
-      entry.classList.toggle(
-        "active",
-        entry.dataset.entryId === NCN_STATE.expandedEntryId
-      );
-    });
+  function selectedFeedEntry() {
+    if (!NCN_STATE.selectedEntryId) return null;
+
+    return feed.querySelector(
+      `.entry[data-entry-id="${CSS.escape(NCN_STATE.selectedEntryId)}"]`
+    );
+  }
+
+  function selectedHeadline() {
+    return selectedFeedEntry()?.querySelector(".headline") || null;
   }
 
   function inspectorProjectionObjects() {
@@ -31,31 +37,76 @@
     return entry ? getVisibleProjectionObjects(entry) : [];
   }
 
+  function ensureSelection() {
+    const visible = getVisibleEntries();
+    const visibleIds = new Set(visible.map(entry => entry.id));
+
+    if (!visibleIds.has(NCN_STATE.selectedEntryId)) {
+      selectEntry(visible[0]?.id || null);
+    }
+  }
+
+  function markFeedSelection() {
+    feed.querySelectorAll(".entry:not(.panel)").forEach(entry => {
+      entry.classList.remove("expanded");
+      entry.classList.toggle(
+        "active",
+        !NCN_STATE.activePanel && entry.dataset.entryId === NCN_STATE.selectedEntryId
+      );
+    });
+  }
+
+  function detailRow(label, value) {
+    return `
+      <div class="detail-label">${escapeHTML(label)}</div>
+      <div class="detail-value">${escapeHTML(value || "—")}</div>`;
+  }
+
+  function storyInspectorMarkup(story) {
+    if (!story) {
+      return `<div class="inspector-placeholder">Select a transmission</div>`;
+    }
+
+    const priorityName = String(story.priorityLabel || "Bulletin").toLowerCase();
+
+    return `
+<article class="entry inspector-entry active expanded" data-entry-id="inspector-${escapeHTML(story.id)}">
+  <div class="projection-plate">
+    <div class="part frame gone"></div>
+    <div class="part corners gone" aria-hidden="true">
+      <i class="corner corner-tl"></i>
+      <i class="corner corner-tr"></i>
+      <i class="corner corner-bl"></i>
+      <i class="corner corner-br"></i>
+    </div>
+    <div class="part priority priority-${Number(story.priority) || 1} priority-${priorityName} gone"></div>
+
+    <div class="entry-content">
+      <div class="part meta gone">${escapeHTML(story.meta)}</div>
+      <h2 class="part headline gone">${escapeHTML(story.headline)}</h2>
+      <div class="part tags gone">${escapeHTML(story.tags)}</div>
+
+      <div class="part body gone">
+        <p>${escapeHTML(story.body || "No further details available.")}</p>
+        <div class="inspector-detail-grid">
+          ${detailRow("Category", story.category)}
+          ${detailRow("Area", story.area)}
+          ${detailRow("Source type", story.sourceType)}
+          ${detailRow("Priority", story.priorityLabel)}
+          ${detailRow("Time scope", story.timeScope)}
+        </div>
+      </div>
+    </div>
+  </div>
+</article>`;
+  }
+
   function inspectorMarkup() {
     if (NCN_STATE.activePanel) {
       return entryMarkup(createPanelEntry(NCN_STATE.activePanel));
     }
 
-    const story = selectedStory();
-
-    if (!story) {
-      return `<div class="inspector-placeholder">Select a transmission</div>`;
-    }
-
-    return entryMarkup(story);
-  }
-
-  function applyInspectorPriority(entry) {
-    if (!entry) return;
-
-    const rail = entry.querySelector(".priority");
-    if (!rail) return;
-
-    const label = NCN_STATE.activePanel
-      ? (NCN_STATE.activePanel === "filter" ? "alert" : "warning")
-      : String(selectedStory()?.priorityLabel || "bulletin").toLowerCase();
-
-    rail.classList.add(`priority-${label}`);
+    return storyInspectorMarkup(selectedStory());
   }
 
   function commitInspector() {
@@ -64,44 +115,36 @@
     const entry = inspector.querySelector(".entry");
     if (!entry) return;
 
-    entry.classList.add("expanded", "active");
-    applyInspectorPriority(entry);
+    entry.classList.add("expanded");
     hideImmediately(getVisibleProjectionObjects(entry));
   }
 
-  async function renderInspector() {
-    if (!isDesktop()) return;
+  async function changeDesktopView({ entryId = NCN_STATE.selectedEntryId, panel = null } = {}) {
+    if (!isDesktop() || NCN_PROJECTION_TRANSITIONING) return;
 
-    const oldObjects = inspectorProjectionObjects();
+    const oldHeadline = selectedHeadline();
+    const oldInspectorObjects = inspectorProjectionObjects();
 
     await runProjectionTransaction({
-      name: "desktop-inspector",
-      dismiss: oldObjects,
-      commit: commitInspector,
-      resolve: inspectorProjectionObjects
+      name: panel ? `desktop-panel:${panel}` : `desktop-story:${entryId}`,
+      dismiss: () => [oldHeadline, ...oldInspectorObjects],
+      commit: () => {
+        NCN_STATE.activePanel = panel;
+        if (entryId) selectEntry(entryId);
+
+        markFeedSelection();
+
+        if (oldHeadline) showImmediately(oldHeadline);
+
+        commitInspector();
+        const newHeadline = selectedHeadline();
+        if (newHeadline && !panel) hideImmediately(newHeadline);
+      },
+      resolve: () => [
+        ...(!panel && selectedHeadline() ? [selectedHeadline()] : []),
+        ...inspectorProjectionObjects()
+      ]
     });
-
-    markActiveEntry();
-  }
-
-  async function selectStory(entryId) {
-    if (NCN_STATE.expandedEntryId === entryId && !NCN_STATE.activePanel) return;
-
-    NCN_STATE.activePanel = null;
-    NCN_STATE.expandedEntryId = entryId;
-    markActiveEntry();
-    await renderInspector();
-  }
-
-  async function selectPanel(panelName) {
-    NCN_STATE.activePanel = panelName;
-    await renderInspector();
-  }
-
-  function chooseInitialStory() {
-    if (NCN_STATE.activePanel || selectedStory()) return;
-    const firstVisible = getVisibleEntries()[0];
-    if (firstVisible) NCN_STATE.expandedEntryId = firstVisible.id;
   }
 
   document.addEventListener("click", event => {
@@ -112,7 +155,10 @@
     if (panelButton) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      void selectPanel(panelButton.dataset.panel);
+
+      const requested = panelButton.dataset.panel;
+      const nextPanel = NCN_STATE.activePanel === requested ? null : requested;
+      void changeDesktopView({ panel: nextPanel });
       return;
     }
 
@@ -125,21 +171,28 @@
 
     event.preventDefault();
     event.stopImmediatePropagation();
-    void selectStory(entry.dataset.entryId);
+
+    if (
+      !NCN_STATE.activePanel &&
+      entry.dataset.entryId === NCN_STATE.selectedEntryId
+    ) {
+      return;
+    }
+
+    void changeDesktopView({ entryId: entry.dataset.entryId, panel: null });
   }, true);
 
   new MutationObserver(() => {
     if (!isDesktop()) return;
 
-    const visibleIds = new Set(getVisibleEntries().map(entry => entry.id));
+    const previousSelection = NCN_STATE.selectedEntryId;
+    ensureSelection();
+    markFeedSelection();
 
-    if (!NCN_STATE.activePanel && !visibleIds.has(NCN_STATE.expandedEntryId)) {
-      NCN_STATE.expandedEntryId = getVisibleEntries()[0]?.id || null;
-      void renderInspector();
-      return;
+    if (previousSelection !== NCN_STATE.selectedEntryId && !NCN_STATE.activePanel) {
+      commitInspector();
+      showImmediately(inspectorProjectionObjects());
     }
-
-    markActiveEntry();
   }).observe(feed, { childList: true, subtree: true });
 
   desktopQuery.addEventListener("change", event => {
@@ -148,19 +201,20 @@
     activatePresence(true);
 
     if (event.matches) {
-      chooseInitialStory();
+      ensureSelection();
+      markFeedSelection();
       commitInspector();
       showImmediately(inspectorProjectionObjects());
-      markActiveEntry();
     } else {
       inspector.innerHTML = "";
+      feed.querySelectorAll(".entry.active").forEach(entry => entry.classList.remove("active"));
     }
   });
 
   if (isDesktop()) {
-    chooseInitialStory();
+    ensureSelection();
+    markFeedSelection();
     commitInspector();
     showImmediately(inspectorProjectionObjects());
-    markActiveEntry();
   }
 })();
