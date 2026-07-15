@@ -1,0 +1,143 @@
+/*==================================================
+  UI POLISH
+
+  Keeps the controls subordinate to the projected article: red at rest,
+  gently warmer during interaction, and without boxed text compartments.
+==================================================*/
+
+/* The form is one projected article, not a stack of framed widgets. */
+.control-stack {
+  border-top: 0;
+  box-shadow: none;
+}
+
+.control-row,
+.control-block {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.control-row:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 52, 38, .13);
+}
+
+.control-row > .control-label,
+.control-block > .control-label {
+  border: 0;
+}
+
+.control-row:focus-within,
+.control-block:focus-within {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.control-label,
+.field-label,
+.panel-section legend,
+.filter-group summary {
+  color: rgba(255, 54, 44, .86);
+  text-shadow: 0 0 5px rgba(255, 38, 28, .14);
+}
+
+.panel-fields .control-input,
+.panel-fields .control-textarea,
+.ncn-select-trigger {
+  color: rgba(255, 68, 52, .9);
+  background: transparent;
+  box-shadow: none;
+}
+
+.panel-fields .control-input:focus,
+.panel-fields .control-textarea:focus,
+.ncn-select-trigger:hover,
+.ncn-select-trigger:focus-visible {
+  color: rgba(255, 103, 58, .96);
+  background: transparent;
+  box-shadow: none;
+}
+
+.ncn-select.is-open .ncn-select-trigger {
+  color: rgba(255, 126, 64, .98);
+  background: transparent;
+  box-shadow: none;
+}
+
+.ncn-select-caret {
+  color: rgba(255, 60, 46, .9);
+}
+
+.ncn-select.is-open .ncn-select-caret {
+  color: rgba(255, 126, 64, .98);
+}
+
+/* Only an open selector enters normal flow. It grows the article to fit every
+   option, while a closed selector keeps its invisible menu out of the layout. */
+.ncn-select.is-open .ncn-select-menu,
+.ncn-select.is-open.opens-up .ncn-select-menu {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  max-height: none;
+  overflow: visible;
+  margin-top: 1px;
+  border: 0;
+  border-left: 1px solid rgba(255, 52, 38, .22);
+  background: rgba(3, 0, 0, .985);
+  box-shadow: none;
+}
+
+.ncn-select-option {
+  border: 0;
+  color: rgba(255, 62, 48, .9);
+  background: transparent;
+}
+
+.ncn-select-option + .ncn-select-option,
+.ncn-select-option-wrap + .ncn-select-option-wrap {
+  border-top: 1px solid rgba(255, 52, 38, .1);
+}
+
+.ncn-select-option:hover,
+.ncn-select-option:focus-visible {
+  color: rgba(255, 100, 58, .98);
+  background: rgba(255, 48, 34, .025);
+  text-shadow: 0 0 6px currentColor;
+}
+
+.ncn-select-option[aria-selected="true"] {
+  color: rgba(255, 170, 92, .98);
+  background: linear-gradient(90deg, rgba(255, 102, 48, .035), transparent 60%);
+  text-shadow: 0 0 6px rgba(255, 148, 76, .22);
+}
+
+.ncn-select-option[aria-selected="true"]::after,
+.ncn-multiselect .ncn-select-option[aria-selected="true"]::after {
+  border-color: rgba(255, 170, 92, .95);
+  box-shadow: 0 0 5px rgba(255, 136, 68, .28);
+}
+
+/* Header controls are physical controls: they warm smoothly from red into a
+   nearby orange, without projection-style glow pulses. */
+.rail-actions button {
+  color: rgba(255, 68, 54, .92);
+  border-color: rgba(255, 58, 44, .28);
+  box-shadow: none;
+  transition: color .18s ease, border-color .18s ease;
+}
+
+.rail-actions button:hover,
+.rail-actions button:focus-visible {
+  color: rgba(255, 96, 58, .98);
+  border-color: rgba(255, 86, 52, .42);
+  box-shadow: none;
+}
+
+.rail-actions button[aria-pressed="true"] {
+  color: rgba(255, 124, 64, .98);
+  border-color: rgba(255, 104, 58, .48);
+  box-shadow: none;
+}
