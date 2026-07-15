@@ -1,37 +1,77 @@
 /*==================================================
   PROJECTION COHESION
 
-  Articles resolve as single projected objects. Every article starts at the
-  same moment; these tiny overlapping offsets preserve internal structure
-  without creating a visible headline / frame / body sequence.
+  Articles resolve as a small number of meaningful projection groups rather
+  than a visible sequence of independent component events. The body remains
+  separate because expansion can introduce or remove it independently.
 ==================================================*/
 
-.frame.energy-up { animation-delay: 0ms; }
-.corners.energy-up { animation-delay: 8ms; }
-.priority.energy-up { animation-delay: 12ms; }
-.meta.energy-up { animation-delay: 14ms; }
-.headline.energy-up { animation-delay: 18ms; }
-.tags.energy-up { animation-delay: 24ms; }
-.body.energy-up,
-.panel-control.energy-up { animation-delay: 30ms; }
+/* Structural layer */
+.frame.energy-up,
+.corners.energy-up {
+  animation-delay: 0ms;
+}
 
-/* Compact transmissions retain a defined inner halo without continuously
-   painting the wider reading-surface glow. Expanded stories, panels and the
-   desktop inspector continue to inherit the full two-layer resting glow. */
-.feed .entry:not(.expanded):not(.panel) .meta,
-.feed .entry:not(.expanded):not(.panel) .headline,
-.feed .entry:not(.expanded):not(.panel) .tags,
-.feed .entry:not(.expanded):not(.panel) .body {
+/* Priority energy layer */
+.priority.energy-up {
+  animation-delay: 8ms;
+}
+
+/* Identity layer */
+.meta.energy-up,
+.headline.energy-up,
+.tags.energy-up {
+  animation-delay: 12ms;
+}
+
+/* Expansion / control layer */
+.body.energy-up,
+.panel-control.energy-up {
+  animation-delay: 24ms;
+}
+
+/* All resting text uses one defined halo. Richer layered bloom remains part of
+   the active energy-up and energy-down animations only. */
+.meta,
+.headline,
+.tags,
+.body {
   text-shadow: 0 0 calc(7px * var(--glow-strength)) currentColor;
 }
 
-/* Resting priority rails keep a tight core and medium halo, but drop the
-   broad 42px ambient wash. The full projection animation remains unchanged. */
+/* Resting priority rails retain a tight core and medium halo. */
 .priority.present,
 .priority.leaving {
   box-shadow:
     0 0 calc(8px * var(--glow-strength)) var(--projection-color),
     0 0 calc(16px * var(--glow-strength)) var(--projection-color);
+}
+
+/* The projection peak uses the same two useful glow zones and omits the broad
+   42px ambient wash. */
+@keyframes solid-energy-up {
+  0% {
+    opacity: 0;
+    background-color: var(--projection-step-0);
+    box-shadow: none;
+  }
+  34% {
+    opacity: .45;
+    background-color: var(--projection-step-1);
+    box-shadow: 0 0 4px currentColor;
+  }
+  68% {
+    opacity: .82;
+    background-color: var(--projection-step-2);
+    box-shadow: 0 0 calc(10px * var(--glow-strength)) var(--projection-step-2);
+  }
+  100% {
+    opacity: 1;
+    background-color: var(--projection-color);
+    box-shadow:
+      0 0 calc(8px * var(--glow-strength)) var(--projection-color),
+      0 0 calc(20px * var(--glow-strength)) var(--projection-color);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
