@@ -1,0 +1,149 @@
+/*==================================================
+  UI COHESION
+
+  Keeps forms predominantly red while reserving low amber for
+  selected, focused and active states.
+==================================================*/
+
+.control-stack {
+  border-top-color: rgba(255, 55, 35, .14);
+  box-shadow: none;
+}
+
+.control-row,
+.control-block {
+  border-color: rgba(255, 55, 35, .15);
+  background: rgba(0, 0, 0, .08);
+}
+
+.control-row {
+  border-right-color: rgba(255, 55, 35, .15);
+  border-bottom-color: rgba(255, 55, 35, .15);
+  border-left-color: rgba(255, 55, 35, .15);
+}
+
+.control-row > .control-label,
+.control-block > .control-label {
+  border-color: rgba(255, 55, 35, .11);
+}
+
+.control-row:focus-within,
+.control-block:focus-within {
+  border-color: rgba(255, 178, 92, .34);
+  box-shadow: 0 0 9px rgba(255, 126, 54, .08);
+}
+
+.control-label,
+.field-label,
+.panel-section legend,
+.filter-group summary {
+  color: rgba(255, 62, 48, .82);
+  text-shadow: 0 0 6px rgba(255, 42, 32, .16);
+}
+
+.panel-note,
+.filter-count {
+  color: rgba(255, 88, 66, .5);
+}
+
+.panel-fields .control-input,
+.panel-fields .control-textarea,
+.ncn-select-trigger {
+  background: transparent;
+  color: rgba(255, 72, 54, .86);
+  box-shadow: none;
+}
+
+.panel-fields .control-input::placeholder,
+.panel-fields .control-textarea::placeholder,
+.panel-fields input::placeholder,
+.panel-fields textarea::placeholder {
+  color: rgba(255, 92, 70, .48);
+}
+
+.ncn-select-caret {
+  color: rgba(255, 62, 48, .84);
+}
+
+.panel-fields .control-input:focus,
+.panel-fields .control-textarea:focus,
+.ncn-select-trigger:hover,
+.ncn-select-trigger:focus-visible,
+.ncn-select.is-open .ncn-select-trigger {
+  color: var(--amber);
+  background: rgba(255, 70, 40, .018);
+  box-shadow: inset 7px 0 12px -14px var(--amber);
+}
+
+.ncn-select.is-open .ncn-select-caret {
+  color: var(--amber);
+}
+
+.ncn-select-menu {
+  border-color: rgba(255, 60, 42, .28);
+  background: rgba(4, 0, 0, .985);
+  box-shadow: 0 0 12px rgba(255, 40, 26, .1);
+}
+
+.ncn-select-option {
+  border-bottom-color: rgba(255, 55, 38, .09);
+  color: rgba(255, 68, 50, .86);
+}
+
+.ncn-select-option:hover,
+.ncn-select-option:focus-visible {
+  color: var(--orange);
+  background: rgba(255, 55, 38, .035);
+  text-shadow: 0 0 7px currentColor;
+}
+
+.ncn-select-option[aria-selected="true"] {
+  color: var(--amber);
+  background: linear-gradient(90deg, rgba(255, 176, 92, .045), transparent 58%);
+  text-shadow: 0 0 7px rgba(255, 188, 108, .26);
+}
+
+.ncn-select-option[aria-selected="true"]::after,
+.ncn-multiselect .ncn-select-option[aria-selected="true"]::after {
+  border-color: var(--amber);
+  box-shadow: 0 0 6px rgba(255, 188, 108, .34);
+}
+
+.panel-fields button {
+  border-color: rgba(255, 58, 42, .28);
+  background: transparent;
+  color: rgba(255, 72, 54, .9);
+}
+
+.panel-fields button:hover,
+.panel-fields button:focus-visible {
+  color: var(--amber);
+  border-color: rgba(255, 176, 92, .46);
+  background: rgba(255, 176, 92, .025);
+  box-shadow: 0 0 9px rgba(255, 176, 92, .12);
+}
+
+.panel-fields .secondary-action {
+  color: rgba(255, 62, 48, .66);
+  border-color: rgba(255, 58, 42, .16);
+}
+
+.rail-actions button {
+  color: rgba(255, 78, 62, .88);
+  border-color: rgba(255, 58, 42, .24);
+  background: transparent;
+}
+
+.rail-actions button:hover,
+.rail-actions button:focus-visible {
+  color: var(--orange);
+  border-color: rgba(255, 92, 54, .42);
+  box-shadow: 0 0 8px rgba(255, 68, 42, .14);
+  outline: none;
+}
+
+.rail-actions button[aria-pressed="true"] {
+  color: var(--amber);
+  border-color: rgba(255, 180, 98, .45);
+  box-shadow: 0 0 8px rgba(255, 180, 98, .14);
+}
