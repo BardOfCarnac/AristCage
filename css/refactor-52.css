@@ -1,0 +1,237 @@
+/*==================================================
+  REFACTOR 52 — PROJECTED FORMS
+
+  Forms remain projections: black field, red apparatus, orange information.
+  Labels stay fixed while selectors reconfigure the right-hand projection.
+==================================================*/
+
+/* Remove the remaining spreadsheet grid. */
+.control-stack,
+.control-row,
+.control-block,
+.control-row:not(:last-child),
+.control-row > .control-label,
+.control-block > .control-label {
+  border: 0;
+  box-shadow: none;
+}
+
+.control-row {
+  align-items: start;
+}
+
+.control-label {
+  align-self: start;
+  min-height: 45px;
+  color: rgba(255, 54, 44, .94);
+  text-shadow: 0 0 5px rgba(255, 38, 28, .16);
+}
+
+/* The left legend never stretches or recentres when the menu grows. */
+.control-row > .control-label {
+  display: flex;
+  align-items: center;
+}
+
+/* Stable dark-red control surfaces with orange projected text. */
+.panel-fields .control-input,
+.panel-fields .control-textarea,
+.ncn-select-trigger {
+  color: rgba(255, 126, 68, .96);
+  background: rgba(24, 2, 2, .78);
+  outline: 1px solid rgba(130, 20, 18, .72);
+  outline-offset: -1px;
+  box-shadow: none;
+}
+
+.panel-fields .control-input:hover,
+.panel-fields .control-textarea:hover,
+.ncn-select-trigger:hover,
+.panel-fields .control-input:focus,
+.panel-fields .control-textarea:focus,
+.ncn-select-trigger:focus-visible,
+.ncn-select.is-open .ncn-select-trigger {
+  color: rgba(255, 145, 76, .98);
+  background: rgba(28, 3, 2, .82);
+  outline-color: rgba(176, 35, 24, .82);
+  box-shadow: none;
+}
+
+.panel-fields .control-input::placeholder,
+.panel-fields .control-textarea::placeholder {
+  color: rgba(178, 62, 46, .66);
+}
+
+/* Open menus join the article layout and reveal every option. */
+.ncn-select.is-open .ncn-select-menu,
+.ncn-select.is-open.opens-up .ncn-select-menu {
+  position: relative;
+  inset: auto;
+  max-height: none;
+  overflow: visible;
+  margin-top: 2px;
+  border: 1px solid rgba(146, 24, 20, .84);
+  background: rgba(2, 0, 0, .995);
+  box-shadow: 0 0 12px rgba(120, 12, 10, .16);
+  isolation: isolate;
+}
+
+.ncn-select-option,
+.ncn-select-option-wrap .ncn-select-option {
+  border: 0;
+  border-bottom: 1px solid rgba(112, 18, 16, .36);
+  color: rgba(255, 126, 68, .96);
+  background: #020000;
+  text-shadow: none;
+}
+
+.ncn-select-option-wrap:last-child .ncn-select-option,
+.ncn-select-menu > .ncn-select-option:last-child {
+  border-bottom: 0;
+}
+
+.ncn-select-option:hover,
+.ncn-select-option:focus-visible {
+  color: rgba(255, 148, 78, 1);
+  background: rgba(28, 2, 1, .98);
+  text-shadow: 0 0 6px rgba(255, 102, 54, .28);
+}
+
+.ncn-select-option[aria-selected="true"] {
+  color: rgba(255, 164, 86, 1);
+  background: rgba(32, 3, 2, .99);
+  text-shadow: 0 0 6px rgba(255, 118, 60, .3);
+}
+
+.ncn-select-option[aria-selected="true"]::after,
+.ncn-multiselect .ncn-select-option[aria-selected="true"]::after {
+  border-color: rgba(255, 142, 72, .98);
+  box-shadow: 0 0 5px rgba(255, 94, 48, .3);
+}
+
+/* Both arrow states exist independently. One dismisses completely before the
+   opposite state resolves; no rotation or half-morphed chevron remains. */
+.ncn-select-caret {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border: 0;
+  color: rgba(255, 72, 52, .94);
+  transform: none !important;
+  transition: none;
+}
+
+.ncn-select-caret::before,
+.ncn-select-caret::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform-origin: center;
+}
+
+/* Closed/down arrow. */
+.ncn-select-caret::before {
+  opacity: 1;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+
+/* Open/up arrow. */
+.ncn-select-caret::after {
+  opacity: 0;
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.ncn-select.selector-resolving .ncn-select-caret::before {
+  animation: selector-arrow-hide .11s linear both;
+}
+
+.ncn-select.selector-resolving .ncn-select-caret::after {
+  animation: selector-arrow-show .11s linear .12s both;
+}
+
+.ncn-select.is-open.selector-visible:not(.selector-closing) .ncn-select-caret::before {
+  opacity: 0;
+}
+
+.ncn-select.is-open.selector-visible:not(.selector-closing) .ncn-select-caret::after {
+  opacity: 1;
+}
+
+.ncn-select.selector-closing .ncn-select-caret::before {
+  animation: selector-arrow-show .11s linear .12s both;
+}
+
+.ncn-select.selector-closing .ncn-select-caret::after {
+  animation: selector-arrow-hide .11s linear both;
+}
+
+@keyframes selector-arrow-hide {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes selector-arrow-show {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Options resolve and dismiss as one projected set rather than a staircase. */
+.ncn-select.selector-visible .ncn-select-option {
+  animation: form-option-resolve .28s linear 70ms both;
+}
+
+.ncn-select.selector-closing .ncn-select-option {
+  animation: form-option-dismiss .16s linear both;
+}
+
+@keyframes form-option-resolve {
+  0% {
+    opacity: 0;
+    color: rgba(72, 8, 8, .2);
+    text-shadow: none;
+  }
+  55% {
+    opacity: .62;
+    color: rgba(220, 48, 34, .78);
+    text-shadow: 0 0 3px currentColor;
+  }
+  100% {
+    opacity: 1;
+    color: rgba(255, 126, 68, .96);
+    text-shadow: none;
+  }
+}
+
+@keyframes form-option-dismiss {
+  0% {
+    opacity: 1;
+    color: rgba(255, 126, 68, .96);
+  }
+  45% {
+    opacity: .46;
+    color: rgba(200, 38, 30, .7);
+  }
+  100% {
+    opacity: 0;
+    color: rgba(72, 8, 8, .2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ncn-select-caret::before,
+  .ncn-select-caret::after,
+  .ncn-select.selector-visible .ncn-select-option,
+  .ncn-select.selector-closing .ncn-select-option {
+    animation: none !important;
+  }
+
+  .ncn-select.is-open .ncn-select-caret::before {
+    opacity: 0;
+  }
+
+  .ncn-select.is-open .ncn-select-caret::after {
+    opacity: 1;
+  }
+}
