@@ -72,11 +72,10 @@
   color: rgba(255, 126, 64, .98);
 }
 
-/* Open selectors become part of the article's layout and grow to fit every
-   option. There is no internal scrolling surface or browser scrollbar. */
-.ncn-select-menu,
+/* Only an open selector enters normal flow. It grows the article to fit every
+   option, while a closed selector keeps its invisible menu out of the layout. */
 .ncn-select.is-open .ncn-select-menu,
-.ncn-select.opens-up .ncn-select-menu {
+.ncn-select.is-open.opens-up .ncn-select-menu {
   position: relative;
   top: auto;
   right: auto;
