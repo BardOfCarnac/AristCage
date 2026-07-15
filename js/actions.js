@@ -67,12 +67,25 @@ function applyFilterForm(form) {
   PANEL ACTIONS
 ==================================================*/
 
+function syncPanelButtons() {
+  document.querySelectorAll("[data-panel]").forEach(button => {
+    const active = button.dataset.panel === NCN_STATE.activePanel;
+    button.setAttribute("aria-pressed", String(active));
+  });
+}
+
+function setRequestedPanel(name) {
+  NCN_STATE.activePanel = NCN_STATE.activePanel === name ? null : name;
+  clearExpandedEntry();
+  syncPanelButtons();
+}
+
 async function transitionPanel(name) {
   await runProjectionTransaction({
     name: `panel:${name}`,
     dismiss: getFeedProjectionObjects,
     commit: () => {
-      togglePanel(name);
+      setRequestedPanel(name);
       renderPanelOnly();
     },
     resolve: getFeedProjectionObjects
@@ -120,6 +133,8 @@ document.addEventListener("click", event => {
 /*==================================================
   SCROLL / RESIZE
 ==================================================*/
+
+syncPanelButtons();
 
 window.addEventListener("scroll", updateProjection, {
   passive: true
