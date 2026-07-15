@@ -25,6 +25,15 @@
   text-shadow: 0 0 calc(7px * var(--glow-strength)) currentColor;
 }
 
+/* Resting priority rails keep a tight core and medium halo, but drop the
+   broad 42px ambient wash. The full projection animation remains unchanged. */
+.priority.present,
+.priority.leaving {
+  box-shadow:
+    0 0 calc(8px * var(--glow-strength)) var(--projection-color),
+    0 0 calc(16px * var(--glow-strength)) var(--projection-color);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .frame.energy-up,
   .corners.energy-up,
