@@ -5,7 +5,9 @@
 const NCN_CONFIG = {
   motion: {
     reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    resolveStagger: 60,
+    // Articles now begin resolving together. Tiny component offsets are
+    // owned by projection-cohesion.css rather than one global DOM sequence.
+    resolveStagger: 0,
     // Must be at least as long as the slowest energy-down animation.
     dismissDuration: 600,
     displacedResolveDelay: 180
