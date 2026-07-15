@@ -1,0 +1,39 @@
+/*==================================================
+  PROJECTION COHESION
+
+  Articles resolve as single projected objects. Every article starts at the
+  same moment; these tiny overlapping offsets preserve internal structure
+  without creating a visible headline / frame / body sequence.
+==================================================*/
+
+.frame.energy-up { animation-delay: 0ms; }
+.corners.energy-up { animation-delay: 8ms; }
+.priority.energy-up { animation-delay: 12ms; }
+.meta.energy-up { animation-delay: 14ms; }
+.headline.energy-up { animation-delay: 18ms; }
+.tags.energy-up { animation-delay: 24ms; }
+.body.energy-up,
+.panel-control.energy-up { animation-delay: 30ms; }
+
+/* Compact transmissions retain a defined inner halo without continuously
+   painting the wider reading-surface glow. Expanded stories, panels and the
+   desktop inspector continue to inherit the full two-layer resting glow. */
+.feed .entry:not(.expanded):not(.panel) .meta,
+.feed .entry:not(.expanded):not(.panel) .headline,
+.feed .entry:not(.expanded):not(.panel) .tags,
+.feed .entry:not(.expanded):not(.panel) .body {
+  text-shadow: 0 0 calc(7px * var(--glow-strength)) currentColor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame.energy-up,
+  .corners.energy-up,
+  .priority.energy-up,
+  .meta.energy-up,
+  .headline.energy-up,
+  .tags.energy-up,
+  .body.energy-up,
+  .panel-control.energy-up {
+    animation-delay: 0ms !important;
+  }
+}
