@@ -1,0 +1,104 @@
+/*==================================================
+  DROPDOWN VISUAL UNIFICATION
+
+  Open selectors remain part of the same red projection as the form.
+  Red communicates available information; pale yellow alone marks selection.
+==================================================*/
+
+/* The menu is projected apparatus, not a separate glowing card. */
+.ncn-select.is-open .ncn-select-menu,
+.ncn-select.is-open.opens-up .ncn-select-menu {
+  border: 1px solid rgba(255, 48, 38, .58);
+  background: #020000;
+  box-shadow:
+    0 0 7px rgba(255, 42, 32, .22),
+    0 0 16px rgba(255, 30, 24, .08);
+}
+
+/* Keep every idle row on one consistent projection-red register. */
+.ncn-select-option,
+.ncn-select-option-wrap .ncn-select-option,
+.ncn-select-option:hover,
+.ncn-select-option:focus-visible {
+  color: rgba(255, 66, 54, .94);
+  background: #020000;
+  border-color: rgba(255, 48, 38, .22);
+  text-shadow: 0 0 5px rgba(255, 48, 38, .18);
+  box-shadow: none;
+}
+
+/* Selection is communicated by colour alone. */
+.ncn-select-option[aria-selected="true"],
+.ncn-select-option[aria-selected="true"]:hover,
+.ncn-select-option[aria-selected="true"]:focus-visible {
+  color: rgba(255, 221, 142, .98);
+  background: #020000;
+  text-shadow: 0 0 6px rgba(255, 205, 118, .26);
+}
+
+/* Remove both option indicators and the selector chevron apparatus. */
+.ncn-select-option::after,
+.ncn-multiselect .ncn-select-option::after,
+.ncn-select-caret,
+.ncn-select-caret::before,
+.ncn-select-caret::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* With no arrow, the value can use the full trigger width. */
+.ncn-select-trigger {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Suppress the current single-select choice inside Submit only.
+   The adapter script keeps this attribute synchronised after each choice. */
+.submit-form .ncn-select-option[data-current-value="true"] {
+  display: none;
+}
+
+/* Override the earlier colour animation so settled options return to the
+   strict red/yellow palette rather than retaining intermediate oranges. */
+.ncn-select.selector-visible .ncn-select-option:not([aria-selected="true"]) {
+  animation-name: dropdown-option-resolve-red;
+}
+
+.ncn-select.selector-visible .ncn-select-option[aria-selected="true"] {
+  animation-name: dropdown-option-resolve-selected;
+}
+
+@keyframes dropdown-option-resolve-red {
+  0% {
+    opacity: 0;
+    color: rgba(72, 8, 8, .2);
+    text-shadow: none;
+  }
+  55% {
+    opacity: .62;
+    color: rgba(205, 40, 32, .74);
+    text-shadow: 0 0 3px currentColor;
+  }
+  100% {
+    opacity: 1;
+    color: rgba(255, 66, 54, .94);
+    text-shadow: 0 0 5px rgba(255, 48, 38, .18);
+  }
+}
+
+@keyframes dropdown-option-resolve-selected {
+  0% {
+    opacity: 0;
+    color: rgba(96, 56, 24, .2);
+    text-shadow: none;
+  }
+  55% {
+    opacity: .65;
+    color: rgba(232, 177, 91, .78);
+    text-shadow: 0 0 3px currentColor;
+  }
+  100% {
+    opacity: 1;
+    color: rgba(255, 221, 142, .98);
+    text-shadow: 0 0 6px rgba(255, 205, 118, .26);
+  }
+}
