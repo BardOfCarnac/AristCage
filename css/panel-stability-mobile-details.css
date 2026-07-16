@@ -1,0 +1,67 @@
+/*==================================================
+  PR 55 — PANEL STABILITY / MOBILE DETAILS
+==================================================*/
+
+/* Selector menus are projected over the panel rather than inserted into its
+   document flow. Opening one therefore never changes the panel frame, rail or
+   corner geometry. */
+.entry.panel .ncn-select {
+  position: relative;
+}
+
+.entry.panel .ncn-select.is-open .ncn-select-menu,
+.entry.panel .ncn-select.is-open.opens-up .ncn-select-menu {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 2px);
+  right: 0;
+  bottom: auto;
+  left: 0;
+  margin: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.entry.panel .ncn-select.is-open.opens-up .ncn-select-menu {
+  top: auto;
+  bottom: calc(100% + 2px);
+}
+
+.entry.panel .projection-plate,
+.entry.panel .entry-content,
+.entry.panel .expansion-zone,
+.entry.panel .panel-body {
+  overflow: visible;
+}
+
+/* Mobile expansion carries the same factual detail block as the desktop
+   inspector. It belongs to the body projection, so it resolves and dismisses
+   with the expanded article rather than becoming another independent layer. */
+.mobile-story-details {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .entry:not(.panel).expanded .mobile-story-details {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, .8fr) minmax(0, 1.2fr);
+    gap: 9px 14px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 54, 40, .2);
+  }
+
+  .mobile-story-details .detail-label {
+    color: rgba(255, 58, 46, .9);
+    font-size: .62rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+
+  .mobile-story-details .detail-value {
+    color: rgba(255, 190, 104, .96);
+    font-size: .72rem;
+    letter-spacing: .06em;
+    text-shadow: 0 0 6px rgba(255, 150, 72, .2);
+  }
+}
