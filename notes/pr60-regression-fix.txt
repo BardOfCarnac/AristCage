@@ -1,0 +1,6 @@
+PR60 corrective pass:
+- removes the self-triggering selector class observer
+- measures marker travel in pixels across the full scales
+- adds device-orientation permission handling where required
+- suppresses mobile tap highlight on Filter and Submit
+- retains outside-press dropdown protection without global pointer locking
