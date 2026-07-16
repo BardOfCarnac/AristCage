@@ -11,12 +11,14 @@
     "priority-advisory",
     "priority-alert",
     "priority-warning",
-    "priority-emergency"
+    "priority-emergency",
+    "priority-panel-filter",
+    "priority-panel-submit"
   ];
 
   const PANEL_PRIORITIES = {
-    "panel-filter": "Alert",
-    "panel-submit": "Warning"
+    "panel-filter": "priority-panel-filter",
+    "panel-submit": "priority-panel-submit"
   };
 
   function priorityClass(label = "") {
@@ -27,14 +29,15 @@
       : "priority-bulletin";
   }
 
-  function priorityLabelForEntry(entry) {
+  function priorityClassForEntry(entry) {
     const id = entry.dataset.entryId;
 
     if (PANEL_PRIORITIES[id]) {
       return PANEL_PRIORITIES[id];
     }
 
-    return NCN_ENTRIES.find(item => item.id === id)?.priorityLabel || "Bulletin";
+    const label = NCN_ENTRIES.find(item => item.id === id)?.priorityLabel || "Bulletin";
+    return priorityClass(label);
   }
 
   function applyPriorityPalette(root = feed) {
@@ -43,7 +46,7 @@
       if (!rail) return;
 
       rail.classList.remove(...PRIORITY_CLASSES);
-      rail.classList.add(priorityClass(priorityLabelForEntry(entry)));
+      rail.classList.add(priorityClassForEntry(entry));
     });
   }
 
