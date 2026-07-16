@@ -2,52 +2,51 @@
   PRIORITY ENERGY PALETTE
 
   Every article rail uses the same red projection source. Priority is shown by
-  intensity and bloom, not by hue. System panels use the existing warm-white
-  endpoint as a reserved function rail.
+  intensity and bloom, not by hue. System panels use the existing gold step.
 ==================================================*/
 
 .priority-bulletin {
   --priority-signal: var(--priority-bulletin);
-  --priority-aura: rgb(66 5 5 / .18);
-  --glow-strength: .48;
+  --priority-aura: rgb(105 8 8 / .2);
+  --glow-strength: .58;
 }
 
 .priority-advisory {
   --priority-signal: var(--priority-advisory);
-  --priority-aura: rgb(105 8 8 / .2);
-  --glow-strength: .6;
+  --priority-aura: rgb(148 16 13 / .22);
+  --glow-strength: .68;
 }
 
 .priority-alert {
   --priority-signal: var(--priority-alert);
-  --priority-aura: rgb(148 16 13 / .22);
-  --glow-strength: .72;
+  --priority-aura: rgb(201 26 20 / .24);
+  --glow-strength: .8;
 }
 
 .priority-warning {
   --priority-signal: var(--priority-warning);
-  --priority-aura: rgb(201 26 20 / .24);
-  --glow-strength: .86;
+  --priority-aura: rgb(255 56 40 / .27);
+  --glow-strength: .92;
 }
 
 .priority-emergency {
   --priority-signal: var(--priority-emergency);
-  --priority-aura: rgb(255 56 40 / .28);
-  --glow-strength: 1;
+  --priority-aura: rgb(255 56 40 / .34);
+  --glow-strength: 1.12;
 }
 
 .priority-panel-filter,
 .priority-panel-submit {
   --priority-signal: var(--priority-system);
-  --priority-aura: rgb(255 240 196 / .2);
+  --priority-aura: rgb(255 209 122 / .22);
 }
 
 .priority-panel-filter {
-  --glow-strength: .66;
+  --glow-strength: .64;
 }
 
 .priority-panel-submit {
-  --glow-strength: .82;
+  --glow-strength: .8;
 }
 
 .priority[class*="priority-"] {

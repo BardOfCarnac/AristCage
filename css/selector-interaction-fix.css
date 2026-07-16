@@ -2,7 +2,7 @@
   SELECTOR INTERACTION FIX
 
   Black projection surfaces, red idle options, yellow selected options.
-  Selection changes do not extinguish or recolour the menu apparatus.
+  Every selector state change fully dismisses before its replacement resolves.
 ==================================================*/
 
 .panel-fields .control-input,
@@ -36,27 +36,34 @@
 }
 
 .ncn-select-option[aria-selected="true"],
-.ncn-select.selector-visible .ncn-select-option[aria-selected="true"],
-.ncn-select-option.selection-pulse[aria-selected="true"] {
+.ncn-select.selector-visible .ncn-select-option[aria-selected="true"] {
   color: rgba(255, 214, 126, 1) !important;
   background: #020000 !important;
   text-shadow: 0 0 6px rgba(255, 190, 94, .32) !important;
 }
 
-.ncn-select-option.selection-pulse {
-  animation: selector-selection-confirm .18s linear both !important;
+/* Trigger summaries and only the option whose state is changing disappear
+   completely before the updated text/colour resolves. */
+.ncn-select-value,
+.ncn-select-option {
+  transition: opacity .125s linear;
 }
 
-@keyframes selector-selection-confirm {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: .72;
-  }
+.ncn-select-value.selector-value-dismissing,
+.ncn-select-option.selector-value-dismissing,
+.ncn-select-value.selector-value-resolving,
+.ncn-select-option.selector-value-resolving {
+  opacity: 0 !important;
 }
 
 /* Button state responds immediately; the projection may then take its time. */
 .rail-actions button {
   transition: color .12s linear, border-color .12s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ncn-select-value,
+  .ncn-select-option {
+    transition: none;
+  }
 }
