@@ -32,17 +32,17 @@
   /*==================================================
     PRIORITY RESTING ENERGY
 
-    Article priority is communicated only by increasing intensity within the
-    existing red range. Filter and Submit use the existing warm-white endpoint
-    as a reserved system-function rail, rather than introducing another hue.
+    Article priority remains entirely within the existing red range, but every
+    resting rail is lifted one step so Bulletin no longer disappears into black.
+    Filter and Submit use the existing low-yellow/gold step as system functions.
   ==================================================*/
 
-  --priority-bulletin:  var(--energy-1);
-  --priority-advisory:  var(--energy-2);
-  --priority-alert:     var(--energy-3);
-  --priority-warning:   var(--energy-4);
+  --priority-bulletin:  var(--energy-2);
+  --priority-advisory:  var(--energy-3);
+  --priority-alert:     var(--energy-4);
+  --priority-warning:   var(--energy-5);
   --priority-emergency: var(--energy-5);
-  --priority-system:    var(--energy-9);
+  --priority-system:    var(--energy-8);
 
   --feed-width: 760px;
   --feed-unit: 118px;
