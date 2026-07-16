@@ -1,0 +1,68 @@
+/*==================================================
+  SELECTOR PANEL CORRECTIONS
+==================================================*/
+
+/* Reserve enough projected space for the tallest menu. The page may scroll on
+   short screens, but the menu itself never clips or creates an inner scrollbar. */
+.entry.panel[data-entry-id="panel-filter"] .projection-plate {
+  min-height: 760px;
+}
+
+.entry.panel[data-entry-id="panel-submit"] .projection-plate {
+  min-height: 720px;
+}
+
+.entry.panel .panel-body,
+.entry.panel .panel-fields {
+  min-height: inherit;
+}
+
+/* Closed trigger, open trigger and menu are one red projection apparatus. */
+.entry.panel .ncn-select-trigger,
+.entry.panel .ncn-select-trigger:hover,
+.entry.panel .ncn-select-trigger:focus-visible,
+.entry.panel .ncn-select.is-open .ncn-select-trigger,
+.entry.panel .ncn-select-menu {
+  outline-color: var(--energy-3) !important;
+  border-color: var(--energy-3) !important;
+  box-shadow: 0 0 8px rgb(148 16 13 / .18) !important;
+}
+
+.entry.panel .ncn-select-trigger,
+.entry.panel .ncn-select-menu,
+.entry.panel .ncn-select-option {
+  background: var(--bg) !important;
+}
+
+/* The menu remains above the panel content and owns its complete hit area. */
+.entry.panel .ncn-select.is-open {
+  z-index: 300;
+}
+
+.entry.panel .ncn-select.is-open .ncn-select-menu {
+  z-index: 301;
+  pointer-events: auto;
+}
+
+/* Buffered calibration movement is handled entirely by CSS interpolation. */
+.attitude-marker {
+  transition-property: transform;
+  transition-duration: 850ms;
+  transition-timing-function: cubic-bezier(.22, .68, .28, 1);
+}
+
+@media (max-width: 600px) {
+  .entry.panel[data-entry-id="panel-filter"] .projection-plate {
+    min-height: 790px;
+  }
+
+  .entry.panel[data-entry-id="panel-submit"] .projection-plate {
+    min-height: 750px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attitude-marker {
+    transition-duration: 0ms !important;
+  }
+}
