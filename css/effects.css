@@ -1,0 +1,41 @@
+/*==================================================
+  OPTICAL EFFECTS
+
+  Appearance-only effects live here. They never decide whether an object is
+  present, selected or expanded; the projection engine remains authoritative.
+==================================================*/
+
+:root {
+  --title-register-y: 0px;
+  --title-register-x: 0px;
+}
+
+.rail-title {
+  transform: translate3d(var(--title-register-x), var(--title-register-y), 0);
+  will-change: transform;
+}
+
+/* A rare registration error shifts projected information as one optical plane.
+   It is intentionally tiny and returns to perfect alignment immediately. */
+.viewer.optical-registration-fault .entry-content,
+.viewer.optical-registration-fault .rail-title {
+  translate: 1px 0;
+}
+
+/* Interaction energy is carried by the existing priority rail rather than a
+   new colour or a page-wide flash. */
+.entry.energy-pulse .priority {
+  will-change: box-shadow;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-title {
+    transform: none;
+    will-change: auto;
+  }
+
+  .viewer.optical-registration-fault .entry-content,
+  .viewer.optical-registration-fault .rail-title {
+    translate: none;
+  }
+}
