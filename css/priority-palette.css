@@ -1,60 +1,89 @@
 /*==================================================
   PRIORITY ENERGY PALETTE
 
-  Priority is expressed as a resting point on the
-  shared red-to-gold projection ladder.
+  Every article rail uses the same red projection source. Priority is shown by
+  intensity and bloom, not by hue. System panels use the existing warm-white
+  endpoint as a reserved function rail.
 ==================================================*/
 
 .priority-bulletin {
   --priority-signal: var(--priority-bulletin);
-  --projection-step-0: var(--energy-0);
-  --projection-step-1: var(--energy-1);
-  --projection-step-2: var(--energy-2);
-  --priority-aura: rgb(148 16 13 / .18);
+  --priority-aura: rgb(66 5 5 / .18);
+  --glow-strength: .48;
 }
 
 .priority-advisory {
   --priority-signal: var(--priority-advisory);
-  --projection-step-0: var(--energy-0);
-  --projection-step-1: var(--energy-2);
-  --projection-step-2: var(--energy-3);
-  --priority-aura: rgb(201 26 20 / .18);
+  --priority-aura: rgb(105 8 8 / .2);
+  --glow-strength: .6;
 }
 
 .priority-alert {
   --priority-signal: var(--priority-alert);
-  --projection-step-0: var(--energy-1);
-  --projection-step-1: var(--energy-3);
-  --projection-step-2: var(--energy-4);
-  --priority-aura: rgb(255 56 40 / .18);
+  --priority-aura: rgb(148 16 13 / .22);
+  --glow-strength: .72;
 }
 
 .priority-warning {
   --priority-signal: var(--priority-warning);
-  --projection-step-0: var(--energy-1);
-  --projection-step-1: var(--energy-4);
-  --projection-step-2: var(--energy-5);
-  --priority-aura: rgb(255 106 40 / .18);
+  --priority-aura: rgb(201 26 20 / .24);
+  --glow-strength: .86;
 }
 
 .priority-emergency {
   --priority-signal: var(--priority-emergency);
-  --projection-step-0: var(--energy-2);
-  --projection-step-1: var(--energy-5);
-  --projection-step-2: var(--energy-7);
-  --priority-aura: rgb(255 209 122 / .22);
+  --priority-aura: rgb(255 56 40 / .28);
+  --glow-strength: 1;
+}
+
+.priority-panel-filter,
+.priority-panel-submit {
+  --priority-signal: var(--priority-system);
+  --priority-aura: rgb(255 240 196 / .2);
+}
+
+.priority-panel-filter {
+  --glow-strength: .66;
+}
+
+.priority-panel-submit {
+  --glow-strength: .82;
 }
 
 .priority[class*="priority-"] {
   --projection-color: var(--priority-signal, var(--red));
-  --glow-strength: .9;
 }
 
 .priority.present,
 .priority.leaving {
   background-color: var(--projection-color);
   box-shadow:
-    0 0 calc(8px * var(--glow-strength)) var(--projection-color),
-    0 0 calc(20px * var(--glow-strength)) var(--projection-color),
-    0 0 calc(42px * var(--glow-strength)) var(--priority-aura, rgb(255 56 40 / .18));
+    0 0 calc(6px * var(--glow-strength)) var(--projection-color),
+    0 0 calc(14px * var(--glow-strength)) var(--projection-color),
+    0 0 calc(30px * var(--glow-strength)) var(--priority-aura, rgb(255 56 40 / .18));
+}
+
+.entry.energy-pulse .priority.present {
+  animation: priority-energy-pulse 260ms linear both;
+}
+
+@keyframes priority-energy-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 calc(6px * var(--glow-strength)) var(--projection-color),
+      0 0 calc(14px * var(--glow-strength)) var(--projection-color),
+      0 0 calc(30px * var(--glow-strength)) var(--priority-aura);
+  }
+  42% {
+    box-shadow:
+      0 0 calc(9px * var(--glow-strength)) var(--projection-color),
+      0 0 calc(22px * var(--glow-strength)) var(--projection-color),
+      0 0 calc(42px * var(--glow-strength)) var(--priority-aura);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry.energy-pulse .priority.present {
+    animation: none;
+  }
 }
