@@ -1,0 +1,108 @@
+/*==================================================
+  FINAL INTERACTION + METADATA POLISH
+==================================================*/
+
+/* Remove native mobile selection flashes from all projected controls. */
+button,
+[role="button"],
+.ncn-select-trigger,
+.ncn-select-option,
+.panel-actions button,
+.rail-actions button {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+/* Keep keyboard focus visible without the native blue box. */
+button:focus,
+[role="button"]:focus,
+.ncn-select-trigger:focus,
+.ncn-select-option:focus {
+  outline: none;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+.ncn-select-trigger:focus-visible,
+.ncn-select-option:focus-visible {
+  outline: 1px solid var(--energy-4);
+  outline-offset: 2px;
+}
+
+/* Every selector state uses the same optical fade rather than snapping. */
+.ncn-select-trigger,
+.ncn-select-value,
+.ncn-select-menu,
+.ncn-select-option,
+.ncn-select-option::before,
+.ncn-select-option::after {
+  transition-property: opacity, color, background-color, border-color, box-shadow, text-shadow, transform;
+  transition-duration: 240ms;
+  transition-timing-function: cubic-bezier(.22,.68,.28,1);
+}
+
+.ncn-select-option[aria-selected="true"] {
+  transition-duration: 300ms;
+}
+
+.ncn-select-option.selection-pulse {
+  animation: none !important;
+}
+
+/* Metadata reads as a true two-column instrument readout. */
+.mobile-inspector-detail-grid {
+  grid-template-columns: 10.25rem minmax(0, 1fr) !important;
+  column-gap: 1.35rem !important;
+  align-items: baseline;
+}
+
+.mobile-inspector-detail-grid .detail-label {
+  color: var(--energy-4) !important;
+  justify-self: start;
+  white-space: nowrap;
+}
+
+.mobile-inspector-detail-grid .detail-value {
+  color: var(--energy-8) !important;
+  justify-self: start;
+  text-align: left;
+  overflow-wrap: normal !important;
+  word-break: normal;
+}
+
+/* Desktop inspector uses the same label/value rhythm. */
+.desktop-inspector .detail-grid,
+.desktop-inspector .inspector-grid {
+  grid-template-columns: 10.25rem minmax(0, 1fr);
+  column-gap: 1.35rem;
+  align-items: baseline;
+}
+
+.desktop-inspector .detail-label,
+.desktop-inspector .inspector-label {
+  color: var(--energy-4) !important;
+  white-space: nowrap;
+}
+
+.desktop-inspector .detail-value,
+.desktop-inspector .inspector-value {
+  color: var(--energy-8) !important;
+  text-align: left;
+}
+
+@media (max-width: 430px) {
+  .mobile-inspector-detail-grid {
+    grid-template-columns: 8.6rem minmax(0, 1fr) !important;
+    column-gap: 1rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ncn-select-trigger,
+  .ncn-select-value,
+  .ncn-select-menu,
+  .ncn-select-option {
+    transition-duration: 0ms !important;
+  }
+}
