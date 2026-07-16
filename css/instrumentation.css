@@ -15,9 +15,21 @@
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Open selector projections own their hit area completely. */
+.rail-actions button {
+  appearance: none;
+  outline: none;
+}
+
+.rail-actions button:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Open selector projections own their hit area completely. The capture-phase
+   outside-press handler in instrumentation.js consumes the first press outside. */
 .ncn-select.is-open,
 .ncn-select.is-open .ncn-select-menu,
 .ncn-select.is-open .ncn-select-option,
@@ -29,18 +41,6 @@
   z-index: 300;
   isolation: isolate;
   touch-action: manipulation;
-}
-
-body.selector-input-locked #feed .entry:not(.panel),
-body.selector-input-locked .desktop-inspector,
-body.selector-input-locked .entry.panel .panel-control:not(.selector-owner) {
-  pointer-events: none;
-}
-
-body.selector-input-locked .entry.panel,
-body.selector-input-locked .entry.panel .selector-owner,
-body.selector-input-locked .entry.panel .selector-owner * {
-  pointer-events: auto;
 }
 
 /* Fixed optical calibration marks. */

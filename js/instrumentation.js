@@ -41,30 +41,42 @@
 
   const target = { x: 0, y: 0 };
   const current = { x: 0, y: 0 };
+  const travel = { x: 0, y: 0 };
   let frame = 0;
+  let orientationBaseline = null;
 
   function clamp(value, min = -1, max = 1) {
     return Math.min(max, Math.max(min, value));
   }
 
+  function measureTravel() {
+    travel.x = Math.max(0, yaw.clientWidth / 2 - 8);
+    travel.y = Math.max(0, pitch.clientHeight / 2 - 8);
+  }
+
   function setPointerTarget(event) {
-    target.x = clamp((event.clientX / window.innerWidth) * 2 - 1);
-    target.y = clamp((event.clientY / window.innerHeight) * 2 - 1);
+    target.x = clamp((event.clientX / Math.max(1, window.innerWidth)) * 2 - 1);
+    target.y = clamp((event.clientY / Math.max(1, window.innerHeight)) * 2 - 1);
   }
 
   function setOrientationTarget(event) {
     if (event.gamma == null || event.beta == null) return;
-    target.x = clamp(event.gamma / 30);
-    target.y = clamp((event.beta - 45) / 35);
+
+    if (!orientationBaseline) {
+      orientationBaseline = { gamma: event.gamma, beta: event.beta };
+    }
+
+    target.x = clamp((event.gamma - orientationBaseline.gamma) / 24);
+    target.y = clamp((event.beta - orientationBaseline.beta) / 24);
   }
 
   function renderMarkers() {
-    const follow = reducedMotion.matches ? 1 : .16;
+    const follow = reducedMotion.matches ? 1 : .18;
     current.x += (target.x - current.x) * follow;
     current.y += (target.y - current.y) * follow;
 
-    yawMarker.style.transform = `translate3d(${current.x * 50}%, 0, 0)`;
-    pitchMarker.style.transform = `translate3d(0, ${current.y * 50}%, 0)`;
+    yawMarker.style.transform = `translate3d(${current.x * travel.x}px, 0, 0)`;
+    pitchMarker.style.transform = `translate3d(0, ${current.y * travel.y}px, 0)`;
 
     const unsettled = Math.abs(target.x - current.x) > .001 || Math.abs(target.y - current.y) > .001;
     frame = unsettled ? requestAnimationFrame(renderMarkers) : 0;
@@ -72,6 +84,17 @@
 
   function requestRender() {
     if (!frame) frame = requestAnimationFrame(renderMarkers);
+  }
+
+  async function requestOrientationPermission() {
+    const requestPermission = window.DeviceOrientationEvent?.requestPermission;
+    if (typeof requestPermission !== "function") return;
+
+    try {
+      await requestPermission.call(window.DeviceOrientationEvent);
+    } catch {
+      /* Pointer input remains available when permission is declined. */
+    }
   }
 
   window.addEventListener("pointermove", event => {
@@ -85,22 +108,14 @@
     requestRender();
   }, { passive: true });
 
-  /* While a selector is open, the first press outside it dismisses the selector
-     and is consumed. This prevents the same press reaching stories underneath. */
-  function syncSelectorLock() {
-    document.querySelectorAll(".selector-owner").forEach(node => node.classList.remove("selector-owner"));
-    const open = document.querySelector(".ncn-select.is-open");
-    document.body.classList.toggle("selector-input-locked", Boolean(open));
-    open?.closest(".panel-control")?.classList.add("selector-owner");
-  }
-
-  new MutationObserver(syncSelectorLock).observe(document.body, {
-    subtree: true,
-    attributes: true,
-    attributeFilter: ["class"]
-  });
+  window.addEventListener("resize", () => {
+    measureTravel();
+    requestRender();
+  }, { passive: true });
 
   document.addEventListener("pointerdown", event => {
+    void requestOrientationPermission();
+
     const open = document.querySelector(".ncn-select.is-open");
     if (!open || open.contains(event.target)) return;
 
@@ -112,5 +127,6 @@
     }
   }, true);
 
-  syncSelectorLock();
+  measureTravel();
+  requestRender();
 })();
