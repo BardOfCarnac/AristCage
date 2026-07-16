@@ -1,0 +1,62 @@
+/*==================================================
+  SELECTOR INTERACTION FIX
+
+  Black projection surfaces, red idle options, yellow selected options.
+  Selection changes do not extinguish or recolour the menu apparatus.
+==================================================*/
+
+.panel-fields .control-input,
+.panel-fields .control-textarea,
+.ncn-select-trigger,
+.ncn-select-trigger:hover,
+.ncn-select-trigger:focus-visible,
+.ncn-select.is-open .ncn-select-trigger {
+  background: #020000 !important;
+}
+
+.ncn-select.is-open .ncn-select-menu,
+.ncn-select.is-open.opens-up .ncn-select-menu {
+  background: #020000 !important;
+  box-shadow: 0 0 10px rgba(120, 12, 10, .14);
+}
+
+.ncn-select-option,
+.ncn-select-option-wrap .ncn-select-option,
+.ncn-select.selector-visible .ncn-select-option {
+  color: rgba(255, 62, 48, .94);
+  background: #020000 !important;
+  text-shadow: none;
+}
+
+.ncn-select-option:hover,
+.ncn-select-option:focus-visible {
+  color: rgba(255, 126, 68, .98);
+  background: #020000 !important;
+  text-shadow: 0 0 5px rgba(255, 86, 48, .24);
+}
+
+.ncn-select-option[aria-selected="true"],
+.ncn-select.selector-visible .ncn-select-option[aria-selected="true"],
+.ncn-select-option.selection-pulse[aria-selected="true"] {
+  color: rgba(255, 214, 126, 1) !important;
+  background: #020000 !important;
+  text-shadow: 0 0 6px rgba(255, 190, 94, .32) !important;
+}
+
+.ncn-select-option.selection-pulse {
+  animation: selector-selection-confirm .18s linear both !important;
+}
+
+@keyframes selector-selection-confirm {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .72;
+  }
+}
+
+/* Button state responds immediately; the projection may then take its time. */
+.rail-actions button {
+  transition: color .12s linear, border-color .12s linear;
+}
