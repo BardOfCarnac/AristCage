@@ -1,0 +1,48 @@
+/*==================================================
+  STORY METADATA POLISH
+==================================================*/
+
+/* Context beneath the headline: category // area // source type. */
+.entry:not(.panel) .tags,
+.desktop-inspector .tags {
+  color: var(--orange);
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  font-size: clamp(.56rem, 1.75vw, .76rem);
+  letter-spacing: clamp(.055em, .35vw, .12em);
+  text-shadow: 0 0 5px rgba(255, 96, 42, .2);
+}
+
+/* Whitespace replaces the old rule between story copy and its details. */
+.mobile-inspector-detail-grid,
+.desktop-inspector .inspector-detail-grid {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* Interface labels recede into projection red. */
+.mobile-inspector-detail-grid .detail-label,
+.desktop-inspector .detail-label {
+  color: rgba(255, 58, 46, .94);
+  text-shadow: 0 0 5px rgba(255, 38, 28, .16);
+}
+
+/* Values remain readable amber information. */
+.mobile-inspector-detail-grid .detail-value,
+.desktop-inspector .detail-value {
+  color: var(--gold);
+  text-shadow: 0 0 6px rgba(255, 184, 92, .18);
+}
+
+@media (max-width: 600px) {
+  .entry:not(.panel) .tags {
+    max-width: 100%;
+    font-size: clamp(.54rem, 2.45vw, .7rem);
+    letter-spacing: clamp(.045em, .5vw, .09em);
+  }
+
+  .mobile-inspector-detail-grid {
+    margin-top: 24px;
+  }
+}
