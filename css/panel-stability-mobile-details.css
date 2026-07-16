@@ -1,0 +1,60 @@
+/*==================================================
+  PANEL STABILITY + MOBILE INSPECTOR PARITY
+==================================================*/
+
+/* Selector menus are projected over the temporarily dismissed controls rather
+   than entering document flow. The panel frame therefore never changes size. */
+.entry.panel .ncn-select {
+  position: relative;
+}
+
+.entry.panel .ncn-select.is-open .ncn-select-menu,
+.entry.panel .ncn-select.is-open.opens-up .ncn-select-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  bottom: auto;
+  left: 0;
+  z-index: 160;
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+  margin-top: 0;
+}
+
+/* The selector scene already dismisses the other controls, so the projected
+   menu can occupy their space without collisions or a moving outer frame. */
+.entry.panel .projection-plate,
+.entry.panel .frame,
+.entry.panel .corners,
+.entry.panel .priority {
+  transition-property: opacity, color, border-color, box-shadow;
+}
+
+.mobile-inspector-detail-grid {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .mobile-inspector-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(7.25rem, auto) minmax(0, 1fr);
+    gap: 9px 14px;
+    margin-top: 22px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 76, 44, .24);
+  }
+
+  .mobile-inspector-detail-grid .detail-label {
+    color: var(--orange);
+    font-size: .68rem;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+  }
+
+  .mobile-inspector-detail-grid .detail-value {
+    min-width: 0;
+    color: var(--gold);
+    overflow-wrap: anywhere;
+  }
+}

@@ -59,10 +59,31 @@ function renderPanelOnly() {
   ENTRY
 ==================================================*/
 
+function mobileDetailRow(label, value) {
+  return `
+    <div class="detail-label">${escapeHTML(label)}</div>
+    <div class="detail-value">${escapeHTML(value || "—")}</div>`;
+}
+
+function mobileInspectorDetails(entry) {
+  if (entry.type === "panel") return "";
+
+  return `
+    <div class="mobile-inspector-detail-grid">
+      ${mobileDetailRow("Category", entry.category)}
+      ${mobileDetailRow("Area", entry.area)}
+      ${mobileDetailRow("Source type", entry.sourceType)}
+      ${mobileDetailRow("Priority", entry.priorityLabel)}
+      ${mobileDetailRow("Time scope", entry.timeScope)}
+    </div>`;
+}
+
 function entryMarkup(entry) {
   const isPanel = entry.type === "panel";
   const expanded = isPanel || isExpanded(entry.id);
-  const body = isPanel ? entry.body : escapeHTML(entry.body);
+  const body = isPanel
+    ? entry.body
+    : `${escapeHTML(entry.body)}${mobileInspectorDetails(entry)}`;
   const bodyClass = isPanel ? "body panel-body" : "part body gone";
 
   return `
