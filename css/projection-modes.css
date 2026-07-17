@@ -1,0 +1,71 @@
+/*==================================================
+  SELECTABLE PROJECTION GEOMETRY
+==================================================*/
+
+.frame,
+.priority,
+.meta,
+.headline,
+.tags,
+.body {
+  transform: translate3d(
+    var(--projection-x, 0px),
+    var(--projection-y, 0px),
+    0
+  );
+}
+
+.projection-mode-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.projection-mode-control span {
+  color: rgba(255, 190, 130, .62);
+  font-size: .52rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.projection-mode-control button {
+  min-width: 9rem;
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 70, 40, .42);
+  background: rgba(255, 40, 20, .025);
+  color: var(--white);
+  font: 500 .58rem/1.2 var(--font-main);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.projection-mode-control button:hover,
+.projection-mode-control button:focus-visible {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+.projection-mode-control button:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+}
+
+.projection-mode-note {
+  margin-top: 5px;
+  color: rgba(255, 220, 180, .55);
+  font-size: .53rem;
+  line-height: 1.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame,
+  .priority,
+  .meta,
+  .headline,
+  .tags,
+  .body {
+    transform: none !important;
+  }
+}
