@@ -51,7 +51,7 @@
       </div>
       <div class="projection-mode-note">
         Vertical preserves the existing centre-line spread. Vanishing point adds
-        a restrained horizontal component around the centre of the feed.
+        a restrained horizontal component around the centre of the viewer.
       </div>`;
 
     panel.insertBefore(section, panel.firstElementChild?.nextElementSibling || null);
