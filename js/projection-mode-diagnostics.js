@@ -1,42 +1,76 @@
 /*==================================================
-  PROJECTION MODE DIAGNOSTIC CONTROL
+  PROJECTION MODE CONTROLS
 
-  This control is mounted only inside the existing diagnostics panel. The
-  production interface remains unchanged while the two geometries are compared.
+  A visible rail control provides direct comparison between the established
+  vertical projection and the experimental vanishing-point geometry. The same
+  control is also mirrored inside Projection Diagnostics when that panel is
+  enabled.
 ==================================================*/
 
 (() => {
-  let control;
-  let button;
+  const buttons = new Set();
+  let diagnosticSection;
 
-  function modeLabel(mode = NCN_CONFIG.projection.mode) {
-    return mode === "vanishing-point"
-      ? "Vanishing point"
-      : "Vertical";
+  function currentMode() {
+    return NCN_CONFIG.projection.mode === "vanishing-point"
+      ? "vanishing-point"
+      : "vertical";
   }
 
-  function syncControl() {
-    if (!button) return;
+  function modeLabel(mode = currentMode()) {
+    return mode === "vanishing-point"
+      ? "Perspective"
+      : "Regular";
+  }
 
-    const mode = NCN_CONFIG.projection.mode;
-    button.textContent = modeLabel(mode);
-    button.setAttribute(
-      "aria-pressed",
-      String(mode === "vanishing-point")
-    );
+  function syncControls() {
+    const mode = currentMode();
+
+    buttons.forEach((button) => {
+      button.textContent = modeLabel(mode);
+      button.setAttribute(
+        "aria-label",
+        `Projection view: ${modeLabel(mode)}. Activate to switch view.`
+      );
+      button.setAttribute(
+        "aria-pressed",
+        String(mode === "vanishing-point")
+      );
+      button.dataset.projectionMode = mode;
+    });
   }
 
   function toggleMode() {
-    const nextMode = NCN_CONFIG.projection.mode === "vanishing-point"
+    const nextMode = currentMode() === "vanishing-point"
       ? "vertical"
       : "vanishing-point";
 
     setProjectionMode(nextMode);
-    syncControl();
+    syncControls();
   }
 
-  function mountControl() {
-    if (control) return true;
+  function registerButton(button) {
+    if (!button || buttons.has(button)) return;
+    buttons.add(button);
+    button.addEventListener("click", toggleMode);
+    syncControls();
+  }
+
+  function mountRailControl() {
+    const actions = document.querySelector(".rail-actions");
+    if (!actions || actions.querySelector("[data-projection-mode-toggle]")) return;
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "projection-mode-toggle";
+    button.setAttribute("data-projection-mode-toggle", "");
+
+    actions.prepend(button);
+    registerButton(button);
+  }
+
+  function mountDiagnosticControl() {
+    if (diagnosticSection) return true;
 
     const panel = document.querySelector(".diagnostics-panel");
     if (!panel) return false;
@@ -46,25 +80,26 @@
     section.innerHTML = `
       <div class="diagnostics-heading">Projection geometry</div>
       <div class="projection-mode-control">
-        <span>Mode</span>
+        <span>View</span>
         <button type="button" data-projection-mode-toggle></button>
       </div>
       <div class="projection-mode-note">
-        Vertical preserves the existing centre-line spread. Vanishing point adds
-        a restrained horizontal component around the centre of the viewer.
+        Regular preserves the established vertical projection. Perspective adds
+        horizontal movement toward the viewer's vanishing point.
       </div>`;
 
     panel.insertBefore(section, panel.firstElementChild?.nextElementSibling || null);
-    control = section;
-    button = section.querySelector("[data-projection-mode-toggle]");
-    button.addEventListener("click", toggleMode);
-    syncControl();
+    diagnosticSection = section;
+    registerButton(section.querySelector("[data-projection-mode-toggle]"));
     return true;
   }
 
-  if (!mountControl()) {
+  mountRailControl();
+
+  if (!mountDiagnosticControl()) {
     const observer = new MutationObserver(() => {
-      if (!mountControl()) return;
+      mountRailControl();
+      if (!mountDiagnosticControl()) return;
       observer.disconnect();
     });
 
@@ -74,5 +109,5 @@
     });
   }
 
-  document.addEventListener("ncn:projection-mode-change", syncControl);
+  document.addEventListener("ncn:projection-mode-change", syncControls);
 })();
