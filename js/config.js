@@ -14,9 +14,9 @@ const NCN_CONFIG = {
   },
   projection: {
     mode: window.localStorage.getItem("ncn-projection-mode") || "vertical",
-    origin: "feed",
+    origin: "viewer",
     travel: 58,
-    horizontalStrength: .32,
+    horizontalStrength: .42,
     verticalStrength: 1
   }
 };
