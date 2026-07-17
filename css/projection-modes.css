@@ -4,15 +4,18 @@
 
 .frame,
 .priority,
+.corners,
 .meta,
 .headline,
 .tags,
 .body {
   transform: translate3d(
-    var(--projection-x, 0px),
-    var(--projection-y, 0px),
-    0
-  );
+      var(--projection-x, 0px),
+      var(--projection-y, 0px),
+      0
+    )
+    scale(var(--projection-scale, 1));
+  transform-origin: center center;
 }
 
 .projection-mode-toggle {
@@ -87,6 +90,7 @@
 @media (prefers-reduced-motion: reduce) {
   .frame,
   .priority,
+  .corners,
   .meta,
   .headline,
   .tags,
