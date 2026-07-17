@@ -13,11 +13,7 @@ const NCN_CONFIG = {
     displacedResolveDelay: 180
   },
   projection: {
-    mode: window.localStorage.getItem("ncn-projection-mode") || "vertical",
-    origin: "viewer",
-    travel: 58,
-    horizontalStrength: .42,
-    verticalStrength: 1
+    travel: 58
   }
 };
 
