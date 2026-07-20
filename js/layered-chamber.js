@@ -9,7 +9,7 @@ window.LayeredChamber = (() => {
     near: 2.5,
     initialDepthCells: 2,
     finalDepthCells: 12,
-    infinityDepthCells: 420,
+    infinityDepthCells: 1000,
     focal: 0.84,
     halfWidth: 3,
     halfHeight: 2.5,
@@ -29,13 +29,11 @@ window.LayeredChamber = (() => {
     settleDuration: 0.42,
     labDelay: 0.12
   };
-
   timing.returnStart = timing.travelStart + timing.travelDuration + timing.infinityHold;
   timing.wallOpenStart = timing.returnStart + timing.returnDuration;
   timing.done = timing.wallOpenStart + timing.wallOpenDuration + timing.settleDuration;
 
   const energy = {
-    dormant: 0,
     operating: 0.64,
     bootPeak: 1,
     rearLockPulse: 0.24,
@@ -180,17 +178,6 @@ window.LayeredChamber = (() => {
     return { x: W / 2 + x * focal / z, y: centreY() - y * focal / z };
   }
 
-  function line(ctx, a, c, style, width = 1) {
-    const A = project(a[0], a[1], a[2]);
-    const C = project(c[0], c[1], c[2]);
-    ctx.strokeStyle = style;
-    ctx.lineWidth = width;
-    ctx.beginPath();
-    ctx.moveTo(A.x, A.y);
-    ctx.lineTo(C.x, C.y);
-    ctx.stroke();
-  }
-
   function palette(value, alpha) {
     const stops = [
       [38, 2, 6],
@@ -259,10 +246,6 @@ window.LayeredChamber = (() => {
     return initial;
   }
 
-  function depthSteps(rearZ) {
-    return Math.max(0, Math.floor((rearZ - geometry.near) / geometry.cell + 0.00001));
-  }
-
   function finalHalfWidth() {
     return geometry.halfWidth + geometry.wallShiftCells * geometry.cell;
   }
@@ -271,10 +254,46 @@ window.LayeredChamber = (() => {
     return geometry.halfWidth + geometry.wallShiftCells * geometry.cell * s.wallOpen;
   }
 
-  function distanceAttenuation(z) {
-    const final = geometry.near + geometry.finalDepthCells * geometry.cell;
-    const ratio = final / Math.max(final, z);
-    return clamp(Math.pow(ratio, 0.78), 0.018, 1);
+  function apertureAt(z, halfWidth) {
+    const tl = project(-halfWidth, geometry.halfHeight, z);
+    const br = project(halfWidth, -geometry.halfHeight, z);
+    return { left: tl.x, top: tl.y, right: br.x, bottom: br.y, width: br.x - tl.x, height: br.y - tl.y };
+  }
+
+  function opticalProfile(z, energyLevel, alpha = 1) {
+    const zRatio = geometry.near / Math.max(geometry.near, z);
+    const apparentCell = geometry.cell * focalLength() / z;
+    const resolve = clamp01((apparentCell - 0.32) / 2.4);
+    const contrast = clamp(Math.pow(zRatio, 0.42), 0.012, 1);
+    const brightness = clamp01(energyLevel * (0.22 + contrast * 0.78));
+    const opacity = clamp01(alpha * Math.pow(contrast, 1.28) * (0.22 + resolve * 0.78));
+    const width = clamp(0.2 + 1.25 * Math.pow(contrast, 0.72), 0.2, 1.45);
+    const glow = clamp01(Math.pow(contrast, 1.7) * energyLevel);
+    return { apparentCell, resolve, contrast, brightness, opacity, width, glow };
+  }
+
+  function resolutionStride(z) {
+    const apparentCell = geometry.cell * focalLength() / z;
+    if (apparentCell >= 5) return 1;
+    if (apparentCell >= 2.5) return 2;
+    if (apparentCell >= 1.25) return 4;
+    if (apparentCell >= 0.62) return 8;
+    if (apparentCell >= 0.31) return 16;
+    return Infinity;
+  }
+
+  function opticalLine(ctx, a, c, energyLevel, alpha, widthScale = 1) {
+    const midpointZ = (a[2] + c[2]) * 0.5;
+    const p = opticalProfile(midpointZ, energyLevel, alpha);
+    if (p.opacity < 0.006) return;
+    const A = project(a[0], a[1], a[2]);
+    const C = project(c[0], c[1], c[2]);
+    ctx.strokeStyle = palette(p.brightness, p.opacity);
+    ctx.lineWidth = p.width * widthScale;
+    ctx.beginPath();
+    ctx.moveTo(A.x, A.y);
+    ctx.lineTo(C.x, C.y);
+    ctx.stroke();
   }
 
   function drawRearWall(ctx, z, visibleX, systemEnergy, alpha) {
@@ -282,26 +301,29 @@ window.LayeredChamber = (() => {
     const fullX = finalHalfWidth();
     const xCells = Math.round((fullX * 2) / cell);
     const yCells = Math.round((Y * 2) / cell);
-    const attenuation = distanceAttenuation(z);
-    const apparentEnergy = clamp01(systemEnergy * (0.28 + attenuation * 0.72));
-    const style = palette(apparentEnergy, alpha * attenuation);
-    const width = clamp(1.15 * Math.sqrt(attenuation), 0.32, 1.15);
+    const profile = opticalProfile(z, systemEnergy, alpha);
+    const stride = resolutionStride(z);
 
-    for (let ix = 0; ix <= xCells; ix++) {
-      const x = -fullX + ix * cell;
-      if (Math.abs(x) <= visibleX + 0.0001) line(ctx, [x, -Y, z], [x, Y, z], style, width);
-    }
-    for (let iy = 0; iy <= yCells; iy++) {
-      const y = -Y + iy * cell;
-      line(ctx, [-visibleX, y, z], [visibleX, y, z], style, width);
+    if (Number.isFinite(stride)) {
+      for (let ix = 0; ix <= xCells; ix += stride) {
+        const x = -fullX + ix * cell;
+        if (Math.abs(x) <= visibleX + 0.0001) {
+          opticalLine(ctx, [x, -Y, z], [x, Y, z], systemEnergy, alpha, 1.04);
+        }
+      }
+      for (let iy = 0; iy <= yCells; iy += stride) {
+        const y = -Y + iy * cell;
+        opticalLine(ctx, [-visibleX, y, z], [visibleX, y, z], systemEnergy, alpha, 1.04);
+      }
     }
 
     const ap = apertureAt(z, visibleX);
-    if (ap.width < 7 || attenuation < 0.08) {
-      const radius = clamp(1.2 + systemEnergy * 2.4, 1.2, 3.6);
+    if (!Number.isFinite(stride) || ap.width < 8 || profile.resolve < 0.12) {
+      const unresolved = clamp01(1 - profile.resolve);
+      const radius = clamp(0.7 + unresolved * 2.8 + systemEnergy * 0.8, 0.7, 4.2);
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = palette(clamp01(systemEnergy + 0.18), clamp01(alpha * (0.25 + attenuation * 2.5)));
+      ctx.fillStyle = palette(clamp01(systemEnergy + 0.22), clamp01(alpha * (0.18 + unresolved * 0.62)));
       ctx.beginPath();
       ctx.arc(W / 2, centreY(), radius, 0, Math.PI * 2);
       ctx.fill();
@@ -312,33 +334,36 @@ window.LayeredChamber = (() => {
   function drawHorizontalPlane(ctx, y, rearZ, visibleX, systemEnergy, alpha) {
     const { cell, near } = geometry;
     const fullX = finalHalfWidth();
-    const style = palette(systemEnergy, alpha);
     const xCells = Math.round((fullX * 2) / cell);
-    const steps = depthSteps(rearZ);
+
     for (let ix = 0; ix <= xCells; ix++) {
       const x = -fullX + ix * cell;
-      if (Math.abs(x) <= visibleX + 0.0001) line(ctx, [x, y, near], [x, y, rearZ], style);
+      if (Math.abs(x) <= visibleX + 0.0001) {
+        opticalLine(ctx, [x, y, near], [x, y, rearZ], systemEnergy, alpha, 0.92);
+      }
     }
-    for (let iz = 0; iz <= steps; iz++) {
-      const z = near + iz * cell;
-      const fade = distanceAttenuation(z);
-      line(ctx, [-visibleX, y, z], [visibleX, y, z], palette(systemEnergy * (0.45 + fade * 0.55), alpha * fade), clamp(0.45 + fade * 0.55, 0.45, 1));
+
+    for (let z = near, index = 0; z <= rearZ + 0.0001; z += cell, index++) {
+      const stride = resolutionStride(z);
+      if (!Number.isFinite(stride) || index % stride !== 0) continue;
+      opticalLine(ctx, [-visibleX, y, z], [visibleX, y, z], systemEnergy, alpha, 0.9);
     }
   }
 
   function drawSideWall(ctx, side, rearZ, visibleX, systemEnergy, alpha) {
     const { cell, halfHeight: Y, near } = geometry;
     const yCells = Math.round((Y * 2) / cell);
-    const steps = depthSteps(rearZ);
     const x = side * visibleX;
+
     for (let iy = 0; iy <= yCells; iy++) {
       const y = -Y + iy * cell;
-      line(ctx, [x, y, near], [x, y, rearZ], palette(systemEnergy, alpha));
+      opticalLine(ctx, [x, y, near], [x, y, rearZ], systemEnergy, alpha, 0.92);
     }
-    for (let iz = 0; iz <= steps; iz++) {
-      const z = near + iz * cell;
-      const fade = distanceAttenuation(z);
-      line(ctx, [x, -Y, z], [x, Y, z], palette(systemEnergy * (0.45 + fade * 0.55), alpha * fade), clamp(0.45 + fade * 0.55, 0.45, 1));
+
+    for (let z = near, index = 0; z <= rearZ + 0.0001; z += cell, index++) {
+      const stride = resolutionStride(z);
+      if (!Number.isFinite(stride) || index % stride !== 0) continue;
+      opticalLine(ctx, [x, -Y, z], [x, Y, z], systemEnergy, alpha, 0.9);
     }
   }
 
@@ -347,15 +372,9 @@ window.LayeredChamber = (() => {
     const visibleX = visibleHalfWidth(s);
     drawRearWall(ctx, rearZ, visibleX, s.energy, alpha * 1.2);
     drawHorizontalPlane(ctx, -geometry.halfHeight, rearZ, visibleX, s.energy, alpha);
-    drawHorizontalPlane(ctx, geometry.halfHeight, rearZ, visibleX, s.energy, alpha);
-    drawSideWall(ctx, -1, rearZ, visibleX, s.energy, alpha);
-    drawSideWall(ctx, 1, rearZ, visibleX, s.energy, alpha);
-  }
-
-  function apertureAt(z, halfWidth) {
-    const tl = project(-halfWidth, geometry.halfHeight, z);
-    const br = project(halfWidth, -geometry.halfHeight, z);
-    return { left: tl.x, top: tl.y, right: br.x, bottom: br.y, width: br.x - tl.x, height: br.y - tl.y };
+    drawHorizontalPlane(ctx, geometry.halfHeight, rearZ, visibleX, s.energy, alpha * 0.92);
+    drawSideWall(ctx, -1, rearZ, visibleX, s.energy, alpha * 0.96);
+    drawSideWall(ctx, 1, rearZ, visibleX, s.energy, alpha * 0.96);
   }
 
   function drawSliceFrame(ctx, z, index, halfWidth, alpha) {
@@ -446,7 +465,7 @@ window.LayeredChamber = (() => {
     if (s.energy > 0) {
       b.save();
       b.globalCompositeOperation = 'lighter';
-      drawChamber(b, s, 0.045 + 0.105 * s.energy);
+      drawChamber(b, s, 0.035 + 0.08 * s.energy);
       b.restore();
     }
     drawScrollLaboratory(g, s);
