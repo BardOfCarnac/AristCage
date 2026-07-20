@@ -1,7 +1,12 @@
-/* Geometry chamber plus six depth-cell scroll laboratory. */
+/* Optional chamber subsystem with explicit lifecycle and operating modes. */
 window.LayeredChamber = (() => {
-  const KEY = 'ncn-layered-chamber';
-  const root = document.documentElement;
+  const STORAGE_KEY = 'ncn-layered-chamber';
+  const ROOT_ID = 'layered-chamber-system';
+  const MODES = Object.freeze({
+    OFF: 'off',
+    BACKGROUND: 'background',
+    LAB: 'lab'
+  });
 
   const geometry = {
     cell: 0.5,
@@ -40,9 +45,18 @@ window.LayeredChamber = (() => {
     diagnostics: true
   };
 
-  let enabled = false;
-  let bg, fg, b, g;
-  let W = 0, H = 0, DPR = 1, raf = 0;
+  const pageRoot = document.documentElement;
+  let mode = MODES.OFF;
+  let mounted = false;
+  let subsystemRoot = null;
+  let bg = null;
+  let fg = null;
+  let b = null;
+  let g = null;
+  let W = 0;
+  let H = 0;
+  let DPR = 1;
+  let raf = 0;
   let startedAt = 0;
 
   const toggle = () => document.querySelector('#layered-chamber-toggle');
@@ -57,20 +71,70 @@ window.LayeredChamber = (() => {
   const snapCells = value =>
     Math.max(geometry.cell, Math.round(value / geometry.cell) * geometry.cell);
 
+  function isMode(value) {
+    return Object.values(MODES).includes(value);
+  }
+
   function makeCanvas(id) {
     const canvas = document.createElement('canvas');
     canvas.id = id;
     canvas.className = 'layered-chamber-canvas';
-    document.body.prepend(canvas);
+    subsystemRoot.append(canvas);
     return canvas;
   }
 
-  function ensure() {
-    if (bg) return;
+  function createSubsystemRoot() {
+    const node = document.createElement('div');
+    node.id = ROOT_ID;
+    node.className = 'layered-chamber-system';
+    node.setAttribute('aria-hidden', 'true');
+    document.body.prepend(node);
+    return node;
+  }
+
+  function mount() {
+    if (mounted) return;
+
+    subsystemRoot = createSubsystemRoot();
     bg = makeCanvas('layered-chamber-bg');
     fg = makeCanvas('layered-chamber-fg');
     b = bg.getContext('2d');
     g = fg.getContext('2d');
+
+    addEventListener('resize', resize, { passive: true });
+    addEventListener('wheel', wheel, { passive: false });
+    addEventListener('touchstart', touchStart, { passive: true });
+    addEventListener('touchmove', touchMove, { passive: false });
+    addEventListener('touchend', touchEnd, { passive: true });
+    addEventListener('touchcancel', touchEnd, { passive: true });
+
+    mounted = true;
+    resize();
+  }
+
+  function unmount() {
+    if (!mounted) return;
+
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+
+    removeEventListener('resize', resize);
+    removeEventListener('wheel', wheel);
+    removeEventListener('touchstart', touchStart);
+    removeEventListener('touchmove', touchMove);
+    removeEventListener('touchend', touchEnd);
+    removeEventListener('touchcancel', touchEnd);
+
+    subsystemRoot?.remove();
+    subsystemRoot = null;
+    bg = null;
+    fg = null;
+    b = null;
+    g = null;
+    W = 0;
+    H = 0;
+    lab.dragging = false;
+    mounted = false;
   }
 
   function focalLength() {
@@ -84,19 +148,14 @@ window.LayeredChamber = (() => {
   function fitGeometryToViewport() {
     const focal = focalLength();
 
-    // The initial near rim is the viewer itself: its four corners sit on the
-    // four corners of the full screen, including the area behind the title rail.
     geometry.halfWidth = snapCells((W * 0.5) * geometry.near / focal);
     geometry.halfHeight = snapCells((H * 0.5) * geometry.near / focal);
-
-    // Opening moves the side walls only two complete cells farther out. Their
-    // first two columns therefore leave the left and right edges of the viewer,
-    // while the original screen-sized chamber remains the starting geometry.
     geometry.wallShiftCells = 2;
   }
 
   function resize() {
-    ensure();
+    if (!mounted || !bg || !fg) return;
+
     DPR = Math.min(devicePixelRatio || 1, 2);
     W = innerWidth;
     H = innerHeight;
@@ -146,7 +205,9 @@ window.LayeredChamber = (() => {
       travel: easeInOut((t - timing.travelStart) / timing.travelDuration),
       returning: easeOut((t - timing.returnStart) / timing.returnDuration),
       wallOpen: easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration),
-      lab: easeOut((t - timing.done + 0.08) / 0.55),
+      lab: mode === MODES.LAB
+        ? easeOut((t - timing.done + 0.08) / 0.55)
+        : 0,
       done: t >= timing.done
     };
   }
@@ -161,7 +222,10 @@ window.LayeredChamber = (() => {
   }
 
   function depthSteps(rearZ) {
-    return Math.max(0, Math.floor((rearZ - geometry.near) / geometry.cell + 0.00001));
+    return Math.max(
+      0,
+      Math.floor((rearZ - geometry.near) / geometry.cell + 0.00001)
+    );
   }
 
   function finalHalfWidth() {
@@ -169,7 +233,8 @@ window.LayeredChamber = (() => {
   }
 
   function visibleHalfWidth(s) {
-    return geometry.halfWidth + geometry.wallShiftCells * geometry.cell * s.wallOpen;
+    return geometry.halfWidth +
+      geometry.wallShiftCells * geometry.cell * s.wallOpen;
   }
 
   function drawRearWall(ctx, z, visibleX, energy, alpha) {
@@ -262,7 +327,11 @@ window.LayeredChamber = (() => {
     ctx.fillStyle = `rgba(255,92,68,${0.32 + alpha * 0.35})`;
     ctx.font = '10px monospace';
     ctx.textBaseline = 'top';
-    ctx.fillText(`SLICE ${String(index).padStart(2, '0')}  Z ${z.toFixed(2)}`, ap.left + 8, ap.top + 7);
+    ctx.fillText(
+      `SLICE ${String(index).padStart(2, '0')}  Z ${z.toFixed(2)}`,
+      ap.left + 8,
+      ap.top + 7
+    );
   }
 
   function drawPlaceholderBlock(ctx, sliceIndex, itemIndex, z, halfWidth, worldY, alpha) {
@@ -285,7 +354,11 @@ window.LayeredChamber = (() => {
     ctx.fillStyle = `rgba(255,120,98,${0.42 * alpha})`;
     ctx.font = `${labelSize}px monospace`;
     ctx.textBaseline = 'middle';
-    ctx.fillText(`S${sliceIndex} / ITEM ${String(itemIndex + 1).padStart(2, '0')}`, tl.x + Math.max(6, width * 0.035), tl.y + height * 0.32);
+    ctx.fillText(
+      `S${sliceIndex} / ITEM ${String(itemIndex + 1).padStart(2, '0')}`,
+      tl.x + Math.max(6, width * 0.035),
+      tl.y + height * 0.32
+    );
 
     const bars = 2 + ((sliceIndex + itemIndex) % 3);
     for (let n = 0; n < bars; n++) {
@@ -314,7 +387,7 @@ window.LayeredChamber = (() => {
   }
 
   function drawScrollLaboratory(ctx, s) {
-    if (s.lab <= 0) return;
+    if (mode !== MODES.LAB || s.lab <= 0) return;
     const halfWidth = visibleHalfWidth(s);
 
     for (let index = geometry.sliceCount; index >= 1; index--) {
@@ -325,10 +398,15 @@ window.LayeredChamber = (() => {
     ctx.fillStyle = `rgba(255,90,68,${0.48 * s.lab})`;
     ctx.font = '11px monospace';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(`SHARED SCROLL ${lab.scroll.toFixed(2)} / ${lab.maxScroll.toFixed(2)}   ·   6 DEPTH CELLS`, 14, H - 14);
+    ctx.fillText(
+      `SHARED SCROLL ${lab.scroll.toFixed(2)} / ${lab.maxScroll.toFixed(2)}   ·   6 DEPTH CELLS`,
+      14,
+      H - 14
+    );
   }
 
   function settleScroll() {
+    if (mode !== MODES.LAB) return false;
     const delta = lab.targetScroll - lab.scroll;
     if (Math.abs(delta) < 0.001) {
       lab.scroll = lab.targetScroll;
@@ -340,7 +418,8 @@ window.LayeredChamber = (() => {
 
   function draw(now = performance.now()) {
     raf = 0;
-    if (!enabled || !W) return;
+    if (!mounted || mode === MODES.OFF || !W || !b || !g) return;
+
     b.clearRect(0, 0, W, H);
     g.clearRect(0, 0, W, H);
 
@@ -359,28 +438,29 @@ window.LayeredChamber = (() => {
   }
 
   function requestDraw() {
-    if (enabled && !raf) raf = requestAnimationFrame(draw);
+    if (mounted && mode !== MODES.OFF && !raf) raf = requestAnimationFrame(draw);
   }
 
   function setScroll(value) {
+    if (mode !== MODES.LAB) return;
     lab.targetScroll = clamp(value, 0, lab.maxScroll);
     requestDraw();
   }
 
   function wheel(event) {
-    if (!enabled || event.target.closest?.('.rail')) return;
+    if (mode !== MODES.LAB || event.target.closest?.('.rail')) return;
     event.preventDefault();
     setScroll(lab.targetScroll + event.deltaY * 0.0065);
   }
 
   function touchStart(event) {
-    if (!enabled || event.target.closest?.('.rail') || !event.touches.length) return;
+    if (mode !== MODES.LAB || event.target.closest?.('.rail') || !event.touches.length) return;
     lab.dragging = true;
     lab.lastTouchY = event.touches[0].clientY;
   }
 
   function touchMove(event) {
-    if (!enabled || !lab.dragging || !event.touches.length) return;
+    if (mode !== MODES.LAB || !lab.dragging || !event.touches.length) return;
     event.preventDefault();
     const y = event.touches[0].clientY;
     const delta = lab.lastTouchY - y;
@@ -393,44 +473,88 @@ window.LayeredChamber = (() => {
   }
 
   function restart() {
+    if (mode === MODES.OFF) return;
+    if (!mounted) mount();
     startedAt = performance.now();
     lab.scroll = 0;
     lab.targetScroll = 0;
     requestDraw();
   }
 
-  function set(on, persist = true) {
-    enabled = on;
-    root.classList.toggle('layered-chamber-mode', on);
+  function updateDocumentState() {
+    pageRoot.classList.toggle('layered-chamber-mode', mode !== MODES.OFF);
+    pageRoot.classList.toggle('layered-chamber-background-mode', mode === MODES.BACKGROUND);
+    pageRoot.classList.toggle('layered-chamber-lab-mode', mode === MODES.LAB);
+    pageRoot.dataset.chamberMode = mode;
+
     const button = toggle();
     if (button) {
-      button.setAttribute('aria-pressed', String(on));
-      button.textContent = on ? 'Restart Chamber' : 'Chamber Off';
-    }
-    if (persist) localStorage.setItem(KEY, on ? 'on' : 'off');
-
-    if (on) {
-      ensure();
-      resize();
-      restart();
-    } else {
-      if (raf) cancelAnimationFrame(raf);
-      raf = 0;
-      b?.clearRect(0, 0, W, H);
-      g?.clearRect(0, 0, W, H);
+      button.setAttribute('aria-pressed', String(mode !== MODES.OFF));
+      button.textContent = mode === MODES.OFF
+        ? 'Chamber Off'
+        : mode === MODES.BACKGROUND
+          ? 'Restart Background'
+          : 'Restart Chamber';
     }
   }
 
+  function clearDocumentState() {
+    pageRoot.classList.remove(
+      'layered-chamber-mode',
+      'layered-chamber-background-mode',
+      'layered-chamber-lab-mode'
+    );
+    delete pageRoot.dataset.chamberMode;
+
+    const button = toggle();
+    if (button) {
+      button.setAttribute('aria-pressed', 'false');
+      button.textContent = 'Chamber Off';
+    }
+  }
+
+  function setMode(nextMode, options = {}) {
+    const { persist = true, restartAnimation = true } = options;
+
+    if (!isMode(nextMode)) {
+      throw new TypeError(`Unknown chamber mode: ${nextMode}`);
+    }
+
+    if (nextMode === MODES.OFF) {
+      mode = MODES.OFF;
+      unmount();
+      clearDocumentState();
+      if (persist) localStorage.setItem(STORAGE_KEY, MODES.OFF);
+      return;
+    }
+
+    mode = nextMode;
+    mount();
+    updateDocumentState();
+    if (persist) localStorage.setItem(STORAGE_KEY, nextMode);
+    if (restartAnimation) restart();
+    else requestDraw();
+  }
+
+  function handleToggle() {
+    if (mode === MODES.OFF) setMode(MODES.LAB);
+    else restart();
+  }
+
   function init() {
-    ensure();
-    toggle()?.addEventListener('click', () => enabled ? restart() : set(true));
-    addEventListener('resize', resize, { passive: true });
-    addEventListener('wheel', wheel, { passive: false });
-    addEventListener('touchstart', touchStart, { passive: true });
-    addEventListener('touchmove', touchMove, { passive: false });
-    addEventListener('touchend', touchEnd, { passive: true });
-    addEventListener('touchcancel', touchEnd, { passive: true });
-    set(localStorage.getItem(KEY) === 'on', false);
+    toggle()?.addEventListener('click', handleToggle);
+
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const initialMode = stored === 'on'
+      ? MODES.LAB
+      : isMode(stored)
+        ? stored
+        : MODES.OFF;
+
+    setMode(initialMode, {
+      persist: false,
+      restartAnimation: initialMode !== MODES.OFF
+    });
   }
 
   if (document.readyState === 'loading') {
@@ -440,10 +564,16 @@ window.LayeredChamber = (() => {
   }
 
   return {
-    enable: () => set(true),
-    disable: () => set(false),
+    MODES,
+    mount,
+    unmount: () => setMode(MODES.OFF),
     restart,
-    isEnabled: () => enabled,
+    setMode,
+    getMode: () => mode,
+    isMounted: () => mounted,
+    isEnabled: () => mode !== MODES.OFF,
+    enable: () => setMode(MODES.LAB),
+    disable: () => setMode(MODES.OFF),
     refresh: requestDraw,
     setScroll,
     toggleDiagnostics: () => {
