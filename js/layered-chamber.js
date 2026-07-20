@@ -60,23 +60,25 @@ window.LayeredChamber = (() => {
 
   function fitGeometryToViewport() {
     const focal = Math.min(W, H) * geometry.focal;
-    const initialRearZ = geometry.near + geometry.initialDepthCells * geometry.cell;
     const centreY = H * 0.53;
 
-    // The first rear wall is a screen-shaped rectangle, never a square.
-    // Both dimensions are snapped to exact whole-cell spans.
-    const targetHalfWidthPx = Math.max(1, W * 0.47);
-    const targetHalfHeightPx = Math.max(1, Math.min(centreY - 18, H - centreY - 18));
-    geometry.halfWidth = snapCells(targetHalfWidthPx * initialRearZ / focal);
-    geometry.halfHeight = snapCells(targetHalfHeightPx * initialRearZ / focal);
+    // Fit the NEAR rim to the viewport. The rear wall is therefore inset by
+    // two full cells of depth and all four surrounding planes remain visible.
+    const targetNearHalfWidthPx = Math.max(1, W * 0.485);
+    const targetNearHalfHeightPx = Math.max(
+      1,
+      Math.min(centreY - 12, H - centreY - 12)
+    );
 
-    // At the final rear depth, move each wall far enough that its rear
-    // floor/ceiling corner approaches the corresponding screen edge.
-    const finalRearZ = geometry.near + geometry.finalDepthCells * geometry.cell;
-    const targetFinalHalfWidth = snapCells((W * 0.485) * finalRearZ / focal);
+    geometry.halfWidth = snapCells(targetNearHalfWidthPx * geometry.near / focal);
+    geometry.halfHeight = snapCells(targetNearHalfHeightPx * geometry.near / focal);
+
+    // Keep the translated side walls just inside the screen at their NEAR
+    // edge. This prevents them disappearing while still opening the room wide.
+    const targetOpenNearHalfWidth = snapCells((W * 0.455) * geometry.near / focal);
     geometry.wallShiftCells = Math.max(
       1,
-      Math.round((targetFinalHalfWidth - geometry.halfWidth) / geometry.cell)
+      Math.round((targetOpenNearHalfWidth - geometry.halfWidth) / geometry.cell)
     );
   }
 
@@ -147,18 +149,22 @@ window.LayeredChamber = (() => {
     return Math.max(0, Math.floor((rearZ - geometry.near) / geometry.cell + 0.00001));
   }
 
-  function drawRearWall(ctx, z, energy, alpha) {
+  function drawRearWall(ctx, z, openedColumns, energy, alpha) {
     const { cell, halfWidth: X, halfHeight: Y } = geometry;
-    const xCells = Math.round((X * 2) / cell);
+    const expandedX = X + openedColumns * cell;
+    const xCells = Math.round((expandedX * 2) / cell);
     const yCells = Math.round((Y * 2) / cell);
     const style = colour(energy, alpha);
+
+    // The original panel remains the centre of a wider, continuous back wall.
+    // Every revealed section is a complete square column.
     for (let ix = 0; ix <= xCells; ix++) {
-      const x = -X + ix * cell;
+      const x = -expandedX + ix * cell;
       line(ctx, [x, -Y, z], [x, Y, z], style, 1.05);
     }
     for (let iy = 0; iy <= yCells; iy++) {
       const y = -Y + iy * cell;
-      line(ctx, [-X, y, z], [X, y, z], style, 1.05);
+      line(ctx, [-expandedX, y, z], [expandedX, y, z], style, 1.05);
     }
   }
 
@@ -169,7 +175,6 @@ window.LayeredChamber = (() => {
     const xCells = Math.round((expandedX * 2) / cell);
     const steps = depthSteps(rearZ);
 
-    // Additional columns are real square columns, revealed outward as the walls move.
     for (let ix = 0; ix <= xCells; ix++) {
       const x = -expandedX + ix * cell;
       line(ctx, [x, y, near], [x, y, rearZ], style);
@@ -186,6 +191,7 @@ window.LayeredChamber = (() => {
     const yCells = Math.round((Y * 2) / cell);
     const steps = depthSteps(rearZ);
     const x = side * (X + shift);
+
     for (let iy = 0; iy <= yCells; iy++) {
       const y = -Y + iy * cell;
       line(ctx, [x, y, near], [x, y, rearZ], style);
@@ -205,7 +211,7 @@ window.LayeredChamber = (() => {
       Math.floor(geometry.wallShiftCells * s.wallOpen + 0.00001)
     );
 
-    drawRearWall(ctx, rearZ, s.energy, alpha * 1.2);
+    drawRearWall(ctx, rearZ, openedColumns, s.energy, alpha * 1.2);
     drawHorizontalPlane(ctx, -geometry.halfHeight, rearZ, openedColumns, s.energy, alpha);
     drawHorizontalPlane(ctx, geometry.halfHeight, rearZ, openedColumns, s.energy, alpha);
     drawSideWall(ctx, -1, rearZ, shift, s.energy, alpha);
