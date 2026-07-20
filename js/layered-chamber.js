@@ -1,4 +1,4 @@
-/* Optional chamber subsystem with explicit lifecycle, modes, and optical energy. */
+/* Optional chamber subsystem with explicit lifecycle, modes, optical energy, and live feed projection. */
 window.LayeredChamber = (() => {
   const STORAGE_KEY = 'ncn-layered-chamber';
   const ROOT_ID = 'layered-chamber-system';
@@ -14,7 +14,7 @@ window.LayeredChamber = (() => {
     halfWidth: 3,
     halfHeight: 2.5,
     wallShiftCells: 2,
-    sliceCount: 6
+    articleDepthStep: 0.72
   };
 
   const timing = {
@@ -41,15 +41,14 @@ window.LayeredChamber = (() => {
   };
 
   const lab = {
-    itemsPerSlice: 20,
-    itemPitch: 1.15,
-    itemHeight: 0.78,
     scroll: 0,
     targetScroll: 0,
-    maxScroll: 18,
+    maxScroll: 0,
     dragging: false,
     lastTouchY: 0,
-    diagnostics: true
+    diagnostics: false,
+    articlePitch: 1.16,
+    articleHeight: 0.86
   };
 
   const pageRoot = document.documentElement;
@@ -68,6 +67,7 @@ window.LayeredChamber = (() => {
   let injectedEnergy = 0;
   let injectedAt = 0;
   let injectedDuration = 0;
+  let feedObserver = null;
 
   const toggle = () => document.querySelector('#layered-chamber-toggle');
   const clamp01 = value => Math.max(0, Math.min(1, value));
@@ -85,8 +85,7 @@ window.LayeredChamber = (() => {
     const envelope = 1 - distance;
     return envelope * envelope * (0.82 + Math.cos(distance * Math.PI * 3) * 0.18);
   };
-  const snapCells = value =>
-    Math.max(geometry.cell, Math.round(value / geometry.cell) * geometry.cell);
+  const snapCells = value => Math.max(geometry.cell, Math.round(value / geometry.cell) * geometry.cell);
 
   function isMode(value) {
     return Object.values(MODES).includes(value);
@@ -109,6 +108,16 @@ window.LayeredChamber = (() => {
     return node;
   }
 
+  function observeFeed() {
+    const feed = document.querySelector('#feed');
+    if (!feed || feedObserver) return;
+    feedObserver = new MutationObserver(() => {
+      updateScrollRange();
+      requestDraw();
+    });
+    feedObserver.observe(feed, { childList: true, subtree: true, characterData: true, attributes: true });
+  }
+
   function mount() {
     if (mounted) return;
     subsystemRoot = createSubsystemRoot();
@@ -123,6 +132,7 @@ window.LayeredChamber = (() => {
     addEventListener('touchend', touchEnd, { passive: true });
     addEventListener('touchcancel', touchEnd, { passive: true });
     mounted = true;
+    observeFeed();
     resize();
   }
 
@@ -136,6 +146,8 @@ window.LayeredChamber = (() => {
     removeEventListener('touchmove', touchMove);
     removeEventListener('touchend', touchEnd);
     removeEventListener('touchcancel', touchEnd);
+    feedObserver?.disconnect();
+    feedObserver = null;
     subsystemRoot?.remove();
     subsystemRoot = bg = fg = b = g = null;
     W = H = 0;
@@ -170,6 +182,7 @@ window.LayeredChamber = (() => {
       canvas.style.height = `${H}px`;
       canvas.getContext('2d').setTransform(DPR, 0, 0, DPR, 0, 0);
     }
+    updateScrollRange();
     requestDraw();
   }
 
@@ -179,29 +192,19 @@ window.LayeredChamber = (() => {
   }
 
   function palette(value, alpha) {
-    const stops = [
-      [38, 2, 6],
-      [104, 5, 12],
-      [176, 10, 18],
-      [244, 24, 24],
-      [255, 66, 32]
-    ];
+    const stops = [[38,2,6],[104,5,12],[176,10,18],[244,24,24],[255,66,32]];
     const scaled = clamp01(value) * (stops.length - 1);
     const index = Math.min(stops.length - 2, Math.floor(scaled));
     const local = scaled - index;
     const a = stops[index];
     const c = stops[index + 1];
-    return `rgba(${Math.round(mix(a[0], c[0], local))},${Math.round(mix(a[1], c[1], local))},${Math.round(mix(a[2], c[2], local))},${clamp01(alpha)})`;
+    return `rgba(${Math.round(mix(a[0],c[0],local))},${Math.round(mix(a[1],c[1],local))},${Math.round(mix(a[2],c[2],local))},${clamp01(alpha)})`;
   }
 
   function bootEnergy(t) {
     if (t < timing.igniteStart) return 0;
-    if (t < timing.ignitePeak) {
-      return mix(0.08, energy.bootPeak, easeOut((t - timing.igniteStart) / (timing.ignitePeak - timing.igniteStart)));
-    }
-    if (t < timing.igniteSettle) {
-      return mix(energy.bootPeak, energy.operating, easeInOut((t - timing.ignitePeak) / (timing.igniteSettle - timing.ignitePeak)));
-    }
+    if (t < timing.ignitePeak) return mix(0.08, energy.bootPeak, easeOut((t - timing.igniteStart) / (timing.ignitePeak - timing.igniteStart)));
+    if (t < timing.igniteSettle) return mix(energy.bootPeak, energy.operating, easeInOut((t - timing.ignitePeak) / (timing.igniteSettle - timing.ignitePeak)));
     return energy.operating;
   }
 
@@ -230,8 +233,6 @@ window.LayeredChamber = (() => {
       returning,
       wallOpen,
       energy: clamp01(base + rearLock * energy.rearLockPulse + wallLock * energy.wallLockPulse + injectedEnergyAt(now)),
-      rearLock,
-      wallLock,
       lab: mode === MODES.LAB ? easeOut((t - timing.done - timing.labDelay) / 0.55) : 0,
       done: t >= timing.done && injectedDuration === 0
     };
@@ -265,11 +266,12 @@ window.LayeredChamber = (() => {
     const apparentCell = geometry.cell * focalLength() / z;
     const resolve = clamp01((apparentCell - 0.32) / 2.4);
     const contrast = clamp(Math.pow(zRatio, 0.42), 0.012, 1);
-    const brightness = clamp01(energyLevel * (0.22 + contrast * 0.78));
-    const opacity = clamp01(alpha * Math.pow(contrast, 1.28) * (0.22 + resolve * 0.78));
-    const width = clamp(0.2 + 1.25 * Math.pow(contrast, 0.72), 0.2, 1.45);
-    const glow = clamp01(Math.pow(contrast, 1.7) * energyLevel);
-    return { apparentCell, resolve, contrast, brightness, opacity, width, glow };
+    return {
+      resolve,
+      brightness: clamp01(energyLevel * (0.22 + contrast * 0.78)),
+      opacity: clamp01(alpha * Math.pow(contrast, 1.28) * (0.22 + resolve * 0.78)),
+      width: clamp(0.2 + 1.25 * Math.pow(contrast, 0.72), 0.2, 1.45)
+    };
   }
 
   function resolutionStride(z) {
@@ -296,6 +298,12 @@ window.LayeredChamber = (() => {
     ctx.stroke();
   }
 
+  function opticalDepthLine(ctx, x, y, nearZ, farZ, energyLevel, alpha, widthScale = 1) {
+    for (let z = nearZ; z < farZ - 0.0001; z += geometry.cell) {
+      opticalLine(ctx, [x, y, z], [x, y, Math.min(farZ, z + geometry.cell)], energyLevel, alpha, widthScale);
+    }
+  }
+
   function drawRearWall(ctx, z, visibleX, systemEnergy, alpha) {
     const { cell, halfHeight: Y } = geometry;
     const fullX = finalHalfWidth();
@@ -303,20 +311,16 @@ window.LayeredChamber = (() => {
     const yCells = Math.round((Y * 2) / cell);
     const profile = opticalProfile(z, systemEnergy, alpha);
     const stride = resolutionStride(z);
-
     if (Number.isFinite(stride)) {
       for (let ix = 0; ix <= xCells; ix += stride) {
         const x = -fullX + ix * cell;
-        if (Math.abs(x) <= visibleX + 0.0001) {
-          opticalLine(ctx, [x, -Y, z], [x, Y, z], systemEnergy, alpha, 1.04);
-        }
+        if (Math.abs(x) <= visibleX + 0.0001) opticalLine(ctx, [x,-Y,z], [x,Y,z], systemEnergy, alpha, 1.04);
       }
       for (let iy = 0; iy <= yCells; iy += stride) {
         const y = -Y + iy * cell;
-        opticalLine(ctx, [-visibleX, y, z], [visibleX, y, z], systemEnergy, alpha, 1.04);
+        opticalLine(ctx, [-visibleX,y,z], [visibleX,y,z], systemEnergy, alpha, 1.04);
       }
     }
-
     const ap = apertureAt(z, visibleX);
     if (!Number.isFinite(stride) || ap.width < 8 || profile.resolve < 0.12) {
       const unresolved = clamp01(1 - profile.resolve);
@@ -335,18 +339,14 @@ window.LayeredChamber = (() => {
     const { cell, near } = geometry;
     const fullX = finalHalfWidth();
     const xCells = Math.round((fullX * 2) / cell);
-
     for (let ix = 0; ix <= xCells; ix++) {
       const x = -fullX + ix * cell;
-      if (Math.abs(x) <= visibleX + 0.0001) {
-        opticalLine(ctx, [x, y, near], [x, y, rearZ], systemEnergy, alpha, 0.92);
-      }
+      if (Math.abs(x) <= visibleX + 0.0001) opticalDepthLine(ctx, x, y, near, rearZ, systemEnergy, alpha, 0.92);
     }
-
     for (let z = near, index = 0; z <= rearZ + 0.0001; z += cell, index++) {
       const stride = resolutionStride(z);
       if (!Number.isFinite(stride) || index % stride !== 0) continue;
-      opticalLine(ctx, [-visibleX, y, z], [visibleX, y, z], systemEnergy, alpha, 0.9);
+      opticalLine(ctx, [-visibleX,y,z], [visibleX,y,z], systemEnergy, alpha, 0.9);
     }
   }
 
@@ -354,16 +354,11 @@ window.LayeredChamber = (() => {
     const { cell, halfHeight: Y, near } = geometry;
     const yCells = Math.round((Y * 2) / cell);
     const x = side * visibleX;
-
-    for (let iy = 0; iy <= yCells; iy++) {
-      const y = -Y + iy * cell;
-      opticalLine(ctx, [x, y, near], [x, y, rearZ], systemEnergy, alpha, 0.92);
-    }
-
+    for (let iy = 0; iy <= yCells; iy++) opticalDepthLine(ctx, x, -Y + iy * cell, near, rearZ, systemEnergy, alpha, 0.92);
     for (let z = near, index = 0; z <= rearZ + 0.0001; z += cell, index++) {
       const stride = resolutionStride(z);
       if (!Number.isFinite(stride) || index % stride !== 0) continue;
-      opticalLine(ctx, [x, -Y, z], [x, Y, z], systemEnergy, alpha, 0.9);
+      opticalLine(ctx, [x,-Y,z], [x,Y,z], systemEnergy, alpha, 0.9);
     }
   }
 
@@ -377,71 +372,134 @@ window.LayeredChamber = (() => {
     drawSideWall(ctx, 1, rearZ, visibleX, s.energy, alpha * 0.96);
   }
 
-  function drawSliceFrame(ctx, z, index, halfWidth, alpha) {
-    const ap = apertureAt(z, halfWidth);
-    ctx.strokeStyle = `rgba(255,84,62,${0.12 + alpha * 0.26})`;
-    ctx.lineWidth = index === 1 ? 1.4 : 0.8;
-    ctx.setLineDash(index === 1 ? [] : [5, 5]);
-    ctx.strokeRect(ap.left, ap.top, ap.width, ap.height);
-    ctx.setLineDash([]);
-    ctx.fillStyle = `rgba(255,92,68,${0.32 + alpha * 0.35})`;
-    ctx.font = '10px monospace';
-    ctx.textBaseline = 'top';
-    ctx.fillText(`SLICE ${String(index).padStart(2, '0')}  Z ${z.toFixed(2)}`, ap.left + 8, ap.top + 7);
+  function textOf(node, selector) {
+    return node.querySelector(selector)?.textContent?.trim().replace(/\s+/g, ' ') || '';
   }
 
-  function drawPlaceholderBlock(ctx, sliceIndex, itemIndex, z, halfWidth, worldY, alpha) {
-    const scale = focalLength() / z;
-    const inset = geometry.cell * (1.05 + sliceIndex * 0.08);
+  function liveArticles() {
+    return [...document.querySelectorAll('#feed .entry:not(.panel)')]
+      .filter(node => getComputedStyle(node).display !== 'none')
+      .map((node, index) => ({
+        id: node.dataset.entryId || `entry-${index}`,
+        headline: textOf(node, '.headline'),
+        meta: textOf(node, '.meta'),
+        tags: textOf(node, '.tags'),
+        body: textOf(node, '.body'),
+        priority: Number((node.querySelector('.priority')?.className.match(/priority-(\d+)/) || [])[1]) || 1,
+        expanded: node.classList.contains('expanded')
+      }))
+      .filter(article => article.headline || article.meta || article.body);
+  }
+
+  function wrapText(ctx, text, maxWidth, maxLines) {
+    const words = String(text || '').split(/\s+/).filter(Boolean);
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width <= maxWidth || !line) line = test;
+      else {
+        lines.push(line);
+        line = word;
+        if (lines.length >= maxLines) break;
+      }
+    }
+    if (lines.length < maxLines && line) lines.push(line);
+    if (lines.length === maxLines && words.length && ctx.measureText(lines[lines.length - 1]).width > maxWidth * 0.92) {
+      lines[lines.length - 1] = `${lines[lines.length - 1].slice(0, -1)}…`;
+    }
+    return lines;
+  }
+
+  function drawArticle(ctx, article, index, z, halfWidth, worldY, alpha) {
+    const inset = geometry.cell * 1.05;
+    const heightWorld = article.expanded ? lab.articleHeight * 1.55 : lab.articleHeight;
     const tl = project(-halfWidth + inset, worldY, z);
-    const br = project(halfWidth - inset, worldY - lab.itemHeight, z);
+    const br = project(halfWidth - inset, worldY - heightWorld, z);
     const width = br.x - tl.x;
     const height = br.y - tl.y;
-    if (br.y < -40 || tl.y > H + 40 || width <= 0) return;
-    const strength = 0.16 + (geometry.sliceCount - sliceIndex + 1) * 0.025;
-    ctx.fillStyle = `rgba(18,3,5,${0.45 + sliceIndex * 0.045})`;
+    if (br.y < -60 || tl.y > H + 60 || width < 24 || height < 12) return;
+
+    const p = opticalProfile(z, 0.88, alpha);
+    const priorityStrength = clamp01(0.42 + article.priority * 0.1);
+    ctx.fillStyle = `rgba(8,0,2,${0.58 * p.opacity})`;
     ctx.fillRect(tl.x, tl.y, width, height);
-    ctx.strokeStyle = `rgba(255,58,48,${strength * alpha})`;
-    ctx.lineWidth = Math.max(0.65, scale * 0.006);
+    ctx.strokeStyle = palette(0.68, 0.78 * p.opacity);
+    ctx.lineWidth = Math.max(0.6, p.width * 0.82);
     ctx.strokeRect(tl.x, tl.y, width, height);
-    const labelSize = clamp(11 * scale / 90, 8, 13);
-    ctx.fillStyle = `rgba(255,120,98,${0.42 * alpha})`;
-    ctx.font = `${labelSize}px monospace`;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`S${sliceIndex} / ITEM ${String(itemIndex + 1).padStart(2, '0')}`, tl.x + Math.max(6, width * 0.035), tl.y + height * 0.32);
-    const bars = 2 + ((sliceIndex + itemIndex) % 3);
-    for (let n = 0; n < bars; n++) {
-      const barY = tl.y + height * (0.55 + n * 0.11);
-      const barW = width * (0.74 - n * 0.09 - (itemIndex % 3) * 0.035);
-      ctx.fillStyle = `rgba(255,62,48,${(0.13 + n * 0.025) * alpha})`;
-      ctx.fillRect(tl.x + width * 0.035, barY, barW, Math.max(1, height * 0.025));
+
+    const railWidth = Math.max(2, width * 0.012);
+    ctx.fillStyle = palette(priorityStrength, 0.95 * p.opacity);
+    ctx.fillRect(tl.x, tl.y, railWidth, height);
+
+    const padX = Math.max(8, width * 0.035);
+    const contentX = tl.x + railWidth + padX;
+    const contentWidth = width - railWidth - padX * 2;
+    const metaSize = clamp(height * 0.095, 7, 11);
+    const headlineSize = clamp(height * 0.17, 10, 22);
+    const bodySize = clamp(height * 0.105, 8, 13);
+
+    ctx.textBaseline = 'top';
+    ctx.font = `${metaSize}px monospace`;
+    ctx.fillStyle = palette(0.72, 0.7 * p.opacity);
+    ctx.fillText(article.meta, contentX, tl.y + height * 0.10, contentWidth);
+
+    ctx.font = `600 ${headlineSize}px sans-serif`;
+    ctx.fillStyle = palette(0.95, 0.96 * p.opacity);
+    const headlineLines = wrapText(ctx, article.headline, contentWidth, article.expanded ? 3 : 2);
+    let cursorY = tl.y + height * 0.26;
+    for (const line of headlineLines) {
+      ctx.fillText(line, contentX, cursorY, contentWidth);
+      cursorY += headlineSize * 1.08;
+    }
+
+    ctx.font = `${bodySize}px sans-serif`;
+    ctx.fillStyle = palette(0.76, 0.65 * p.opacity);
+    const bodyLines = wrapText(ctx, article.body, contentWidth, article.expanded ? 4 : 2);
+    cursorY += bodySize * 0.45;
+    for (const line of bodyLines) {
+      if (cursorY > br.y - bodySize * 2) break;
+      ctx.fillText(line, contentX, cursorY, contentWidth);
+      cursorY += bodySize * 1.2;
+    }
+
+    ctx.font = `${Math.max(7, bodySize * 0.82)}px monospace`;
+    ctx.fillStyle = palette(0.62, 0.5 * p.opacity);
+    ctx.fillText(article.tags, contentX, br.y - Math.max(12, height * 0.12), contentWidth);
+
+    if (lab.diagnostics) {
+      ctx.font = '9px monospace';
+      ctx.fillStyle = `rgba(255,120,98,${0.55 * p.opacity})`;
+      ctx.fillText(`Z ${z.toFixed(2)} · ${article.id}`, tl.x + 5, tl.y + 4);
     }
   }
 
-  function drawSliceColumn(ctx, sliceIndex, z, halfWidth, alpha) {
-    const ap = apertureAt(z, halfWidth);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(ap.left, ap.top, ap.width, ap.height);
-    ctx.clip();
-    const contentTop = geometry.halfHeight - geometry.cell * 1.35 + lab.scroll;
-    for (let i = 0; i < lab.itemsPerSlice; i++) {
-      drawPlaceholderBlock(ctx, sliceIndex, i, z, halfWidth, contentTop - i * lab.itemPitch - (sliceIndex - 1) * 0.08, alpha);
-    }
-    ctx.restore();
-    if (lab.diagnostics) drawSliceFrame(ctx, z, sliceIndex, halfWidth, alpha);
+  function updateScrollRange() {
+    const count = liveArticles().length;
+    lab.maxScroll = Math.max(0, count * lab.articlePitch - geometry.halfHeight * 1.35);
+    lab.targetScroll = clamp(lab.targetScroll, 0, lab.maxScroll);
+    lab.scroll = clamp(lab.scroll, 0, lab.maxScroll);
   }
 
-  function drawScrollLaboratory(ctx, s) {
+  function drawLiveFeed(ctx, s) {
     if (mode !== MODES.LAB || s.lab <= 0) return;
+    const articles = liveArticles();
     const halfWidth = visibleHalfWidth(s);
-    for (let index = geometry.sliceCount; index >= 1; index--) {
-      drawSliceColumn(ctx, index, geometry.near + index * geometry.cell, halfWidth, s.lab);
+    const contentTop = geometry.halfHeight - geometry.cell * 1.2 + lab.scroll;
+
+    for (let index = articles.length - 1; index >= 0; index--) {
+      const z = geometry.near + geometry.cell * 1.25 + index * geometry.articleDepthStep;
+      const worldY = contentTop - index * lab.articlePitch;
+      drawArticle(ctx, articles[index], index, z, halfWidth, worldY, s.lab);
     }
-    ctx.fillStyle = `rgba(255,90,68,${0.48 * s.lab})`;
-    ctx.font = '11px monospace';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(`SHARED SCROLL ${lab.scroll.toFixed(2)} / ${lab.maxScroll.toFixed(2)}   ·   6 DEPTH CELLS`, 14, H - 14);
+
+    if (!articles.length) {
+      ctx.fillStyle = `rgba(255,100,78,${0.58 * s.lab})`;
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('NO LIVE FEED ENTRIES', W / 2, H / 2);
+      ctx.textAlign = 'start';
+    }
   }
 
   function settleScroll() {
@@ -468,7 +526,7 @@ window.LayeredChamber = (() => {
       drawChamber(b, s, 0.035 + 0.08 * s.energy);
       b.restore();
     }
-    drawScrollLaboratory(g, s);
+    drawLiveFeed(g, s);
     const movingScroll = settleScroll();
     if (!s.done || movingScroll) requestDraw();
   }
@@ -515,6 +573,7 @@ window.LayeredChamber = (() => {
     injectedDuration = 0;
     lab.scroll = 0;
     lab.targetScroll = 0;
+    updateScrollRange();
     requestDraw();
   }
 
