@@ -1,19 +1,71 @@
-/* Optional layered chamber mode. Standard AristCage is unchanged while disabled. */
-.layered-chamber-canvas{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;display:none}
-#layered-chamber-bg{z-index:0}#layered-chamber-fg{z-index:30}
-html.layered-chamber-mode .layered-chamber-canvas{display:block}
-html.layered-chamber-mode body{background:#020102}
-html.layered-chamber-mode .viewer{position:relative;z-index:2}
-html.layered-chamber-mode .rail{z-index:50}
-.layered-chamber-toggle[aria-pressed="true"]{color:#fff;border-color:#e43b45;box-shadow:0 0 12px rgba(228,59,69,.35)}
-html.layered-chamber-mode .entry:not(.panel){transform-style:preserve-3d;perspective:900px;overflow:visible}
-html.layered-chamber-mode .entry:not(.panel) .projection-plate{transform-style:preserve-3d;overflow:visible;background:rgba(5,2,3,.72)}
-html.layered-chamber-mode .entry:not(.panel) .part{will-change:transform;transition:transform .18s ease-out,text-shadow .18s ease-out,filter .18s ease-out}
-html.layered-chamber-mode .entry:not(.panel) .frame{transform:translate3d(var(--lc-back-x,0px),var(--lc-back-y,0px),-54px) scale(.955)}
-html.layered-chamber-mode .entry:not(.panel) .corners{transform:translate3d(var(--lc-back-x,0px),var(--lc-back-y,0px),-38px) scale(.968)}
-html.layered-chamber-mode .entry:not(.panel) .priority{transform:translate3d(var(--lc-mid-x,0px),var(--lc-mid-y,0px),-18px) scale(.984)}
+/* Optional exact-lattice chamber mode. Standard AristCage is unchanged while disabled. */
+.layered-chamber-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: none;
+}
+
+#layered-chamber-bg { z-index: 0; }
+#layered-chamber-fg { z-index: 30; }
+
+html.layered-chamber-mode .layered-chamber-canvas { display: block; }
+html.layered-chamber-mode body { background: #020102; }
+html.layered-chamber-mode .viewer { position: relative; z-index: 2; }
+html.layered-chamber-mode .rail { z-index: 50; }
+
+.layered-chamber-toggle[aria-pressed="true"] {
+  color: #fff;
+  border-color: #e43b45;
+  box-shadow: 0 0 12px rgba(228, 59, 69, .35);
+}
+
+html.layered-chamber-mode .entry:not(.panel),
+html.layered-chamber-mode .entry:not(.panel) .projection-plate,
+html.layered-chamber-mode .entry:not(.panel) .entry-content {
+  overflow: visible;
+}
+
+html.layered-chamber-mode .entry:not(.panel) .projection-plate {
+  background: rgba(5, 2, 3, .62);
+}
+
+html.layered-chamber-mode .entry:not(.panel) .frame,
+html.layered-chamber-mode .entry:not(.panel) .corners,
+html.layered-chamber-mode .entry:not(.panel) .priority,
 html.layered-chamber-mode .entry:not(.panel) .meta,
-html.layered-chamber-mode .entry:not(.panel) .tags{transform:translate3d(var(--lc-mid-x,0px),var(--lc-mid-y,0px),0)}
-html.layered-chamber-mode .entry:not(.panel) .headline{transform:translate3d(var(--lc-front-x,0px),var(--lc-front-y,0px),34px) scale(1.018);text-shadow:0 0 14px rgba(255,255,255,.14),0 0 28px rgba(255,45,55,.08)}
-html.layered-chamber-mode .entry:not(.panel).expanded .part{transform:none}
-@media(max-width:720px){html.layered-chamber-mode .entry:not(.panel){perspective:720px}.layered-chamber-toggle{font-size:11px}}
+html.layered-chamber-mode .entry:not(.panel) .tags,
+html.layered-chamber-mode .entry:not(.panel) .headline {
+  clip-path: var(--lc-clip, none);
+  transform-origin: 50% 50%;
+  transform: translate3d(var(--lc-x, 0px), var(--lc-y, 0px), 0) scale(var(--lc-scale, 1));
+  will-change: transform, clip-path;
+  transition: transform .12s linear, clip-path .12s linear;
+}
+
+/* Depth order follows the exact lattice planes used by layered-chamber.js. */
+html.layered-chamber-mode .entry:not(.panel) .frame { z-index: 1; }
+html.layered-chamber-mode .entry:not(.panel) .corners { z-index: 2; }
+html.layered-chamber-mode .entry:not(.panel) .priority { z-index: 3; }
+html.layered-chamber-mode .entry:not(.panel) .meta,
+html.layered-chamber-mode .entry:not(.panel) .tags { z-index: 4; }
+html.layered-chamber-mode .entry:not(.panel) .headline {
+  z-index: 5;
+  text-shadow: 0 0 14px rgba(255,255,255,.14), 0 0 28px rgba(255,45,55,.08);
+}
+
+html.layered-chamber-mode .entry:not(.panel).expanded .frame,
+html.layered-chamber-mode .entry:not(.panel).expanded .corners,
+html.layered-chamber-mode .entry:not(.panel).expanded .priority,
+html.layered-chamber-mode .entry:not(.panel).expanded .meta,
+html.layered-chamber-mode .entry:not(.panel).expanded .tags,
+html.layered-chamber-mode .entry:not(.panel).expanded .headline {
+  clip-path: none;
+  transform: none;
+}
+
+@media (max-width: 720px) {
+  .layered-chamber-toggle { font-size: 11px; }
+}
