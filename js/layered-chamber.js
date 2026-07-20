@@ -83,14 +83,22 @@ window.LayeredChamber = (() => {
 
   function fitGeometryToViewport() {
     const focal = focalLength();
-    geometry.halfWidth = snapCells((W * 0.49) * geometry.near / focal);
-    geometry.halfHeight = snapCells((H * 0.49) * geometry.near / focal);
 
-    const targetOpenX = snapCells((W * 0.46) * geometry.near / focal);
+    // Fit the final opened rim to the full viewport. The initial chamber is
+    // one or more complete cells narrower, so its side walls can move outward
+    // and finish at the actual screen corners rather than beyond them.
+    const targetFinalX = snapCells((W * 0.495) * geometry.near / focal);
+    const targetInitialX = snapCells((W * 0.40) * geometry.near / focal);
+
+    geometry.halfWidth = Math.min(
+      targetInitialX,
+      Math.max(geometry.cell, targetFinalX - geometry.cell)
+    );
     geometry.wallShiftCells = Math.max(
       1,
-      Math.round((targetOpenX - geometry.halfWidth) / geometry.cell)
+      Math.round((targetFinalX - geometry.halfWidth) / geometry.cell)
     );
+    geometry.halfHeight = snapCells((H * 0.495) * geometry.near / focal);
   }
 
   function resize() {
