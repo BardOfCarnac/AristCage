@@ -1,32 +1,34 @@
-/* Optional exact-lattice layered chamber mode. */
+/* Geometry-only boot chamber. Article cards remain hidden while this mode is active. */
 window.LayeredChamber = (() => {
   const KEY = 'ncn-layered-chamber';
   const root = document.documentElement;
+
   const geometry = {
     cell: 0.5,
     halfWidth: 3,
     halfHeight: 2.5,
     near: 2.5,
-    far: 8.5,
+    initialDepthCells: 2,
+    finalDepthCells: 12,
+    infinityDepthCells: 120,
+    wallShiftCells: 4,
     focal: 0.84
   };
-  const layerDepths = {
-    headline: 2.75,
-    meta: 3.25,
-    tags: 3.25,
-    priority: 3.75,
-    corners: 4.25,
-    frame: 4.75
+
+  const timing = {
+    greyHold: 700,
+    ignite: 520,
+    infinity: 1450,
+    snapHold: 380,
+    walls: 1200
   };
 
   let enabled = false;
   let bg, fg, b, g;
   let W = 0, H = 0, DPR = 1, raf = 0;
-  let viewerX = 0, viewerY = 0;
+  let startedAt = 0;
 
-  const feed = () => document.querySelector('#feed');
   const toggle = () => document.querySelector('#layered-chamber-toggle');
-  const entries = () => [...(feed()?.querySelectorAll('.entry:not(.panel)') || [])];
 
   function makeCanvas(id) {
     const canvas = document.createElement('canvas');
@@ -50,8 +52,8 @@ window.LayeredChamber = (() => {
     W = innerWidth;
     H = innerHeight;
     for (const canvas of [bg, fg]) {
-      canvas.width = W * DPR;
-      canvas.height = H * DPR;
+      canvas.width = Math.round(W * DPR);
+      canvas.height = Math.round(H * DPR);
       canvas.style.width = `${W}px`;
       canvas.style.height = `${H}px`;
       canvas.getContext('2d').setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -59,24 +61,22 @@ window.LayeredChamber = (() => {
     requestDraw();
   }
 
+  const clamp01 = value => Math.max(0, Math.min(1, value));
+  const mix = (a, c, t) => a + (c - a) * t;
+  const ease = t => 1 - Math.pow(1 - clamp01(t), 3);
+
   function project(x, y, z) {
     const focal = Math.min(W, H) * geometry.focal;
     return {
-      x: W / 2 + (x - viewerX) * focal / z,
-      y: H * 0.53 - (y - viewerY) * focal / z
+      x: W / 2 + x * focal / z,
+      y: H * 0.53 - y * focal / z
     };
   }
 
-  function opening(z) {
-    const tl = project(-geometry.halfWidth, geometry.halfHeight, z);
-    const br = project(geometry.halfWidth, -geometry.halfHeight, z);
-    return { left: tl.x, top: tl.y, right: br.x, bottom: br.y };
-  }
-
-  function stroke(ctx, a, c, alpha = 0.24, width = 1) {
-    const A = project(...a);
-    const C = project(...c);
-    ctx.strokeStyle = `rgba(214,38,48,${alpha})`;
+  function line(ctx, a, c, style, width = 1) {
+    const A = project(a[0], a[1], a[2]);
+    const C = project(c[0], c[1], c[2]);
+    ctx.strokeStyle = style;
     ctx.lineWidth = width;
     ctx.beginPath();
     ctx.moveTo(A.x, A.y);
@@ -84,103 +84,137 @@ window.LayeredChamber = (() => {
     ctx.stroke();
   }
 
-  function drawExactLattice(ctx, z0, z1, alpha) {
-    const { cell, halfWidth: X, halfHeight: Y } = geometry;
-    const xCells = Math.round((X * 2) / cell);
+  function colour(redness, alpha) {
+    const r = Math.round(mix(122, 255, redness));
+    const green = Math.round(mix(130, 28, redness));
+    const blue = Math.round(mix(137, 38, redness));
+    return `rgba(${r},${green},${blue},${alpha})`;
+  }
+
+  function drawRearPanel(ctx, far, halfWidth, redness, alpha) {
+    const { cell, halfHeight: Y } = geometry;
+    const xCells = Math.round((halfWidth * 2) / cell);
     const yCells = Math.round((Y * 2) / cell);
-    const zCells = Math.round((z1 - z0) / cell);
+    const style = colour(redness, alpha);
 
-    // Longitudinal lines: every edge belongs to one complete row of square cells.
     for (let ix = 0; ix <= xCells; ix++) {
-      const x = -X + ix * cell;
-      stroke(ctx, [x, -Y, z0], [x, -Y, z1], alpha);
-      stroke(ctx, [x,  Y, z0], [x,  Y, z1], alpha);
+      const x = -halfWidth + ix * cell;
+      line(ctx, [x, -Y, far], [x, Y, far], style, 1.05);
     }
     for (let iy = 0; iy <= yCells; iy++) {
       const y = -Y + iy * cell;
-      stroke(ctx, [-X, y, z0], [-X, y, z1], alpha);
-      stroke(ctx, [ X, y, z0], [ X, y, z1], alpha);
+      line(ctx, [-halfWidth, y, far], [halfWidth, y, far], style, 1.05);
     }
+  }
 
-    // Cross-rings: integer z steps only; no stretched remainder at the rear.
-    for (let iz = 0; iz <= zCells; iz++) {
-      const z = z0 + iz * cell;
-      stroke(ctx, [-X, -Y, z], [ X, -Y, z], alpha);
-      stroke(ctx, [ X, -Y, z], [ X,  Y, z], alpha);
-      stroke(ctx, [ X,  Y, z], [-X,  Y, z], alpha);
-      stroke(ctx, [-X,  Y, z], [-X, -Y, z], alpha);
-    }
+  function drawTunnel(ctx, near, far, nearHalfWidth, farHalfWidth, redness, alpha, drawRear) {
+    const { cell, halfHeight: Y } = geometry;
+    const zCells = Math.max(1, Math.round((far - near) / cell));
+    const yCells = Math.round((Y * 2) / cell);
+    const style = colour(redness, alpha);
 
-    // Rear panel: same cell size and exact integer dimensions as every other surface.
-    const z = z1;
+    // Depth rails on floor and ceiling. Width changes only by revealing exact columns.
+    const maxHalfWidth = Math.max(nearHalfWidth, farHalfWidth);
+    const xCells = Math.round((maxHalfWidth * 2) / cell);
     for (let ix = 0; ix <= xCells; ix++) {
-      const x = -X + ix * cell;
-      stroke(ctx, [x, -Y, z], [x, Y, z], alpha * 1.35);
-    }
-    for (let iy = 0; iy <= yCells; iy++) {
-      const y = -Y + iy * cell;
-      stroke(ctx, [-X, y, z], [X, y, z], alpha * 1.35);
-    }
-  }
-
-  function clipPart(part, z) {
-    const aperture = opening(z);
-    const rect = part.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-
-    const top = Math.max(0, aperture.top - rect.top);
-    const right = Math.max(0, rect.right - aperture.right);
-    const bottom = Math.max(0, rect.bottom - aperture.bottom);
-    const left = Math.max(0, aperture.left - rect.left);
-
-    part.style.setProperty('--lc-clip', `inset(${top.toFixed(2)}px ${right.toFixed(2)}px ${bottom.toFixed(2)}px ${left.toFixed(2)}px)`);
-
-    const reference = layerDepths.headline;
-    const relativeScale = reference / z;
-    const dx = viewerX * Math.min(W, H) * geometry.focal * (1 / reference - 1 / z);
-    const dy = -viewerY * Math.min(W, H) * geometry.focal * (1 / reference - 1 / z);
-    part.style.setProperty('--lc-scale', relativeScale.toFixed(4));
-    part.style.setProperty('--lc-x', `${dx.toFixed(2)}px`);
-    part.style.setProperty('--lc-y', `${dy.toFixed(2)}px`);
-  }
-
-  function applyLayerGeometry() {
-    for (const entry of entries()) {
-      for (const [name, z] of Object.entries(layerDepths)) {
-        const part = entry.querySelector(`.${name}`);
-        if (part) clipPart(part, z);
+      const x = -maxHalfWidth + ix * cell;
+      if (Math.abs(x) <= nearHalfWidth + 0.0001 && Math.abs(x) <= farHalfWidth + 0.0001) {
+        line(ctx, [x, -Y, near], [x, -Y, far], style);
+        line(ctx, [x, Y, near], [x, Y, far], style);
       }
     }
-  }
 
-  function clearLayerGeometry() {
-    for (const entry of entries()) {
-      entry.querySelectorAll('.frame,.corners,.priority,.meta,.tags,.headline').forEach(part => {
-        part.style.removeProperty('--lc-clip');
-        part.style.removeProperty('--lc-scale');
-        part.style.removeProperty('--lc-x');
-        part.style.removeProperty('--lc-y');
-      });
+    // Side-wall horizontal rails.
+    for (let iy = 0; iy <= yCells; iy++) {
+      const y = -Y + iy * cell;
+      line(ctx, [-nearHalfWidth, y, near], [-farHalfWidth, y, far], style);
+      line(ctx, [nearHalfWidth, y, near], [farHalfWidth, y, far], style);
     }
+
+    // Integer depth rings. There is never a stretched remainder cell.
+    for (let iz = 0; iz <= zCells; iz++) {
+      const z = near + iz * cell;
+      const t = zCells ? iz / zCells : 0;
+      const X = mix(nearHalfWidth, farHalfWidth, t);
+      line(ctx, [-X, -Y, z], [X, -Y, z], style);
+      line(ctx, [X, -Y, z], [X, Y, z], style);
+      line(ctx, [X, Y, z], [-X, Y, z], style);
+      line(ctx, [-X, Y, z], [-X, -Y, z], style);
+    }
+
+    if (drawRear) drawRearPanel(ctx, far, farHalfWidth, redness, alpha * 1.35);
   }
 
-  function draw() {
+  function phase(now) {
+    const t = now - startedAt;
+    const a = timing.greyHold;
+    const b0 = a + timing.ignite;
+    const c = b0 + timing.infinity;
+    const d = c + timing.snapHold;
+    const e = d + timing.walls;
+
+    if (t < a) return { name: 'grey', p: t / timing.greyHold };
+    if (t < b0) return { name: 'ignite', p: (t - a) / timing.ignite };
+    if (t < c) return { name: 'infinity', p: (t - b0) / timing.infinity };
+    if (t < d) return { name: 'snap', p: (t - c) / timing.snapHold };
+    if (t < e) return { name: 'walls', p: (t - d) / timing.walls };
+    return { name: 'done', p: 1 };
+  }
+
+  function draw(now = performance.now()) {
     raf = 0;
     if (!enabled || !W) return;
+
     b.clearRect(0, 0, W, H);
     g.clearRect(0, 0, W, H);
 
-    // Rear chamber and deeper walls.
-    drawExactLattice(b, 4.5, geometry.far, 0.18);
+    const state = phase(now);
+    const initialFar = geometry.near + geometry.initialDepthCells * geometry.cell;
+    const finalFar = geometry.near + geometry.finalDepthCells * geometry.cell;
+    const infinityFar = geometry.near + geometry.infinityDepthCells * geometry.cell;
+    const finalHalfWidth = geometry.halfWidth + geometry.wallShiftCells * geometry.cell;
 
-    // Near wall section. Its ceiling/floor/side lines sit in front of deeper article planes.
-    drawExactLattice(g, geometry.near, 4.5, 0.34);
+    let far = initialFar;
+    let redness = 0;
+    let nearHalfWidth = geometry.halfWidth;
+    let farHalfWidth = geometry.halfWidth;
+    let drawRear = true;
 
-    applyLayerGeometry();
+    if (state.name === 'ignite') {
+      redness = ease(state.p);
+    } else if (state.name === 'infinity') {
+      redness = 1;
+      far = mix(initialFar, infinityFar, ease(state.p));
+      drawRear = false;
+    } else if (state.name === 'snap') {
+      redness = 1;
+      far = finalFar;
+    } else if (state.name === 'walls' || state.name === 'done') {
+      redness = 1;
+      far = finalFar;
+      const shift = state.name === 'done' ? 1 : ease(state.p);
+      nearHalfWidth = mix(geometry.halfWidth, finalHalfWidth, shift);
+      farHalfWidth = mix(geometry.halfWidth, finalHalfWidth, shift);
+    }
+
+    drawTunnel(b, geometry.near, far, nearHalfWidth, farHalfWidth, redness, 0.34, drawRear);
+
+    if (redness > 0) {
+      g.globalCompositeOperation = 'lighter';
+      drawTunnel(g, geometry.near, far, nearHalfWidth, farHalfWidth, redness, 0.09 * redness, false);
+      g.globalCompositeOperation = 'source-over';
+    }
+
+    if (state.name !== 'done') requestDraw();
   }
 
   function requestDraw() {
     if (enabled && !raf) raf = requestAnimationFrame(draw);
+  }
+
+  function restart() {
+    startedAt = performance.now();
+    requestDraw();
   }
 
   function set(on, persist = true) {
@@ -189,45 +223,37 @@ window.LayeredChamber = (() => {
     const button = toggle();
     if (button) {
       button.setAttribute('aria-pressed', String(on));
-      button.textContent = on ? 'Chamber On' : 'Chamber Off';
+      button.textContent = on ? 'Restart Chamber' : 'Chamber Off';
     }
     if (persist) localStorage.setItem(KEY, on ? 'on' : 'off');
+
     if (on) {
       ensure();
       resize();
+      restart();
     } else {
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
-      clearLayerGeometry();
       b?.clearRect(0, 0, W, H);
       g?.clearRect(0, 0, W, H);
     }
   }
 
-  function pointer(event) {
-    if (!enabled) return;
-    viewerX = ((event.clientX / W) - 0.5) * 0.5;
-    viewerY = ((event.clientY / H) - 0.5) * 0.36;
-    requestDraw();
-  }
-
   function init() {
     ensure();
-    toggle()?.addEventListener('click', () => set(!enabled));
+    toggle()?.addEventListener('click', () => enabled ? restart() : set(true));
     addEventListener('resize', resize, { passive: true });
-    addEventListener('scroll', requestDraw, { passive: true });
-    addEventListener('pointermove', pointer, { passive: true });
-    new MutationObserver(requestDraw).observe(feed(), {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class']
-    });
     set(localStorage.getItem(KEY) === 'on', false);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
 
-  return { enable: () => set(true), disable: () => set(false), isEnabled: () => enabled, refresh: requestDraw };
+  return {
+    enable: () => set(true),
+    disable: () => set(false),
+    restart,
+    isEnabled: () => enabled,
+    refresh: requestDraw
+  };
 })();
