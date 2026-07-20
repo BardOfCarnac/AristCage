@@ -5,18 +5,17 @@ window.LayeredChamber = (() => {
 
   const geometry = {
     cell: 0.5,
-    halfWidth: 3,
-    halfHeight: 2.5,
     near: 2.5,
     initialDepthCells: 2,
     finalDepthCells: 12,
     infinityDepthCells: 120,
-    wallShiftCells: 4,
-    focal: 0.84
+    focal: 0.84,
+    halfWidth: 3,
+    halfHeight: 2.5,
+    wallShiftCells: 4
   };
 
   const timing = {
-    hold: 0.65,
     igniteStart: 0.35,
     igniteDuration: 0.7,
     travelStart: 0.82,
@@ -41,6 +40,7 @@ window.LayeredChamber = (() => {
     const n = clamp01(t);
     return n < 0.5 ? 4 * n * n * n : 1 - Math.pow(-2 * n + 2, 3) / 2;
   };
+  const snapCells = value => Math.max(geometry.cell, Math.round(value / geometry.cell) * geometry.cell);
 
   function makeCanvas(id) {
     const canvas = document.createElement('canvas');
@@ -58,11 +58,34 @@ window.LayeredChamber = (() => {
     g = fg.getContext('2d');
   }
 
+  function fitGeometryToViewport() {
+    const focal = Math.min(W, H) * geometry.focal;
+    const initialRearZ = geometry.near + geometry.initialDepthCells * geometry.cell;
+    const centreY = H * 0.53;
+
+    // The first rear wall is a screen-shaped rectangle, never a square.
+    // Both dimensions are snapped to exact whole-cell spans.
+    const targetHalfWidthPx = Math.max(1, W * 0.47);
+    const targetHalfHeightPx = Math.max(1, Math.min(centreY - 18, H - centreY - 18));
+    geometry.halfWidth = snapCells(targetHalfWidthPx * initialRearZ / focal);
+    geometry.halfHeight = snapCells(targetHalfHeightPx * initialRearZ / focal);
+
+    // At the final rear depth, move each wall far enough that its rear
+    // floor/ceiling corner approaches the corresponding screen edge.
+    const finalRearZ = geometry.near + geometry.finalDepthCells * geometry.cell;
+    const targetFinalHalfWidth = snapCells((W * 0.485) * finalRearZ / focal);
+    geometry.wallShiftCells = Math.max(
+      1,
+      Math.round((targetFinalHalfWidth - geometry.halfWidth) / geometry.cell)
+    );
+  }
+
   function resize() {
     ensure();
     DPR = Math.min(devicePixelRatio || 1, 2);
     W = innerWidth;
     H = innerHeight;
+    fitGeometryToViewport();
     for (const canvas of [bg, fg]) {
       canvas.width = Math.round(W * DPR);
       canvas.height = Math.round(H * DPR);
@@ -101,18 +124,20 @@ window.LayeredChamber = (() => {
 
   function state(now) {
     const t = (now - startedAt) / 1000;
-    const energy = easeOut((t - timing.igniteStart) / timing.igniteDuration);
-    const travel = easeInOut((t - timing.travelStart) / timing.travelDuration);
-    const returning = easeOut((t - timing.returnStart) / timing.returnDuration);
-    const wallOpen = easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration);
-    return { t, energy, travel, returning, wallOpen, done: t >= timing.done };
+    return {
+      t,
+      energy: easeOut((t - timing.igniteStart) / timing.igniteDuration),
+      travel: easeInOut((t - timing.travelStart) / timing.travelDuration),
+      returning: easeOut((t - timing.returnStart) / timing.returnDuration),
+      wallOpen: easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration),
+      done: t >= timing.done
+    };
   }
 
   function rearDepth(s) {
     const initial = geometry.near + geometry.initialDepthCells * geometry.cell;
     const final = geometry.near + geometry.finalDepthCells * geometry.cell;
     const infinity = geometry.near + geometry.infinityDepthCells * geometry.cell;
-
     if (s.returning > 0) return mix(infinity, final, s.returning);
     if (s.travel > 0) return mix(initial, infinity, s.travel);
     return initial;
@@ -127,7 +152,6 @@ window.LayeredChamber = (() => {
     const xCells = Math.round((X * 2) / cell);
     const yCells = Math.round((Y * 2) / cell);
     const style = colour(energy, alpha);
-
     for (let ix = 0; ix <= xCells; ix++) {
       const x = -X + ix * cell;
       line(ctx, [x, -Y, z], [x, Y, z], style, 1.05);
@@ -138,35 +162,21 @@ window.LayeredChamber = (() => {
     }
   }
 
-  function drawFloor(ctx, rearZ, energy, alpha) {
-    const { cell, halfWidth: X, halfHeight: Y, near } = geometry;
+  function drawHorizontalPlane(ctx, y, rearZ, openedColumns, energy, alpha) {
+    const { cell, halfWidth: X, near } = geometry;
     const style = colour(energy, alpha);
-    const xCells = Math.round((X * 2) / cell);
+    const expandedX = X + openedColumns * cell;
+    const xCells = Math.round((expandedX * 2) / cell);
     const steps = depthSteps(rearZ);
 
+    // Additional columns are real square columns, revealed outward as the walls move.
     for (let ix = 0; ix <= xCells; ix++) {
-      const x = -X + ix * cell;
-      line(ctx, [x, -Y, near], [x, -Y, rearZ], style);
+      const x = -expandedX + ix * cell;
+      line(ctx, [x, y, near], [x, y, rearZ], style);
     }
     for (let iz = 0; iz <= steps; iz++) {
       const z = near + iz * cell;
-      line(ctx, [-X, -Y, z], [X, -Y, z], style);
-    }
-  }
-
-  function drawCeiling(ctx, rearZ, energy, alpha) {
-    const { cell, halfWidth: X, halfHeight: Y, near } = geometry;
-    const style = colour(energy, alpha);
-    const xCells = Math.round((X * 2) / cell);
-    const steps = depthSteps(rearZ);
-
-    for (let ix = 0; ix <= xCells; ix++) {
-      const x = -X + ix * cell;
-      line(ctx, [x, Y, near], [x, Y, rearZ], style);
-    }
-    for (let iz = 0; iz <= steps; iz++) {
-      const z = near + iz * cell;
-      line(ctx, [-X, Y, z], [X, Y, z], style);
+      line(ctx, [-expandedX, y, z], [expandedX, y, z], style);
     }
   }
 
@@ -176,7 +186,6 @@ window.LayeredChamber = (() => {
     const yCells = Math.round((Y * 2) / cell);
     const steps = depthSteps(rearZ);
     const x = side * (X + shift);
-
     for (let iy = 0; iy <= yCells; iy++) {
       const y = -Y + iy * cell;
       line(ctx, [x, y, near], [x, y, rearZ], style);
@@ -189,11 +198,16 @@ window.LayeredChamber = (() => {
 
   function drawScene(ctx, s, alpha) {
     const rearZ = rearDepth(s);
-    const shift = geometry.wallShiftCells * geometry.cell * s.wallOpen;
+    const totalShift = geometry.wallShiftCells * geometry.cell;
+    const shift = totalShift * s.wallOpen;
+    const openedColumns = Math.min(
+      geometry.wallShiftCells,
+      Math.floor(geometry.wallShiftCells * s.wallOpen + 0.00001)
+    );
 
     drawRearWall(ctx, rearZ, s.energy, alpha * 1.2);
-    drawFloor(ctx, rearZ, s.energy, alpha);
-    drawCeiling(ctx, rearZ, s.energy, alpha);
+    drawHorizontalPlane(ctx, -geometry.halfHeight, rearZ, openedColumns, s.energy, alpha);
+    drawHorizontalPlane(ctx, geometry.halfHeight, rearZ, openedColumns, s.energy, alpha);
     drawSideWall(ctx, -1, rearZ, shift, s.energy, alpha);
     drawSideWall(ctx, 1, rearZ, shift, s.energy, alpha);
   }
@@ -201,19 +215,15 @@ window.LayeredChamber = (() => {
   function draw(now = performance.now()) {
     raf = 0;
     if (!enabled || !W) return;
-
     b.clearRect(0, 0, W, H);
     g.clearRect(0, 0, W, H);
-
     const s = state(now);
     drawScene(b, s, 0.34);
-
     if (s.energy > 0) {
       g.globalCompositeOperation = 'lighter';
       drawScene(g, s, 0.085 * s.energy);
       g.globalCompositeOperation = 'source-over';
     }
-
     if (!s.done) requestDraw();
   }
 
@@ -235,7 +245,6 @@ window.LayeredChamber = (() => {
       button.textContent = on ? 'Restart Chamber' : 'Chamber Off';
     }
     if (persist) localStorage.setItem(KEY, on ? 'on' : 'off');
-
     if (on) {
       ensure();
       resize();
