@@ -1,4 +1,4 @@
-/* Geometry-only boot chamber. Article cards remain hidden while this mode is active. */
+/* Geometry-only boot chamber built from five persistent planes. */
 window.LayeredChamber = (() => {
   const KEY = 'ncn-layered-chamber';
   const root = document.documentElement;
@@ -16,11 +16,16 @@ window.LayeredChamber = (() => {
   };
 
   const timing = {
-    greyHold: 700,
-    ignite: 520,
-    infinity: 1450,
-    snapHold: 380,
-    walls: 1200
+    hold: 0.65,
+    igniteStart: 0.35,
+    igniteDuration: 0.7,
+    travelStart: 0.82,
+    travelDuration: 1.35,
+    returnStart: 2.0,
+    returnDuration: 0.38,
+    wallOpenStart: 2.38,
+    wallOpenDuration: 1.1,
+    done: 3.55
   };
 
   let enabled = false;
@@ -29,6 +34,13 @@ window.LayeredChamber = (() => {
   let startedAt = 0;
 
   const toggle = () => document.querySelector('#layered-chamber-toggle');
+  const clamp01 = value => Math.max(0, Math.min(1, value));
+  const mix = (a, c, t) => a + (c - a) * t;
+  const easeOut = t => 1 - Math.pow(1 - clamp01(t), 3);
+  const easeInOut = t => {
+    const n = clamp01(t);
+    return n < 0.5 ? 4 * n * n * n : 1 - Math.pow(-2 * n + 2, 3) / 2;
+  };
 
   function makeCanvas(id) {
     const canvas = document.createElement('canvas');
@@ -61,10 +73,6 @@ window.LayeredChamber = (() => {
     requestDraw();
   }
 
-  const clamp01 = value => Math.max(0, Math.min(1, value));
-  const mix = (a, c, t) => a + (c - a) * t;
-  const ease = t => 1 - Math.pow(1 - clamp01(t), 3);
-
   function project(x, y, z) {
     const focal = Math.min(W, H) * geometry.focal;
     return {
@@ -84,81 +92,110 @@ window.LayeredChamber = (() => {
     ctx.stroke();
   }
 
-  function colour(redness, alpha) {
-    const r = Math.round(mix(122, 255, redness));
-    const green = Math.round(mix(130, 28, redness));
-    const blue = Math.round(mix(137, 38, redness));
+  function colour(energy, alpha) {
+    const r = Math.round(mix(112, 255, energy));
+    const green = Math.round(mix(120, 24, energy));
+    const blue = Math.round(mix(128, 32, energy));
     return `rgba(${r},${green},${blue},${alpha})`;
   }
 
-  function drawRearPanel(ctx, far, halfWidth, redness, alpha) {
-    const { cell, halfHeight: Y } = geometry;
-    const xCells = Math.round((halfWidth * 2) / cell);
+  function state(now) {
+    const t = (now - startedAt) / 1000;
+    const energy = easeOut((t - timing.igniteStart) / timing.igniteDuration);
+    const travel = easeInOut((t - timing.travelStart) / timing.travelDuration);
+    const returning = easeOut((t - timing.returnStart) / timing.returnDuration);
+    const wallOpen = easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration);
+    return { t, energy, travel, returning, wallOpen, done: t >= timing.done };
+  }
+
+  function rearDepth(s) {
+    const initial = geometry.near + geometry.initialDepthCells * geometry.cell;
+    const final = geometry.near + geometry.finalDepthCells * geometry.cell;
+    const infinity = geometry.near + geometry.infinityDepthCells * geometry.cell;
+
+    if (s.returning > 0) return mix(infinity, final, s.returning);
+    if (s.travel > 0) return mix(initial, infinity, s.travel);
+    return initial;
+  }
+
+  function depthSteps(rearZ) {
+    return Math.max(0, Math.floor((rearZ - geometry.near) / geometry.cell + 0.00001));
+  }
+
+  function drawRearWall(ctx, z, energy, alpha) {
+    const { cell, halfWidth: X, halfHeight: Y } = geometry;
+    const xCells = Math.round((X * 2) / cell);
     const yCells = Math.round((Y * 2) / cell);
-    const style = colour(redness, alpha);
+    const style = colour(energy, alpha);
 
     for (let ix = 0; ix <= xCells; ix++) {
-      const x = -halfWidth + ix * cell;
-      line(ctx, [x, -Y, far], [x, Y, far], style, 1.05);
+      const x = -X + ix * cell;
+      line(ctx, [x, -Y, z], [x, Y, z], style, 1.05);
     }
     for (let iy = 0; iy <= yCells; iy++) {
       const y = -Y + iy * cell;
-      line(ctx, [-halfWidth, y, far], [halfWidth, y, far], style, 1.05);
+      line(ctx, [-X, y, z], [X, y, z], style, 1.05);
     }
   }
 
-  function drawTunnel(ctx, near, far, nearHalfWidth, farHalfWidth, redness, alpha, drawRear) {
-    const { cell, halfHeight: Y } = geometry;
-    const zCells = Math.max(1, Math.round((far - near) / cell));
-    const yCells = Math.round((Y * 2) / cell);
-    const style = colour(redness, alpha);
+  function drawFloor(ctx, rearZ, energy, alpha) {
+    const { cell, halfWidth: X, halfHeight: Y, near } = geometry;
+    const style = colour(energy, alpha);
+    const xCells = Math.round((X * 2) / cell);
+    const steps = depthSteps(rearZ);
 
-    // Depth rails on floor and ceiling. Width changes only by revealing exact columns.
-    const maxHalfWidth = Math.max(nearHalfWidth, farHalfWidth);
-    const xCells = Math.round((maxHalfWidth * 2) / cell);
     for (let ix = 0; ix <= xCells; ix++) {
-      const x = -maxHalfWidth + ix * cell;
-      if (Math.abs(x) <= nearHalfWidth + 0.0001 && Math.abs(x) <= farHalfWidth + 0.0001) {
-        line(ctx, [x, -Y, near], [x, -Y, far], style);
-        line(ctx, [x, Y, near], [x, Y, far], style);
-      }
+      const x = -X + ix * cell;
+      line(ctx, [x, -Y, near], [x, -Y, rearZ], style);
     }
-
-    // Side-wall horizontal rails.
-    for (let iy = 0; iy <= yCells; iy++) {
-      const y = -Y + iy * cell;
-      line(ctx, [-nearHalfWidth, y, near], [-farHalfWidth, y, far], style);
-      line(ctx, [nearHalfWidth, y, near], [farHalfWidth, y, far], style);
-    }
-
-    // Integer depth rings. There is never a stretched remainder cell.
-    for (let iz = 0; iz <= zCells; iz++) {
+    for (let iz = 0; iz <= steps; iz++) {
       const z = near + iz * cell;
-      const t = zCells ? iz / zCells : 0;
-      const X = mix(nearHalfWidth, farHalfWidth, t);
       line(ctx, [-X, -Y, z], [X, -Y, z], style);
-      line(ctx, [X, -Y, z], [X, Y, z], style);
-      line(ctx, [X, Y, z], [-X, Y, z], style);
-      line(ctx, [-X, Y, z], [-X, -Y, z], style);
     }
-
-    if (drawRear) drawRearPanel(ctx, far, farHalfWidth, redness, alpha * 1.35);
   }
 
-  function phase(now) {
-    const t = now - startedAt;
-    const a = timing.greyHold;
-    const b0 = a + timing.ignite;
-    const c = b0 + timing.infinity;
-    const d = c + timing.snapHold;
-    const e = d + timing.walls;
+  function drawCeiling(ctx, rearZ, energy, alpha) {
+    const { cell, halfWidth: X, halfHeight: Y, near } = geometry;
+    const style = colour(energy, alpha);
+    const xCells = Math.round((X * 2) / cell);
+    const steps = depthSteps(rearZ);
 
-    if (t < a) return { name: 'grey', p: t / timing.greyHold };
-    if (t < b0) return { name: 'ignite', p: (t - a) / timing.ignite };
-    if (t < c) return { name: 'infinity', p: (t - b0) / timing.infinity };
-    if (t < d) return { name: 'snap', p: (t - c) / timing.snapHold };
-    if (t < e) return { name: 'walls', p: (t - d) / timing.walls };
-    return { name: 'done', p: 1 };
+    for (let ix = 0; ix <= xCells; ix++) {
+      const x = -X + ix * cell;
+      line(ctx, [x, Y, near], [x, Y, rearZ], style);
+    }
+    for (let iz = 0; iz <= steps; iz++) {
+      const z = near + iz * cell;
+      line(ctx, [-X, Y, z], [X, Y, z], style);
+    }
+  }
+
+  function drawSideWall(ctx, side, rearZ, shift, energy, alpha) {
+    const { cell, halfWidth: X, halfHeight: Y, near } = geometry;
+    const style = colour(energy, alpha);
+    const yCells = Math.round((Y * 2) / cell);
+    const steps = depthSteps(rearZ);
+    const x = side * (X + shift);
+
+    for (let iy = 0; iy <= yCells; iy++) {
+      const y = -Y + iy * cell;
+      line(ctx, [x, y, near], [x, y, rearZ], style);
+    }
+    for (let iz = 0; iz <= steps; iz++) {
+      const z = near + iz * cell;
+      line(ctx, [x, -Y, z], [x, Y, z], style);
+    }
+  }
+
+  function drawScene(ctx, s, alpha) {
+    const rearZ = rearDepth(s);
+    const shift = geometry.wallShiftCells * geometry.cell * s.wallOpen;
+
+    drawRearWall(ctx, rearZ, s.energy, alpha * 1.2);
+    drawFloor(ctx, rearZ, s.energy, alpha);
+    drawCeiling(ctx, rearZ, s.energy, alpha);
+    drawSideWall(ctx, -1, rearZ, shift, s.energy, alpha);
+    drawSideWall(ctx, 1, rearZ, shift, s.energy, alpha);
   }
 
   function draw(now = performance.now()) {
@@ -168,44 +205,16 @@ window.LayeredChamber = (() => {
     b.clearRect(0, 0, W, H);
     g.clearRect(0, 0, W, H);
 
-    const state = phase(now);
-    const initialFar = geometry.near + geometry.initialDepthCells * geometry.cell;
-    const finalFar = geometry.near + geometry.finalDepthCells * geometry.cell;
-    const infinityFar = geometry.near + geometry.infinityDepthCells * geometry.cell;
-    const finalHalfWidth = geometry.halfWidth + geometry.wallShiftCells * geometry.cell;
+    const s = state(now);
+    drawScene(b, s, 0.34);
 
-    let far = initialFar;
-    let redness = 0;
-    let nearHalfWidth = geometry.halfWidth;
-    let farHalfWidth = geometry.halfWidth;
-    let drawRear = true;
-
-    if (state.name === 'ignite') {
-      redness = ease(state.p);
-    } else if (state.name === 'infinity') {
-      redness = 1;
-      far = mix(initialFar, infinityFar, ease(state.p));
-      drawRear = false;
-    } else if (state.name === 'snap') {
-      redness = 1;
-      far = finalFar;
-    } else if (state.name === 'walls' || state.name === 'done') {
-      redness = 1;
-      far = finalFar;
-      const shift = state.name === 'done' ? 1 : ease(state.p);
-      nearHalfWidth = mix(geometry.halfWidth, finalHalfWidth, shift);
-      farHalfWidth = mix(geometry.halfWidth, finalHalfWidth, shift);
-    }
-
-    drawTunnel(b, geometry.near, far, nearHalfWidth, farHalfWidth, redness, 0.34, drawRear);
-
-    if (redness > 0) {
+    if (s.energy > 0) {
       g.globalCompositeOperation = 'lighter';
-      drawTunnel(g, geometry.near, far, nearHalfWidth, farHalfWidth, redness, 0.09 * redness, false);
+      drawScene(g, s, 0.085 * s.energy);
       g.globalCompositeOperation = 'source-over';
     }
 
-    if (state.name !== 'done') requestDraw();
+    if (!s.done) requestDraw();
   }
 
   function requestDraw() {
