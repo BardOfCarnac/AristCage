@@ -1,20 +1,26 @@
-/* Geometry-only chamber laboratory. Standard AristCage remains untouched while disabled. */
-.layered-chamber-canvas {
+/* Optional chamber subsystem. Removing this file and layered-chamber.js restores the original viewer. */
+.layered-chamber-system {
   position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.layered-chamber-canvas {
+  position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  display: none;
 }
 
-#layered-chamber-bg { z-index: 10; }
+#layered-chamber-bg { z-index: 0; }
 #layered-chamber-fg {
-  z-index: 11;
+  z-index: 1;
   filter: blur(.35px);
 }
 
-html.layered-chamber-mode .layered-chamber-canvas { display: block; }
 html.layered-chamber-mode body { background: #020102; }
 html.layered-chamber-mode .viewer { position: relative; z-index: 20; }
 html.layered-chamber-mode .rail { z-index: 50; }
@@ -25,20 +31,20 @@ html.layered-chamber-mode .rail { z-index: 50; }
   box-shadow: 0 0 12px rgba(228, 59, 69, .35);
 }
 
-/* Cards are deliberately removed while the chamber geometry is being established. */
-html.layered-chamber-mode .app,
-html.layered-chamber-mode .rail-occlusion {
+/* Lab mode preserves the current geometry demonstrator. Background mode leaves the app intact. */
+html.layered-chamber-lab-mode .app,
+html.layered-chamber-lab-mode .rail-occlusion {
   visibility: hidden;
   pointer-events: none;
 }
 
-html.layered-chamber-mode .rail {
+html.layered-chamber-lab-mode .rail {
   background: linear-gradient(to bottom, rgba(2, 1, 2, .94), rgba(2, 1, 2, .54));
 }
 
-html.layered-chamber-mode .rail-actions button:not(.layered-chamber-toggle),
-html.layered-chamber-mode .rail-mark,
-html.layered-chamber-mode .rail-title {
+html.layered-chamber-lab-mode .rail-actions button:not(.layered-chamber-toggle),
+html.layered-chamber-lab-mode .rail-mark,
+html.layered-chamber-lab-mode .rail-title {
   opacity: .28;
 }
 
