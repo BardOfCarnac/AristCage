@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NCN Optical Chamber — Boot Sequence Laboratory</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --red: #ff2b1f;
+      --dim: #5b4543;
+      --panel: rgba(10, 4, 4, 0.88);
+      --line: rgba(255, 71, 55, 0.34);
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      color: #f5d7d3;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      background:
+        radial-gradient(circle at 50% 52%, rgba(48, 5, 3, 0.15), transparent 48%),
+        #000;
+    }
+
+    .hud {
+      position: fixed;
+      z-index: 2;
+      left: 16px;
+      right: 16px;
+      bottom: 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px 18px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(8px);
+    }
+
+    .readout {
+      min-width: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    #phase {
+      color: #fff0ed;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+
+    #time {
+      color: #bd827b;
+      font-size: 12px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      min-height: 34px;
+      border: 1px solid rgba(255, 71, 55, 0.55);
+      background: rgba(85, 10, 7, 0.55);
+      color: #ffe7e3;
+      padding: 6px 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button:hover { background: rgba(130, 18, 12, 0.68); }
+    button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+    .scrub {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      font-size: 11px;
+      color: #a96e68;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--red);
+    }
+
+    .legend {
+      position: fixed;
+      top: 14px;
+      left: 16px;
+      z-index: 2;
+      color: rgba(255, 180, 170, 0.62);
+      font-size: 11px;
+      line-height: 1.5;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+    }
+
+    @media (max-width: 620px) {
+      .hud { grid-template-columns: 1fr; }
+      .buttons { grid-row: 2; }
+      .scrub { grid-row: 3; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="stage" aria-label="Animated construction of the NCN optical chamber"></canvas>
+
+  <div class="legend" aria-hidden="true">
+    NCN // OPTICAL CONSTRUCTION LAB<br>
+    GEOMETRY IS GENERATED ONCE; REVEAL VALUES CHANGE PER FRAME
+  </div>
+
+  <section class="hud" aria-label="Boot sequence controls">
+    <div class="readout">
+      <strong id="phase">CONVERGENCE</strong>
+      <span id="time">0.00 / 6.00 s</span>
+    </div>
+    <div class="buttons">
+      <button id="play" type="button">Pause</button>
+      <button id="reboot" type="button">Reboot</button>
+    </div>
+    <label class="scrub">
+      <span>0%</span>
+      <input id="scrubber" type="range" min="0" max="1000" value="0" aria-label="Boot progress">
+      <span>100%</span>
+    </label>
+  </section>
+
+  <script>
+    'use strict';
+
+    // -----------------------------------------------------------------------
+    // 1. FIXED CHAMBER DESCRIPTION
+    // -----------------------------------------------------------------------
+    // The chamber is not rebuilt every frame. These values define one finished
+    // cubic lattice in world space. Animation controls only how much of each
+    // pre-existing line is eligible to be drawn.
+
+    const CONFIG = {
+      duration: 6,
+      cell: 0.5,
+      columns: 8,
+      rows: 10,
+      depthCells: 6,
+      rearZ: 5.2,
+      cameraZ: -3.4,
+      focal: 3.7,
+      centreY: 0.15
+    };
+
+    const canvas = document.querySelector('#stage');
+    const ctx = canvas.getContext('2d');
+    const phaseLabel = document.querySelector('#phase');
+    const timeLabel = document.querySelector('#time');
+    const scrubber = document.querySelector('#scrubber');
+    const playButton = document.querySelector('#play');
+    const rebootButton = document.querySelector('#reboot');
+
+    const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const easeOutCubic = t => 1 - Math.pow(1 - clamp(t), 3);
+    const easeInOutCubic = t => {
+      t = clamp(t);
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    };
+    const phase = (p, start, end, easing = easeInOutCubic) => easing((p - start) / (end - start));
+
+    const widthWorld = CONFIG.columns * CONFIG.cell;
+    const heightWorld = CONFIG.rows * CONFIG.cell;
+    const frontZ = CONFIG.rearZ - CONFIG.depthCells * CONFIG.cell;
+    const halfW = widthWorld / 2;
+    const halfH = heightWorld / 2;
+
+    const point = (x, y, z) => ({ x, y, z });
+    const mixPoint = (a, b, t) => point(
+      lerp(a.x, b.x, t),
+      lerp(a.y, b.y, t),
+      lerp(a.z, b.z, t)
+    );
+
+    const rearCorners = [
+      point(-halfW, -halfH, CONFIG.rearZ),
+      point( halfW, -halfH, CONFIG.rearZ),
+      point( halfW,  halfH, CONFIG.rearZ),
+      point(-halfW,  halfH, CONFIG.rearZ)
+    ];
+
+    // Each record is created once and carries its own reveal order.
+    const rearFrame = [];
+    const rearGrid = [];
+    const depthRails = [];
+    const depthRungs = [];
+    const frontFrame = [];
+
+    function addLine(collection, a, b, order = 0, family = 'grid') {
+      collection.push({ a, b, order, family });
+    }
+
+    // Rear outer frame: four physical lines.
+    for (let i = 0; i < 4; i += 1) {
+      addLine(rearFrame, rearCorners[i], rearCorners[(i + 1) % 4], i / 4, 'frame');
+    }
+
+    // Rear lattice. Each line stores distance from the centre so the reveal can
+    // travel outward rather than fading the whole wall in at once.
+    for (let column = 1; column < CONFIG.columns; column += 1) {
+      const x = -halfW + column * CONFIG.cell;
+      addLine(
+        rearGrid,
+        point(x, -halfH, CONFIG.rearZ),
+        point(x, halfH, CONFIG.rearZ),
+        Math.abs(x) / halfW,
+        'rear-grid'
+      );
+    }
+
+    for (let row = 1; row < CONFIG.rows; row += 1) {
+      const y = -halfH + row * CONFIG.cell;
+      addLine(
+        rearGrid,
+        point(-halfW, y, CONFIG.rearZ),
+        point(halfW, y, CONFIG.rearZ),
+        Math.abs(y) / halfH,
+        'rear-grid'
+      );
+    }
+
+    // Longitudinal rails. They begin at every grid node around the perimeter of
+    // the rear wall and grow towards the viewer. This creates walls, ceiling and
+    // floor without treating those surfaces as four separate objects.
+    for (let column = 0; column <= CONFIG.columns; column += 1) {
+      const x = -halfW + column * CONFIG.cell;
+      const order = Math.abs(x) / halfW;
+      addLine(depthRails, point(x, -halfH, CONFIG.rearZ), point(x, -halfH, frontZ), order, 'rail');
+      addLine(depthRails, point(x,  halfH, CONFIG.rearZ), point(x,  halfH, frontZ), order, 'rail');
+    }
+
+    for (let row = 1; row < CONFIG.rows; row += 1) {
+      const y = -halfH + row * CONFIG.cell;
+      const order = Math.abs(y) / halfH;
+      addLine(depthRails, point(-halfW, y, CONFIG.rearZ), point(-halfW, y, frontZ), order, 'rail');
+      addLine(depthRails, point( halfW, y, CONFIG.rearZ), point( halfW, y, frontZ), order, 'rail');
+    }
+
+    // Cross-rungs at each depth cell. These make the longitudinal rails read as
+    // a cubic lattice instead of a bundle of converging rays.
+    for (let slice = 1; slice <= CONFIG.depthCells; slice += 1) {
+      const z = CONFIG.rearZ - slice * CONFIG.cell;
+      const sliceOrder = slice / CONFIG.depthCells;
+
+      for (let column = 0; column < CONFIG.columns; column += 1) {
+        const x1 = -halfW + column * CONFIG.cell;
+        const x2 = x1 + CONFIG.cell;
+        addLine(depthRungs, point(x1, -halfH, z), point(x2, -halfH, z), sliceOrder, 'rung');
+        addLine(depthRungs, point(x1,  halfH, z), point(x2,  halfH, z), sliceOrder, 'rung');
+      }
+
+      for (let row = 0; row < CONFIG.rows; row += 1) {
+        const y1 = -halfH + row * CONFIG.cell;
+        const y2 = y1 + CONFIG.cell;
+        addLine(depthRungs, point(-halfW, y1, z), point(-halfW, y2, z), sliceOrder, 'rung');
+        addLine(depthRungs, point( halfW, y1, z), point( halfW, y2, z), sliceOrder, 'rung');
+      }
+    }
+
+    const frontCorners = rearCorners.map(corner => point(corner.x, corner.y, frontZ));
+    for (let i = 0; i < 4; i += 1) {
+      addLine(frontFrame, frontCorners[i], frontCorners[(i + 1) % 4], i / 4, 'front-frame');
+    }
+
+    // -----------------------------------------------------------------------
+    // 2. CAMERA / PROJECTION
+    // -----------------------------------------------------------------------
+
+    let viewport = { width: 1, height: 1, dpr: 1, scale: 1 };
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      viewport = {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        dpr,
+        scale: Math.min(window.innerWidth / 7.4, window.innerHeight / 7.8)
+      };
+      canvas.width = Math.round(viewport.width * dpr);
+      canvas.height = Math.round(viewport.height * dpr);
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function project(p) {
+      const distance = p.z - CONFIG.cameraZ;
+      const perspective = CONFIG.focal / distance;
+      return {
+        x: viewport.width * 0.5 + p.x * viewport.scale * perspective,
+        y: viewport.height * 0.47 + (p.y + CONFIG.centreY) * viewport.scale * perspective,
+        depth: distance
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. DRAWING PRIMITIVES
+    // -----------------------------------------------------------------------
+
+    function strokeFor(energy, alpha = 1, emphasis = 0) {
+      const dormant = { r: 82, g: 70, b: 68 };
+      const live = { r: 255, g: 38, b: 25 };
+      const e = clamp(energy);
+      const r = Math.round(lerp(dormant.r, live.r, e));
+      const g = Math.round(lerp(dormant.g, live.g, e));
+      const b = Math.round(lerp(dormant.b, live.b, e));
+      return `rgba(${r}, ${g}, ${b}, ${clamp(alpha + emphasis * 0.15)})`;
+    }
+
+    function drawWorldLine(a, b, amount, energy, alpha = 1, width = 1) {
+      if (amount <= 0) return;
+      const end = mixPoint(a, b, clamp(amount));
+      const pa = project(a);
+      const pb = project(end);
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.lineWidth = width;
+      ctx.strokeStyle = strokeFor(energy, alpha, width - 1);
+      ctx.stroke();
+    }
+
+    function drawCentredLine(line, amount, energy, alpha = 1, width = 1) {
+      if (amount <= 0) return;
+      const half = clamp(amount) * 0.5;
+      const a = mixPoint(line.a, line.b, 0.5 - half);
+      const b = mixPoint(line.a, line.b, 0.5 + half);
+      drawWorldLine(a, b, 1, energy, alpha, width);
+    }
+
+    function drawPoint2D(x, y, radius, alpha, energy) {
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = strokeFor(energy, alpha);
+      ctx.fill();
+    }
+
+    // -----------------------------------------------------------------------
+    // 4. BOOT STATE
+    // -----------------------------------------------------------------------
+    // The timeline returns independent progress values. Geometry remains fixed.
+    // No wall is translated and no completed chamber is scaled.
+
+    function bootState(progress) {
+      return {
+        convergence: phase(progress, 0.00, 0.08, easeOutCubic),
+        beams:       phase(progress, 0.04, 0.17, easeInOutCubic),
+        rearFrame:   phase(progress, 0.15, 0.27, easeInOutCubic),
+        rearGrid:    phase(progress, 0.24, 0.43, easeInOutCubic),
+        extrusion:   phase(progress, 0.39, 0.73, easeInOutCubic),
+        rungs:       phase(progress, 0.48, 0.78, easeInOutCubic),
+        frontFrame:  phase(progress, 0.72, 0.84, easeInOutCubic),
+        energy:      phase(progress, 0.79, 0.98, easeOutCubic)
+      };
+    }
+
+    function currentPhase(p) {
+      if (p < 0.04) return 'CONVERGENCE';
+      if (p < 0.17) return 'CORNER ACQUISITION';
+      if (p < 0.27) return 'REAR FRAME';
+      if (p < 0.43) return 'REAR LATTICE';
+      if (p < 0.73) return 'VOLUME EXTRUSION';
+      if (p < 0.84) return 'FRONT LOCK';
+      if (p < 0.98) return 'ENERGISING';
+      return 'OPTICAL LINK: LIVE';
+    }
+
+    // -----------------------------------------------------------------------
+    // 5. FRAME RENDERER
+    // -----------------------------------------------------------------------
+
+    function render(progress) {
+      const state = bootState(progress);
+      ctx.clearRect(0, 0, viewport.width, viewport.height);
+
+      const centre = { x: viewport.width * 0.5, y: viewport.height * 0.47 };
+
+      // Ignition point. It tightens before the corner beams are released.
+      const pointAlpha = 1 - phase(progress, 0.12, 0.20, easeOutCubic);
+      if (pointAlpha > 0) {
+        drawPoint2D(
+          centre.x,
+          centre.y,
+          1.2 + state.convergence * 5.5,
+          pointAlpha,
+          state.energy
+        );
+      }
+
+      // Four acquisition beams travel from the projection centre to the rear
+      // corners. Their endpoints are interpolated; the rear frame is not yet on.
+      if (state.beams > 0 && progress < 0.25) {
+        const origin = point(0, -CONFIG.centreY, CONFIG.cameraZ + 4.6);
+        for (const corner of rearCorners) {
+          drawWorldLine(origin, corner, state.beams, state.energy, 0.68, 1);
+        }
+      }
+
+      // Rear outer frame traces around its four edges in sequence.
+      rearFrame.forEach(line => {
+        const local = clamp(state.rearFrame * 4 - line.order * 4);
+        drawWorldLine(line.a, line.b, easeInOutCubic(local), state.energy, 0.95, 1.35);
+      });
+
+      // Rear grid grows from the middle of each line. Lines nearer the wall centre
+      // start first; outer lines follow as the reveal radius expands.
+      rearGrid.forEach(line => {
+        const local = clamp((state.rearGrid - line.order * 0.52) / 0.48);
+        drawCentredLine(line, easeInOutCubic(local), state.energy, 0.55, 0.8);
+      });
+
+      // Depth rails grow from rear endpoints toward the viewer. Small per-line
+      // offsets prevent the surface from behaving as one uniformly scaled mesh.
+      depthRails.forEach((line, index) => {
+        const ripple = line.order * 0.14 + (index % 3) * 0.012;
+        const local = clamp((state.extrusion - ripple) / (1 - ripple));
+        drawWorldLine(line.a, line.b, easeInOutCubic(local), state.energy, 0.48, 0.85);
+      });
+
+      // Cross-rungs appear only when the extrusion front has reached their depth.
+      // Each rung therefore belongs to a fixed z-slice rather than sliding forward.
+      depthRungs.forEach(line => {
+        const reached = clamp((state.rungs - line.order * 0.78) / 0.22);
+        drawCentredLine(line, easeOutCubic(reached), state.energy, 0.42, 0.72);
+      });
+
+      // The front rim traces only after the rails have almost reached full length.
+      frontFrame.forEach(line => {
+        const local = clamp(state.frontFrame * 4 - line.order * 4);
+        drawWorldLine(line.a, line.b, easeInOutCubic(local), state.energy, 0.9, 1.4);
+      });
+
+      // A restrained hot pass makes the finished front edge read as the nearest
+      // optical plane without changing any geometry.
+      if (state.energy > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        frontFrame.forEach(line => {
+          drawWorldLine(line.a, line.b, 1, state.energy, state.energy * 0.22, 2.1);
+        });
+        ctx.restore();
+      }
+
+      phaseLabel.textContent = currentPhase(progress);
+      timeLabel.textContent = `${(progress * CONFIG.duration).toFixed(2)} / ${CONFIG.duration.toFixed(2)} s`;
+    }
+
+    // -----------------------------------------------------------------------
+    // 6. PLAYBACK / SCRUBBING
+    // -----------------------------------------------------------------------
+
+    let playing = true;
+    let progress = 0;
+    let lastNow = performance.now();
+    let dragging = false;
+
+    function setProgress(next) {
+      progress = clamp(next);
+      scrubber.value = String(Math.round(progress * 1000));
+      render(progress);
+    }
+
+    function animate(now) {
+      const deltaSeconds = Math.min((now - lastNow) / 1000, 0.1);
+      lastNow = now;
+
+      if (playing && !dragging) {
+        progress += deltaSeconds / CONFIG.duration;
+        if (progress >= 1) {
+          progress = 1;
+          playing = false;
+          playButton.textContent = 'Play';
+        }
+        scrubber.value = String(Math.round(progress * 1000));
+      }
+
+      render(progress);
+      requestAnimationFrame(animate);
+    }
+
+    playButton.addEventListener('click', () => {
+      if (progress >= 1) progress = 0;
+      playing = !playing;
+      playButton.textContent = playing ? 'Pause' : 'Play';
+      lastNow = performance.now();
+    });
+
+    rebootButton.addEventListener('click', () => {
+      progress = 0;
+      playing = true;
+      playButton.textContent = 'Pause';
+      lastNow = performance.now();
+      setProgress(0);
+    });
+
+    scrubber.addEventListener('pointerdown', () => { dragging = true; });
+    window.addEventListener('pointerup', () => { dragging = false; });
+    scrubber.addEventListener('input', event => {
+      setProgress(Number(event.target.value) / 1000);
+    });
+
+    window.addEventListener('resize', () => {
+      resize();
+      render(progress);
+    });
+
+    resize();
+    render(0);
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
