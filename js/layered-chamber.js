@@ -1,4 +1,4 @@
-/* Geometry-only boot chamber built from five persistent planes. */
+/* Geometry chamber plus six depth-cell scroll laboratory. */
 window.LayeredChamber = (() => {
   const KEY = 'ncn-layered-chamber';
   const root = document.documentElement;
@@ -12,7 +12,8 @@ window.LayeredChamber = (() => {
     focal: 0.84,
     halfWidth: 3,
     halfHeight: 2.5,
-    wallShiftCells: 4
+    wallShiftCells: 4,
+    sliceCount: 6
   };
 
   const timing = {
@@ -27,6 +28,18 @@ window.LayeredChamber = (() => {
     done: 3.55
   };
 
+  const lab = {
+    itemsPerSlice: 20,
+    itemPitch: 1.15,
+    itemHeight: 0.78,
+    scroll: 0,
+    targetScroll: 0,
+    maxScroll: 18,
+    dragging: false,
+    lastTouchY: 0,
+    diagnostics: true
+  };
+
   let enabled = false;
   let bg, fg, b, g;
   let W = 0, H = 0, DPR = 1, raf = 0;
@@ -34,6 +47,7 @@ window.LayeredChamber = (() => {
 
   const toggle = () => document.querySelector('#layered-chamber-toggle');
   const clamp01 = value => Math.max(0, Math.min(1, value));
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const mix = (a, c, t) => a + (c - a) * t;
   const easeOut = t => 1 - Math.pow(1 - clamp01(t), 3);
   const easeInOut = t => {
@@ -58,23 +72,23 @@ window.LayeredChamber = (() => {
     g = fg.getContext('2d');
   }
 
-  function fitGeometryToViewport() {
-    const focal = Math.min(W, H) * geometry.focal;
-    const centreY = H * 0.53;
+  function focalLength() {
+    return Math.min(W, H) * geometry.focal;
+  }
 
-    // Fit the NEAR rim to the viewport. The rear wall is therefore inset by
-    // two full cells of depth and all four surrounding planes remain visible.
+  function centreY() {
+    return H * 0.53;
+  }
+
+  function fitGeometryToViewport() {
+    const focal = focalLength();
+    const cy = centreY();
     const targetNearHalfWidthPx = Math.max(1, W * 0.485);
-    const targetNearHalfHeightPx = Math.max(
-      1,
-      Math.min(centreY - 12, H - centreY - 12)
-    );
+    const targetNearHalfHeightPx = Math.max(1, Math.min(cy - 12, H - cy - 12));
 
     geometry.halfWidth = snapCells(targetNearHalfWidthPx * geometry.near / focal);
     geometry.halfHeight = snapCells(targetNearHalfHeightPx * geometry.near / focal);
 
-    // Keep the translated side walls just inside the screen at their NEAR
-    // edge. This prevents them disappearing while still opening the room wide.
     const targetOpenNearHalfWidth = snapCells((W * 0.455) * geometry.near / focal);
     geometry.wallShiftCells = Math.max(
       1,
@@ -99,10 +113,10 @@ window.LayeredChamber = (() => {
   }
 
   function project(x, y, z) {
-    const focal = Math.min(W, H) * geometry.focal;
+    const focal = focalLength();
     return {
       x: W / 2 + x * focal / z,
-      y: H * 0.53 - y * focal / z
+      y: centreY() - y * focal / z
     };
   }
 
@@ -132,6 +146,7 @@ window.LayeredChamber = (() => {
       travel: easeInOut((t - timing.travelStart) / timing.travelDuration),
       returning: easeOut((t - timing.returnStart) / timing.returnDuration),
       wallOpen: easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration),
+      lab: easeOut((t - timing.done + 0.08) / 0.55),
       done: t >= timing.done
     };
   }
@@ -149,15 +164,20 @@ window.LayeredChamber = (() => {
     return Math.max(0, Math.floor((rearZ - geometry.near) / geometry.cell + 0.00001));
   }
 
-  function drawRearWall(ctx, z, openedColumns, energy, alpha) {
+  function openedColumns(s) {
+    return Math.min(
+      geometry.wallShiftCells,
+      Math.floor(geometry.wallShiftCells * s.wallOpen + 0.00001)
+    );
+  }
+
+  function drawRearWall(ctx, z, columns, energy, alpha) {
     const { cell, halfWidth: X, halfHeight: Y } = geometry;
-    const expandedX = X + openedColumns * cell;
+    const expandedX = X + columns * cell;
     const xCells = Math.round((expandedX * 2) / cell);
     const yCells = Math.round((Y * 2) / cell);
     const style = colour(energy, alpha);
 
-    // The original panel remains the centre of a wider, continuous back wall.
-    // Every revealed section is a complete square column.
     for (let ix = 0; ix <= xCells; ix++) {
       const x = -expandedX + ix * cell;
       line(ctx, [x, -Y, z], [x, Y, z], style, 1.05);
@@ -168,10 +188,10 @@ window.LayeredChamber = (() => {
     }
   }
 
-  function drawHorizontalPlane(ctx, y, rearZ, openedColumns, energy, alpha) {
+  function drawHorizontalPlane(ctx, y, rearZ, columns, energy, alpha) {
     const { cell, halfWidth: X, near } = geometry;
     const style = colour(energy, alpha);
-    const expandedX = X + openedColumns * cell;
+    const expandedX = X + columns * cell;
     const xCells = Math.round((expandedX * 2) / cell);
     const steps = depthSteps(rearZ);
 
@@ -202,20 +222,133 @@ window.LayeredChamber = (() => {
     }
   }
 
-  function drawScene(ctx, s, alpha) {
+  function drawChamber(ctx, s, alpha) {
     const rearZ = rearDepth(s);
-    const totalShift = geometry.wallShiftCells * geometry.cell;
-    const shift = totalShift * s.wallOpen;
-    const openedColumns = Math.min(
-      geometry.wallShiftCells,
-      Math.floor(geometry.wallShiftCells * s.wallOpen + 0.00001)
-    );
+    const columns = openedColumns(s);
+    const shift = geometry.wallShiftCells * geometry.cell * s.wallOpen;
 
-    drawRearWall(ctx, rearZ, openedColumns, s.energy, alpha * 1.2);
-    drawHorizontalPlane(ctx, -geometry.halfHeight, rearZ, openedColumns, s.energy, alpha);
-    drawHorizontalPlane(ctx, geometry.halfHeight, rearZ, openedColumns, s.energy, alpha);
+    drawRearWall(ctx, rearZ, columns, s.energy, alpha * 1.2);
+    drawHorizontalPlane(ctx, -geometry.halfHeight, rearZ, columns, s.energy, alpha);
+    drawHorizontalPlane(ctx, geometry.halfHeight, rearZ, columns, s.energy, alpha);
     drawSideWall(ctx, -1, rearZ, shift, s.energy, alpha);
     drawSideWall(ctx, 1, rearZ, shift, s.energy, alpha);
+  }
+
+  function apertureAt(z, columns) {
+    const X = geometry.halfWidth + columns * geometry.cell;
+    const Y = geometry.halfHeight;
+    const tl = project(-X, Y, z);
+    const br = project(X, -Y, z);
+    return {
+      left: tl.x,
+      top: tl.y,
+      right: br.x,
+      bottom: br.y,
+      width: br.x - tl.x,
+      height: br.y - tl.y
+    };
+  }
+
+  function drawSliceFrame(ctx, z, index, columns, alpha) {
+    const ap = apertureAt(z, columns);
+    ctx.strokeStyle = `rgba(255,84,62,${0.12 + alpha * 0.26})`;
+    ctx.lineWidth = index === 1 ? 1.4 : 0.8;
+    ctx.setLineDash(index === 1 ? [] : [5, 5]);
+    ctx.strokeRect(ap.left, ap.top, ap.width, ap.height);
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = `rgba(255,92,68,${0.32 + alpha * 0.35})`;
+    ctx.font = '10px monospace';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`SLICE ${String(index).padStart(2, '0')}  Z ${z.toFixed(2)}`, ap.left + 8, ap.top + 7);
+  }
+
+  function drawPlaceholderBlock(ctx, sliceIndex, itemIndex, z, columns, worldY, alpha) {
+    const X = geometry.halfWidth + columns * geometry.cell;
+    const scale = focalLength() / z;
+    const inset = geometry.cell * (1.05 + sliceIndex * 0.08);
+    const x0 = -X + inset;
+    const x1 = X - inset;
+    const y0 = worldY;
+    const y1 = worldY - lab.itemHeight;
+    const tl = project(x0, y0, z);
+    const br = project(x1, y1, z);
+    const width = br.x - tl.x;
+    const height = br.y - tl.y;
+    if (br.y < -40 || tl.y > H + 40) return;
+
+    const strength = 0.16 + (geometry.sliceCount - sliceIndex + 1) * 0.025;
+    ctx.fillStyle = `rgba(18,3,5,${0.45 + sliceIndex * 0.045})`;
+    ctx.fillRect(tl.x, tl.y, width, height);
+    ctx.strokeStyle = `rgba(255,58,48,${strength * alpha})`;
+    ctx.lineWidth = Math.max(0.65, scale * 0.006);
+    ctx.strokeRect(tl.x, tl.y, width, height);
+
+    const labelSize = clamp(11 * scale / 90, 8, 13);
+    ctx.fillStyle = `rgba(255,120,98,${0.42 * alpha})`;
+    ctx.font = `${labelSize}px monospace`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      `S${sliceIndex} / ITEM ${String(itemIndex + 1).padStart(2, '0')}`,
+      tl.x + Math.max(6, width * 0.035),
+      tl.y + height * 0.32
+    );
+
+    const bars = 2 + ((sliceIndex + itemIndex) % 3);
+    for (let n = 0; n < bars; n++) {
+      const barY = tl.y + height * (0.55 + n * 0.11);
+      const barW = width * (0.74 - n * 0.09 - (itemIndex % 3) * 0.035);
+      ctx.fillStyle = `rgba(255,62,48,${(0.13 + n * 0.025) * alpha})`;
+      ctx.fillRect(tl.x + width * 0.035, barY, barW, Math.max(1, height * 0.025));
+    }
+  }
+
+  function drawSliceColumn(ctx, sliceIndex, z, columns, alpha) {
+    const ap = apertureAt(z, columns);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(ap.left, ap.top, ap.width, ap.height);
+    ctx.clip();
+
+    const contentTop = geometry.halfHeight - geometry.cell * 1.35 + lab.scroll;
+    for (let i = 0; i < lab.itemsPerSlice; i++) {
+      const stagger = (sliceIndex - 1) * 0.08;
+      const y = contentTop - i * lab.itemPitch - stagger;
+      drawPlaceholderBlock(ctx, sliceIndex, i, z, columns, y, alpha);
+    }
+    ctx.restore();
+
+    if (lab.diagnostics) drawSliceFrame(ctx, z, sliceIndex, columns, alpha);
+  }
+
+  function drawScrollLaboratory(ctx, s) {
+    if (s.lab <= 0) return;
+    const columns = openedColumns(s);
+
+    // Deepest first, nearest last, so closer slices can occlude deeper content.
+    for (let index = geometry.sliceCount; index >= 1; index--) {
+      const z = geometry.near + index * geometry.cell;
+      drawSliceColumn(ctx, index, z, columns, s.lab);
+    }
+
+    ctx.fillStyle = `rgba(255,90,68,${0.48 * s.lab})`;
+    ctx.font = '11px monospace';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(
+      `SHARED SCROLL ${lab.scroll.toFixed(2)} / ${lab.maxScroll.toFixed(2)}   ·   6 DEPTH CELLS`,
+      14,
+      H - 14
+    );
+  }
+
+  function settleScroll() {
+    const delta = lab.targetScroll - lab.scroll;
+    if (Math.abs(delta) < 0.001) {
+      lab.scroll = lab.targetScroll;
+      return false;
+    }
+    lab.scroll += delta * 0.18;
+    return true;
   }
 
   function draw(now = performance.now()) {
@@ -223,22 +356,60 @@ window.LayeredChamber = (() => {
     if (!enabled || !W) return;
     b.clearRect(0, 0, W, H);
     g.clearRect(0, 0, W, H);
+
     const s = state(now);
-    drawScene(b, s, 0.34);
+    drawChamber(b, s, 0.34);
+
     if (s.energy > 0) {
-      g.globalCompositeOperation = 'lighter';
-      drawScene(g, s, 0.085 * s.energy);
-      g.globalCompositeOperation = 'source-over';
+      b.save();
+      b.globalCompositeOperation = 'lighter';
+      drawChamber(b, s, 0.075 * s.energy);
+      b.restore();
     }
-    if (!s.done) requestDraw();
+
+    drawScrollLaboratory(g, s);
+    const movingScroll = settleScroll();
+    if (!s.done || movingScroll) requestDraw();
   }
 
   function requestDraw() {
     if (enabled && !raf) raf = requestAnimationFrame(draw);
   }
 
+  function setScroll(value) {
+    lab.targetScroll = clamp(value, 0, lab.maxScroll);
+    requestDraw();
+  }
+
+  function wheel(event) {
+    if (!enabled || event.target.closest?.('.rail')) return;
+    event.preventDefault();
+    setScroll(lab.targetScroll + event.deltaY * 0.0065);
+  }
+
+  function touchStart(event) {
+    if (!enabled || event.target.closest?.('.rail') || !event.touches.length) return;
+    lab.dragging = true;
+    lab.lastTouchY = event.touches[0].clientY;
+  }
+
+  function touchMove(event) {
+    if (!enabled || !lab.dragging || !event.touches.length) return;
+    event.preventDefault();
+    const y = event.touches[0].clientY;
+    const delta = lab.lastTouchY - y;
+    lab.lastTouchY = y;
+    setScroll(lab.targetScroll + delta * 0.018);
+  }
+
+  function touchEnd() {
+    lab.dragging = false;
+  }
+
   function restart() {
     startedAt = performance.now();
+    lab.scroll = 0;
+    lab.targetScroll = 0;
     requestDraw();
   }
 
@@ -267,6 +438,11 @@ window.LayeredChamber = (() => {
     ensure();
     toggle()?.addEventListener('click', () => enabled ? restart() : set(true));
     addEventListener('resize', resize, { passive: true });
+    addEventListener('wheel', wheel, { passive: false });
+    addEventListener('touchstart', touchStart, { passive: true });
+    addEventListener('touchmove', touchMove, { passive: false });
+    addEventListener('touchend', touchEnd, { passive: true });
+    addEventListener('touchcancel', touchEnd, { passive: true });
     set(localStorage.getItem(KEY) === 'on', false);
   }
 
@@ -278,6 +454,11 @@ window.LayeredChamber = (() => {
     disable: () => set(false),
     restart,
     isEnabled: () => enabled,
-    refresh: requestDraw
+    refresh: requestDraw,
+    setScroll,
+    toggleDiagnostics: () => {
+      lab.diagnostics = !lab.diagnostics;
+      requestDraw();
+    }
   };
 })();
