@@ -4,57 +4,64 @@
   This file is intentionally self-contained. Remove it, the matching
   script include, and the rail toggle to restore the standard viewer.
   Chamber geometry remains the responsibility of the existing chamber
-  module. This file only renders the article copies held by each plane.
+  module. This file only renders article copies on chamber-world planes.
 ==================================================*/
 
+/* Keep the interactive viewer above the optical copies and the chamber
+   canvases below them. The viewer itself remains visually transparent. */
 .optical-mode .viewer {
+  position: relative;
+  z-index: 20;
   isolation: isolate;
 }
 
-.optical-mode .app,
-.optical-mode .app-shell,
-.optical-mode .feed,
-.optical-mode .optical-plane-system,
-.optical-mode .optical-plane,
-.optical-mode .optical-plane-article {
-  transform-style: preserve-3d;
-}
-
-.optical-mode .feed {
-  position: relative;
-  perspective: 1100px;
-  perspective-origin: 50% var(--optical-focus-y, 50vh);
-}
-
-/* The chamber's LAB canvas contains its own old article renderer.
-   Optics replaces only that foreground feed while retaining the chamber. */
-.optical-mode #layered-chamber-fg {
-  opacity: 0;
-}
-
+/* The chamber canvas is z-index 10. Optical articles occupy the gap
+   between it and the real, interactive viewer. */
 .optical-plane-system {
   display: none;
 }
 
 .optical-mode .optical-plane-system {
   display: block;
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  z-index: 5;
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  overflow: visible;
   pointer-events: none;
-  transform-style: preserve-3d;
 }
 
+/* Chamber LAB has its own canvas-drawn feed. Optics replaces only that
+   foreground feed while leaving the chamber geometry intact. */
+.optical-mode #layered-chamber-fg {
+  opacity: 0;
+}
+
+/* Each plane begins as the full near-plane viewport. Scaling it by
+   near / z gives exactly the chamber projection for that world depth.
+   Overflow clips off-chamber articles before the plane is projected. */
 .optical-mode .optical-plane {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  overflow: hidden;
   opacity: var(--optical-plane-opacity, 1);
   pointer-events: none;
-  transform: translateZ(var(--optical-plane-z, 0));
-  transform-origin: 50% var(--optical-focus-y, 50vh);
+  transform: scale(var(--optical-plane-scale, 1));
+  transform-origin: var(--optical-camera-x, 50vw) var(--optical-camera-y, 50vh);
   backface-visibility: hidden;
+}
+
+.optical-mode .optical-plane-content {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transform: translate3d(
+    var(--optical-scroll-x, 0px),
+    var(--optical-scroll-y, 0px),
+    0
+  );
+  transform-origin: 0 0;
 }
 
 .optical-mode .optical-plane-article {
@@ -68,26 +75,17 @@
   width: 100%;
   height: 100%;
   min-height: 100%;
-  background: rgba(2, 2, 2, 0.12);
+  background: rgba(2, 2, 2, 0.10);
 }
 
-/* The real DOM entries remain the click, layout and accessibility layer.
-   Only their visual plate is transparent while Optics is active. */
-.optical-mode #feed > .entry:not(.panel) {
-  z-index: 10;
-}
-
+/* The semantic source entries remain the layout, click and accessibility
+   layer. Only their visual plate is transparent while Optics is active. */
 .optical-mode #feed > .entry:not(.panel) > .projection-plate {
   opacity: 0;
 }
 
-.optical-mode #feed > .entry.panel {
-  z-index: 20;
-}
-
-/* Every clone is an intact article at this stage. Internal projection
-   offsets are deliberately neutralised until semantic pieces are peeled
-   onto their own planes in a later pass. */
+/* Every clone is still an intact article. Internal legacy parallax is
+   neutralised so depth comes only from its chamber plane. */
 .optical-mode .optical-plane .frame,
 .optical-mode .optical-plane .priority,
 .optical-mode .optical-plane .meta,
@@ -98,10 +96,7 @@
   transform: none !important;
 }
 
-.optical-mode .optical-plane .frame {
-  --projection-color: var(--optical-plane-structure);
-}
-
+.optical-mode .optical-plane .frame,
 .optical-mode .optical-plane .priority {
   --projection-color: var(--optical-plane-structure);
 }
