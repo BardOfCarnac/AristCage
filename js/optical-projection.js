@@ -14,24 +14,16 @@ window.OpticalProjection = (() => {
   const STORAGE_KEY = "ncn-optical-projection";
   const ROOT_CLASS = "optical-mode";
 
-  /* These values mirror the settled LayeredChamber camera. */
-  const CHAMBER_CAMERA = Object.freeze({
-    near: 2.5,
-    cell: 0.5,
-    focalRatio: 0.84,
-    wallShiftCells: 2
-  });
-
   /* Far to near. Every pane contains the same article list, but only
      the semantic role assigned to that pane remains visible. The
-     complete article now spans one chamber cell rather than five. */
+     complete article spans one chamber cell. */
   const SEMANTIC_PLANES = Object.freeze([
-    { role: "frame",    z: 3.0 },
-    { role: "corners",  z: 2.9 },
-    { role: "priority", z: 2.8 },
-    { role: "context",  z: 2.7 },
-    { role: "headline", z: 2.6 },
-    { role: "body",     z: 2.5 }
+    Object.freeze({ role: "frame",    z: 3.0 }),
+    Object.freeze({ role: "corners",  z: 2.9 }),
+    Object.freeze({ role: "priority", z: 2.8 }),
+    Object.freeze({ role: "context",  z: 2.7 }),
+    Object.freeze({ role: "headline", z: 2.6 }),
+    Object.freeze({ role: "body",     z: 2.5 })
   ]);
 
   let feed = null;
@@ -42,38 +34,10 @@ window.OpticalProjection = (() => {
   let observer = null;
   let resizeObserver = null;
 
-  function snapCells(value) {
-    const { cell } = CHAMBER_CAMERA;
-    return Math.max(cell, Math.round(value / cell) * cell);
-  }
-
-  function chamberGeometry() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    const focal = Math.min(width, height) * CHAMBER_CAMERA.focalRatio;
-    const centreX = width * 0.5;
-    const centreY = height * 0.5;
-    const halfWidth = snapCells(
-      (width * 0.5) * CHAMBER_CAMERA.near / focal
-    );
-    const halfHeight = snapCells(
-      (height * 0.5) * CHAMBER_CAMERA.near / focal
-    );
-    const visibleHalfWidth = halfWidth
-      + CHAMBER_CAMERA.wallShiftCells * CHAMBER_CAMERA.cell;
-    const apertureHalfWidth = visibleHalfWidth * focal / CHAMBER_CAMERA.near;
-    const apertureHalfHeight = halfHeight * focal / CHAMBER_CAMERA.near;
-
-    return {
-      centreX,
-      centreY,
-      nearAperture: {
-        left: centreX - apertureHalfWidth,
-        top: centreY - apertureHalfHeight,
-        width: apertureHalfWidth * 2,
-        height: apertureHalfHeight * 2
-      }
-    };
+  function cameraSnapshot() {
+    return window.LayeredChamber?.getCameraSnapshot?.()
+      || window.NCNChamberCamera?.snapshot?.()
+      || null;
   }
 
   function sourceEntries() {
@@ -139,7 +103,7 @@ window.OpticalProjection = (() => {
 
   function buildPlane(definition, index, sources, camera) {
     const plane = document.createElement("div");
-    const scale = CHAMBER_CAMERA.near / definition.z;
+    const scale = camera.scaleAt(definition.z);
     const aperture = camera.nearAperture;
 
     plane.className = "optical-plane";
@@ -166,8 +130,10 @@ window.OpticalProjection = (() => {
     frameRequest = 0;
     if (!enabled || !feed) return;
 
+    const camera = cameraSnapshot();
+    if (!camera) return;
+
     const root = ensurePlaneSystem();
-    const camera = chamberGeometry();
     const sources = sourceEntries().map(entry => ({
       entry,
       geometry: sourceGeometry(entry)
@@ -230,6 +196,7 @@ window.OpticalProjection = (() => {
     toggle?.addEventListener("click", toggleMode);
     window.addEventListener("scroll", requestSync, { passive: true });
     window.addEventListener("resize", requestSync, { passive: true });
+    window.addEventListener("ncn:chamber-camera-change", requestSync);
 
     observer = new MutationObserver(requestSync);
     observer.observe(feed, {
@@ -260,6 +227,7 @@ window.OpticalProjection = (() => {
     toggle?.removeEventListener("click", toggleMode);
     window.removeEventListener("scroll", requestSync);
     window.removeEventListener("resize", requestSync);
+    window.removeEventListener("ncn:chamber-camera-change", requestSync);
     observer?.disconnect();
     resizeObserver?.disconnect();
 
@@ -285,6 +253,8 @@ window.OpticalProjection = (() => {
     disable,
     refresh,
     destroy,
+    getCameraSnapshot: cameraSnapshot,
+    getPlaneDefinitions: () => SEMANTIC_PLANES.map(plane => ({ ...plane })),
     isEnabled: () => enabled
   };
 })();
