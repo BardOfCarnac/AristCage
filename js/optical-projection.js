@@ -13,17 +13,25 @@
 window.OpticalProjection = (() => {
   const STORAGE_KEY = "ncn-optical-projection";
   const ROOT_CLASS = "optical-mode";
+  const LIFECYCLE_CLASSES = Object.freeze([
+    "entering",
+    "present",
+    "leaving",
+    "gone",
+    "energy-up",
+    "energy-down"
+  ]);
 
   /* Far to near. Every pane contains the same article list, but only
      the semantic role assigned to that pane remains visible. The
-     complete article spans one chamber cell. */
+     headline now occupies the nearest plane. */
   const SEMANTIC_PLANES = Object.freeze([
     Object.freeze({ role: "frame",    z: 3.0 }),
     Object.freeze({ role: "corners",  z: 2.9 }),
     Object.freeze({ role: "priority", z: 2.8 }),
-    Object.freeze({ role: "context",  z: 2.7 }),
-    Object.freeze({ role: "headline", z: 2.6 }),
-    Object.freeze({ role: "body",     z: 2.5 })
+    Object.freeze({ role: "body",     z: 2.7 }),
+    Object.freeze({ role: "context",  z: 2.6 }),
+    Object.freeze({ role: "headline", z: 2.5 })
   ]);
 
   let feed = null;
@@ -31,6 +39,7 @@ window.OpticalProjection = (() => {
   let planeSystem = null;
   let enabled = false;
   let frameRequest = 0;
+  let stableSyncTimer = 0;
   let observer = null;
   let resizeObserver = null;
 
@@ -55,6 +64,15 @@ window.OpticalProjection = (() => {
     return planeSystem;
   }
 
+  function stabiliseProjectionObjects(node) {
+    node.querySelectorAll(".part, .priority").forEach(object => {
+      object.classList.remove(...LIFECYCLE_CLASSES);
+      object.classList.add("present");
+      object.style.removeProperty("animation");
+      object.style.removeProperty("transition");
+    });
+  }
+
   function sanitiseVisualClone(node) {
     node.removeAttribute("id");
     node.setAttribute("aria-hidden", "true");
@@ -65,6 +83,8 @@ window.OpticalProjection = (() => {
       control.setAttribute("tabindex", "-1");
       control.setAttribute("aria-hidden", "true");
     });
+
+    stabiliseProjectionObjects(node);
   }
 
   function sourceGeometry(entry) {
@@ -111,10 +131,6 @@ window.OpticalProjection = (() => {
     plane.dataset.chamberDepth = definition.z.toFixed(2);
     plane.style.setProperty("--optical-plane-scale", scale.toFixed(6));
     plane.style.setProperty("--optical-plane-order", String(index));
-    plane.style.setProperty("--optical-pane-left", `${aperture.left}px`);
-    plane.style.setProperty("--optical-pane-top", `${aperture.top}px`);
-    plane.style.setProperty("--optical-pane-width", `${aperture.width}px`);
-    plane.style.setProperty("--optical-pane-height", `${aperture.height}px`);
 
     sources.forEach(({ entry, geometry }) => {
       plane.append(cloneArticle(
@@ -124,6 +140,17 @@ window.OpticalProjection = (() => {
     });
 
     return plane;
+  }
+
+  function applyAperture(root, camera) {
+    const aperture = camera.nearAperture;
+
+    root.style.setProperty("--optical-camera-x", `${camera.centreX}px`);
+    root.style.setProperty("--optical-camera-y", `${camera.centreY}px`);
+    root.style.setProperty("--optical-aperture-left", `${aperture.left}px`);
+    root.style.setProperty("--optical-aperture-top", `${aperture.top}px`);
+    root.style.setProperty("--optical-aperture-width", `${aperture.width}px`);
+    root.style.setProperty("--optical-aperture-height", `${aperture.height}px`);
   }
 
   function rebuildPlanes() {
@@ -144,14 +171,42 @@ window.OpticalProjection = (() => {
       fragment.append(buildPlane(definition, index, sources, camera));
     });
 
+    applyAperture(root, camera);
     root.replaceChildren(fragment);
-    root.style.setProperty("--optical-camera-x", `${camera.centreX}px`);
-    root.style.setProperty("--optical-camera-y", `${camera.centreY}px`);
   }
 
   function requestSync() {
     if (!enabled || frameRequest) return;
     frameRequest = requestAnimationFrame(rebuildPlanes);
+  }
+
+  function requestStableSync(delay = 90) {
+    if (!enabled) return;
+    window.clearTimeout(stableSyncTimer);
+    stableSyncTimer = window.setTimeout(() => {
+      stableSyncTimer = 0;
+      requestAnimationFrame(() => requestAnimationFrame(requestSync));
+    }, delay);
+  }
+
+  function articleExpansionChanged(record) {
+    const target = record.target;
+    if (!(target instanceof Element)) return false;
+    if (target.parentElement !== feed || !target.classList.contains("entry")) return false;
+
+    const wasExpanded = String(record.oldValue || "")
+      .split(/\s+/)
+      .includes("expanded");
+    return wasExpanded !== target.classList.contains("expanded");
+  }
+
+  function handleFeedMutations(records) {
+    const needsGeometrySync = records.some(record => {
+      if (record.type === "childList" || record.type === "characterData") return true;
+      return record.type === "attributes" && articleExpansionChanged(record);
+    });
+
+    if (needsGeometrySync) requestStableSync();
   }
 
   function setToggleState() {
@@ -175,6 +230,8 @@ window.OpticalProjection = (() => {
 
     if (frameRequest) cancelAnimationFrame(frameRequest);
     frameRequest = 0;
+    window.clearTimeout(stableSyncTimer);
+    stableSyncTimer = 0;
 
     planeSystem?.remove();
     planeSystem = null;
@@ -198,17 +255,18 @@ window.OpticalProjection = (() => {
     window.addEventListener("resize", requestSync, { passive: true });
     window.addEventListener("ncn:chamber-camera-change", requestSync);
 
-    observer = new MutationObserver(requestSync);
+    observer = new MutationObserver(handleFeedMutations);
     observer.observe(feed, {
       childList: true,
       subtree: true,
       characterData: true,
       attributes: true,
-      attributeFilter: ["class", "style"]
+      attributeOldValue: true,
+      attributeFilter: ["class"]
     });
 
     if ("ResizeObserver" in window) {
-      resizeObserver = new ResizeObserver(requestSync);
+      resizeObserver = new ResizeObserver(() => requestStableSync(70));
       resizeObserver.observe(feed);
     }
 
@@ -219,7 +277,7 @@ window.OpticalProjection = (() => {
   }
 
   function refresh() {
-    requestSync();
+    requestStableSync(0);
   }
 
   function destroy() {
