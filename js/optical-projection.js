@@ -4,165 +4,182 @@
   Progressive enhancement for the existing feed. The module owns no
   story data or chamber geometry and can be deleted without changing
   the standard renderer.
+
+  Each optical plane contains a complete visual copy of every live
+  article. The semantic source articles remain in the normal feed and
+  continue to own layout, interaction, expansion and accessibility.
 ==================================================*/
 
 window.OpticalProjection = (() => {
   const STORAGE_KEY = "ncn-optical-projection";
   const ROOT_CLASS = "optical-mode";
-  const VISIBLE_RANGE = 3.2;
 
-  /* Every article receives one synchronized visual layer on every plane. */
+  /* Far to near: every plane receives every article. */
   const ARTICLE_PLANES = Object.freeze([
-    { z: 0,    opacity: 1.00 },
-    { z: -90,  opacity: 0.13 },
-    { z: -180, opacity: 0.10 },
-    { z: -270, opacity: 0.08 },
-    { z: -360, opacity: 0.06 },
-    { z: -450, opacity: 0.04 }
+    {
+      z: -420,
+      opacity: 0.11,
+      structure: "#61100c",
+      headline: "#861b12",
+      secondary: "#9b2b17"
+    },
+    {
+      z: -320,
+      opacity: 0.13,
+      structure: "#78130e",
+      headline: "#a52216",
+      secondary: "#b6341b"
+    },
+    {
+      z: -230,
+      opacity: 0.15,
+      structure: "#941812",
+      headline: "#c72d1d",
+      secondary: "#d24322"
+    },
+    {
+      z: -150,
+      opacity: 0.18,
+      structure: "#b41f17",
+      headline: "#e34429",
+      secondary: "#eb6335"
+    },
+    {
+      z: -75,
+      opacity: 0.22,
+      structure: "#d72d20",
+      headline: "#ff7652",
+      secondary: "#ff9a5f"
+    },
+    {
+      z: 0,
+      opacity: 1,
+      structure: "var(--red)",
+      headline: "var(--white)",
+      secondary: "var(--amber)"
+    }
   ]);
 
   let feed = null;
   let toggle = null;
+  let planeSystem = null;
   let enabled = false;
   let frameRequest = 0;
   let observer = null;
   let resizeObserver = null;
 
-  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-  const mix = (a, b, amount) => Math.round(a + (b - a) * amount);
+  function sourceEntries() {
+    if (!feed) return [];
+    return [...feed.querySelectorAll(":scope > .entry:not(.panel)")];
+  }
 
-  function colourPhase(distance) {
-    const resolve = clamp(1 - distance / 2.5, 0, 1);
-    let red;
-    let green;
-    let blue;
+  function ensurePlaneSystem() {
+    if (planeSystem?.isConnected) return planeSystem;
 
-    if (resolve < 0.52) {
-      const amount = resolve / 0.52;
-      red = mix(92, 255, amount);
-      green = mix(12, 58, amount);
-      blue = mix(8, 22, amount);
-    } else {
-      const amount = (resolve - 0.52) / 0.48;
-      red = 255;
-      green = mix(58, 248, amount);
-      blue = mix(22, 239, amount);
-    }
+    planeSystem = document.createElement("div");
+    planeSystem.className = "optical-plane-system";
+    planeSystem.setAttribute("aria-hidden", "true");
+    feed.prepend(planeSystem);
+    return planeSystem;
+  }
+
+  function sanitiseVisualClone(node) {
+    node.removeAttribute("id");
+    node.querySelectorAll("[id]").forEach(child => child.removeAttribute("id"));
+    node.querySelectorAll("button, input, select, textarea, a").forEach(control => {
+      control.setAttribute("tabindex", "-1");
+      control.setAttribute("aria-hidden", "true");
+    });
+  }
+
+  function sourceGeometry(entry, feedRect) {
+    const rect = entry.getBoundingClientRect();
 
     return {
-      main: `rgb(${red}, ${green}, ${blue})`,
-      secondary: `rgb(255, ${mix(65, 172, resolve)}, ${mix(28, 105, resolve)})`,
-      energy: 0.12 + resolve * 0.82
+      top: rect.top - feedRect.top,
+      left: rect.left - feedRect.left,
+      width: rect.width,
+      height: rect.height
     };
   }
 
-  function sanitiseVisualClone(layer) {
-    layer.removeAttribute("id");
-    layer.querySelectorAll("[id]").forEach(node => node.removeAttribute("id"));
-    layer.querySelectorAll("button, input, select, textarea, a").forEach(node => {
-      node.setAttribute("tabindex", "-1");
-      node.setAttribute("aria-hidden", "true");
+  function cloneArticle(entry, geometry) {
+    const sourcePlate = entry.querySelector(":scope > .projection-plate");
+    if (!sourcePlate) return null;
+
+    const article = document.createElement("div");
+    article.className = `optical-plane-article${entry.classList.contains("expanded") ? " expanded" : ""}`;
+    article.dataset.entryId = entry.dataset.entryId || "";
+    article.style.top = `${geometry.top}px`;
+    article.style.left = `${geometry.left}px`;
+    article.style.width = `${geometry.width}px`;
+    article.style.height = `${geometry.height}px`;
+
+    const plate = sourcePlate.cloneNode(true);
+    sanitiseVisualClone(plate);
+    article.append(plate);
+
+    return article;
+  }
+
+  function buildPlane(definition, index, sources) {
+    const plane = document.createElement("div");
+    plane.className = "optical-plane";
+    plane.dataset.opticalPlane = String(index);
+    plane.style.setProperty("--optical-plane-z", `${definition.z}px`);
+    plane.style.setProperty("--optical-plane-opacity", String(definition.opacity));
+    plane.style.setProperty("--optical-plane-structure", definition.structure);
+    plane.style.setProperty("--optical-plane-headline", definition.headline);
+    plane.style.setProperty("--optical-plane-secondary", definition.secondary);
+
+    sources.forEach(({ entry, geometry }) => {
+      const clone = cloneArticle(entry, geometry);
+      if (clone) plane.append(clone);
     });
+
+    return plane;
   }
 
-  function buildEntryLayers(entry) {
-    if (entry.querySelector(":scope > .optical-article-stack")) return;
+  function syncPerspectiveOrigin() {
+    if (!enabled || !feed) return;
 
-    const source = entry.querySelector(":scope > .projection-plate");
-    if (!source) return;
-
-    source.classList.add("optical-article-source");
-
-    const stack = document.createElement("div");
-    stack.className = "optical-article-stack";
-    stack.setAttribute("aria-hidden", "true");
-
-    ARTICLE_PLANES.forEach((plane, index) => {
-      const layer = source.cloneNode(true);
-      layer.classList.remove("optical-article-source");
-      layer.classList.add("optical-article-layer");
-      layer.dataset.opticalPlane = String(index);
-      layer.style.setProperty("--optical-layer-z", `${plane.z}px`);
-      layer.style.setProperty("--optical-layer-opacity", String(plane.opacity));
-      sanitiseVisualClone(layer);
-      stack.append(layer);
-    });
-
-    entry.append(stack);
+    const feedRect = feed.getBoundingClientRect();
+    const viewportFocus = window.innerHeight * 0.47;
+    const localFocus = viewportFocus - feedRect.top;
+    feed.style.setProperty("--optical-focus-y", `${localFocus}px`);
   }
 
-  function buildAllEntryLayers() {
-    feed?.querySelectorAll(".entry:not(.panel)").forEach(buildEntryLayers);
-  }
-
-  function removeEntryLayers(entry) {
-    entry.querySelector(":scope > .optical-article-stack")?.remove();
-    entry.querySelector(":scope > .optical-article-source")?.classList.remove("optical-article-source");
-  }
-
-  function clearEntry(entry) {
-    entry.style.removeProperty("--optical-opacity");
-    entry.style.removeProperty("--optical-main");
-    entry.style.removeProperty("--optical-secondary");
-    entry.style.removeProperty("--optical-energy");
-    entry.style.removeProperty("transform");
-    entry.style.removeProperty("z-index");
-  }
-
-  function clearAllEntries() {
-    feed?.querySelectorAll(".entry:not(.panel)").forEach(clearEntry);
-  }
-
-  function removeAllEntryLayers() {
-    feed?.querySelectorAll(".entry:not(.panel)").forEach(removeEntryLayers);
-  }
-
-  function updateEntry(entry, viewportFocus, spacing) {
-    buildEntryLayers(entry);
-
-    const rect = entry.getBoundingClientRect();
-    const centre = rect.top + rect.height / 2;
-    const relative = (centre - viewportFocus) / spacing;
-    const distance = Math.abs(relative);
-
-    if (distance > VISIBLE_RANGE) {
-      entry.style.setProperty("--optical-opacity", "0");
-      return;
-    }
-
-    const opacity = 1 - clamp(distance / VISIBLE_RANGE, 0, 1) * 0.72;
-    const phase = colourPhase(distance);
-    const tilt = clamp(relative * -0.35, -1.4, 1.4);
-    const travel = clamp(relative * -7, -20, 20);
-
-    entry.style.setProperty("--optical-opacity", opacity.toFixed(3));
-    entry.style.setProperty("--optical-main", phase.main);
-    entry.style.setProperty("--optical-secondary", phase.secondary);
-    entry.style.setProperty("--optical-energy", phase.energy.toFixed(3));
-    entry.style.transform = `translate3d(0, ${travel}px, 0) rotateX(${tilt}deg)`;
-    entry.style.zIndex = String(1000 - Math.round(distance * 100));
-  }
-
-  function update() {
+  function rebuildPlanes() {
     frameRequest = 0;
     if (!enabled || !feed) return;
 
-    buildAllEntryLayers();
+    const root = ensurePlaneSystem();
+    const entries = sourceEntries();
+    const feedRect = feed.getBoundingClientRect();
+    const sources = entries.map(entry => ({
+      entry,
+      geometry: sourceGeometry(entry, feedRect)
+    }));
+    const fragment = document.createDocumentFragment();
 
-    const railHeight = document.querySelector(".rail")?.getBoundingClientRect().height || 0;
-    const usableHeight = Math.max(window.innerHeight - railHeight, 320);
-    const viewportFocus = railHeight + usableHeight * 0.43;
-    const firstEntry = feed.querySelector(".entry:not(.panel)");
-    const spacing = Math.max((firstEntry?.getBoundingClientRect().height || 104) + 12, 116);
-
-    feed.querySelectorAll(".entry:not(.panel)").forEach(entry => {
-      updateEntry(entry, viewportFocus, spacing);
+    ARTICLE_PLANES.forEach((definition, index) => {
+      fragment.append(buildPlane(definition, index, sources));
     });
+
+    const sourceChildren = [...feed.children].filter(child => child !== root);
+    const contentHeight = sourceChildren.reduce((height, child) => {
+      const rect = child.getBoundingClientRect();
+      return Math.max(height, rect.bottom - feedRect.top);
+    }, feedRect.height);
+
+    root.replaceChildren(fragment);
+    root.style.height = `${Math.max(0, contentHeight)}px`;
+    syncPerspectiveOrigin();
   }
 
-  function requestUpdate() {
+  function requestSync() {
     if (!enabled || frameRequest) return;
-    frameRequest = requestAnimationFrame(update);
+    frameRequest = requestAnimationFrame(rebuildPlanes);
   }
 
   function setToggleState() {
@@ -174,18 +191,23 @@ window.OpticalProjection = (() => {
   function enable(options = {}) {
     enabled = true;
     document.documentElement.classList.add(ROOT_CLASS);
-    buildAllEntryLayers();
+    ensurePlaneSystem();
     setToggleState();
     if (options.persist !== false) localStorage.setItem(STORAGE_KEY, "on");
-    requestUpdate();
+    requestSync();
   }
 
   function disable(options = {}) {
     enabled = false;
     document.documentElement.classList.remove(ROOT_CLASS);
+
     if (frameRequest) cancelAnimationFrame(frameRequest);
     frameRequest = 0;
-    clearAllEntries();
+
+    planeSystem?.remove();
+    planeSystem = null;
+    feed?.style.removeProperty("--optical-focus-y");
+
     setToggleState();
     if (options.persist !== false) localStorage.setItem(STORAGE_KEY, "off");
   }
@@ -195,26 +217,34 @@ window.OpticalProjection = (() => {
     else enable();
   }
 
+  function handleFeedMutations(mutations) {
+    const sourceChanged = mutations.some(mutation => {
+      return !planeSystem || !planeSystem.contains(mutation.target);
+    });
+
+    if (sourceChanged) requestSync();
+  }
+
   function init(options = {}) {
     feed = options.feed || document.querySelector("#feed");
     toggle = options.toggle || document.querySelector("#optical-projection-toggle");
     if (!feed) return false;
 
     toggle?.addEventListener("click", toggleMode);
+    window.addEventListener("scroll", syncPerspectiveOrigin, { passive: true });
+    window.addEventListener("resize", requestSync, { passive: true });
 
-    window.addEventListener("scroll", requestUpdate, { passive: true });
-    window.addEventListener("resize", requestUpdate, { passive: true });
-
-    observer = new MutationObserver(requestUpdate);
+    observer = new MutationObserver(handleFeedMutations);
     observer.observe(feed, {
       childList: true,
       subtree: true,
+      characterData: true,
       attributes: true,
       attributeFilter: ["class"]
     });
 
     if ("ResizeObserver" in window) {
-      resizeObserver = new ResizeObserver(requestUpdate);
+      resizeObserver = new ResizeObserver(requestSync);
       resizeObserver.observe(feed);
     }
 
@@ -225,17 +255,16 @@ window.OpticalProjection = (() => {
   }
 
   function refresh() {
-    requestUpdate();
+    requestSync();
   }
 
   function destroy() {
     disable({ persist: false });
     toggle?.removeEventListener("click", toggleMode);
-    window.removeEventListener("scroll", requestUpdate);
-    window.removeEventListener("resize", requestUpdate);
+    window.removeEventListener("scroll", syncPerspectiveOrigin);
+    window.removeEventListener("resize", requestSync);
     observer?.disconnect();
     resizeObserver?.disconnect();
-    removeAllEntryLayers();
 
     feed = null;
     toggle = null;
