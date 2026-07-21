@@ -3,107 +3,137 @@
 
   This file is intentionally self-contained. Remove it, the matching
   script include, and the rail toggle to restore the standard viewer.
-  It styles projected article layers only; chamber geometry belongs to
-  the existing chamber module.
+  Chamber geometry remains the responsibility of the existing chamber
+  module. This file only renders the article copies held by each plane.
 ==================================================*/
 
 .optical-mode .viewer {
   isolation: isolate;
-  perspective: 1100px;
-  perspective-origin: 50% 44%;
-  transform-style: preserve-3d;
 }
 
 .optical-mode .app,
 .optical-mode .app-shell,
-.optical-mode .feed {
+.optical-mode .feed,
+.optical-mode .optical-plane-system,
+.optical-mode .optical-plane,
+.optical-mode .optical-plane-article {
   transform-style: preserve-3d;
 }
 
 .optical-mode .feed {
-  perspective: 980px;
-  perspective-origin: 50% var(--optical-focus-y, 43%);
-  overflow: visible;
-}
-
-.optical-mode .entry:not(.panel) {
-  --optical-opacity: 1;
   position: relative;
-  opacity: var(--optical-opacity);
-  transform-style: preserve-3d;
-  will-change: transform, opacity;
+  perspective: 1100px;
+  perspective-origin: 50% var(--optical-focus-y, 50vh);
 }
 
-.optical-article-stack {
+/* The chamber's LAB canvas contains its own old article renderer.
+   Optics replaces only that foreground feed while retaining the chamber. */
+.optical-mode #layered-chamber-fg {
+  opacity: 0;
+}
+
+.optical-plane-system {
   display: none;
 }
 
-.optical-mode .entry:not(.panel) > .optical-article-source {
-  visibility: hidden;
-}
-
-.optical-mode .entry:not(.panel) > .optical-article-stack {
+.optical-mode .optical-plane-system {
   display: block;
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 5;
   pointer-events: none;
   transform-style: preserve-3d;
 }
 
-.optical-mode .optical-article-layer {
+.optical-mode .optical-plane {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: var(--optical-layer-opacity, 1);
-  transform: translateZ(var(--optical-layer-z, 0));
-  transform-style: preserve-3d;
+  opacity: var(--optical-plane-opacity, 1);
+  pointer-events: none;
+  transform: translateZ(var(--optical-plane-z, 0));
+  transform-origin: 50% var(--optical-focus-y, 50vh);
   backface-visibility: hidden;
 }
 
-.optical-mode .entry:not(.panel) .projection-plate,
-.optical-mode .entry:not(.panel) .part {
-  transform-style: preserve-3d;
-  will-change: transform, color, text-shadow, border-color, box-shadow;
+.optical-mode .optical-plane-article {
+  position: absolute;
+  pointer-events: none;
+  backface-visibility: hidden;
 }
 
-.optical-mode .entry:not(.panel) .projection-plate {
-  background: rgba(2, 2, 2, 0.16);
+.optical-mode .optical-plane-article > .projection-plate {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  background: rgba(2, 2, 2, 0.12);
 }
 
-.optical-mode .entry:not(.panel) .headline,
-.optical-mode .entry:not(.panel) .tags,
-.optical-mode .entry:not(.panel) .priority,
-.optical-mode .entry:not(.panel) .frame,
-.optical-mode .entry:not(.panel) .corners {
-  color: var(--optical-main, var(--white));
+/* The real DOM entries remain the click, layout and accessibility layer.
+   Only their visual plate is transparent while Optics is active. */
+.optical-mode #feed > .entry:not(.panel) {
+  z-index: 10;
 }
 
-.optical-mode .entry:not(.panel) .tags {
-  color: var(--optical-secondary, var(--amber));
+.optical-mode #feed > .entry:not(.panel) > .projection-plate {
+  opacity: 0;
 }
 
-.optical-mode .entry:not(.panel) .headline {
-  text-shadow:
-    0 0 calc(4px + 10px * var(--optical-energy, 0.5)) rgba(255, 245, 232, var(--optical-energy, 0.5)),
-    0 0 20px rgba(255, 70, 30, 0.28);
+.optical-mode #feed > .entry.panel {
+  z-index: 20;
 }
 
-.optical-mode .entry:not(.panel) .priority {
-  background: currentColor;
-  box-shadow: 0 0 12px currentColor;
+/* Every clone is an intact article at this stage. Internal projection
+   offsets are deliberately neutralised until semantic pieces are peeled
+   onto their own planes in a later pass. */
+.optical-mode .optical-plane .frame,
+.optical-mode .optical-plane .priority,
+.optical-mode .optical-plane .meta,
+.optical-mode .optical-plane .headline,
+.optical-mode .optical-plane .tags,
+.optical-mode .optical-plane .body,
+.optical-mode .optical-plane .corners {
+  transform: none !important;
 }
 
-.optical-mode .entry:not(.panel) .frame {
-  border-color: currentColor;
+.optical-mode .optical-plane .frame {
+  --projection-color: var(--optical-plane-structure);
 }
 
-.optical-mode .entry:not(.panel) .corner {
-  border-color: currentColor;
+.optical-mode .optical-plane .priority {
+  --projection-color: var(--optical-plane-structure);
 }
 
-.optical-mode .entry.expanded:not(.panel) {
-  opacity: 1 !important;
+.optical-mode .optical-plane .corners {
+  color: var(--optical-plane-structure);
+}
+
+.optical-mode .optical-plane .meta,
+.optical-mode .optical-plane .tags,
+.optical-mode .optical-plane .body {
+  --projection-color: var(--optical-plane-secondary);
+}
+
+.optical-mode .optical-plane .headline {
+  --projection-color: var(--optical-plane-headline);
+}
+
+.optical-mode .optical-plane-article .meta {
+  display: none;
+}
+
+.optical-mode .optical-plane-article.expanded .expansion-zone {
+  display: block;
+}
+
+.optical-mode .optical-plane-article.expanded .body {
+  padding-top: 12px;
+}
+
+.optical-mode .optical-plane-article.expanded .priority {
+  height: calc(100% - 28px);
 }
 
 .optical-toggle[aria-pressed="true"] {
@@ -113,14 +143,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .optical-mode .entry:not(.panel),
-  .optical-mode .entry:not(.panel) .projection-plate,
-  .optical-mode .entry:not(.panel) .part,
-  .optical-mode .optical-article-layer {
-    transform: none !important;
-  }
-
-  .optical-mode .entry:not(.panel) {
-    opacity: 1 !important;
+  .optical-mode .optical-plane .part,
+  .optical-mode .optical-plane .priority {
+    animation: none !important;
+    transition: none !important;
   }
 }
