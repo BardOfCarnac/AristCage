@@ -2,7 +2,8 @@
   OPTIONAL OPTICAL PROJECTION
 
   Progressive enhancement for the existing feed. The module owns no
-  story data and can be deleted without changing the standard renderer.
+  story data or chamber geometry and can be deleted without changing
+  the standard renderer.
 ==================================================*/
 
 window.OpticalProjection = (() => {
@@ -21,7 +22,6 @@ window.OpticalProjection = (() => {
   ]);
 
   let feed = null;
-  let chamber = null;
   let toggle = null;
   let enabled = false;
   let frameRequest = 0;
@@ -30,26 +30,6 @@ window.OpticalProjection = (() => {
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const mix = (a, b, amount) => Math.round(a + (b - a) * amount);
-
-  function chamberMarkup() {
-    return `
-      <div class="optical-chamber" aria-hidden="true">
-        <div class="optical-chamber__rear"></div>
-        <div class="optical-chamber__wall optical-chamber__wall--left"></div>
-        <div class="optical-chamber__wall optical-chamber__wall--right"></div>
-        <div class="optical-chamber__floor"></div>
-        <div class="optical-chamber__beam"></div>
-        <div class="optical-chamber__projector"></div>
-        <div class="optical-chamber__focus"></div>
-      </div>`;
-  }
-
-  function createChamber() {
-    if (chamber) return chamber;
-    document.body.insertAdjacentHTML("afterbegin", chamberMarkup());
-    chamber = document.querySelector(".optical-chamber");
-    return chamber;
-  }
 
   function colourPhase(distance) {
     const resolve = clamp(1 - distance / 2.5, 0, 1);
@@ -194,7 +174,6 @@ window.OpticalProjection = (() => {
   function enable(options = {}) {
     enabled = true;
     document.documentElement.classList.add(ROOT_CLASS);
-    createChamber();
     buildAllEntryLayers();
     setToggleState();
     if (options.persist !== false) localStorage.setItem(STORAGE_KEY, "on");
@@ -221,7 +200,6 @@ window.OpticalProjection = (() => {
     toggle = options.toggle || document.querySelector("#optical-projection-toggle");
     if (!feed) return false;
 
-    createChamber();
     toggle?.addEventListener("click", toggleMode);
 
     window.addEventListener("scroll", requestUpdate, { passive: true });
@@ -258,10 +236,8 @@ window.OpticalProjection = (() => {
     observer?.disconnect();
     resizeObserver?.disconnect();
     removeAllEntryLayers();
-    chamber?.remove();
 
     feed = null;
-    chamber = null;
     toggle = null;
     observer = null;
     resizeObserver = null;
