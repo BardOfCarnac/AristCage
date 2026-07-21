@@ -28,6 +28,10 @@
     };
   }
 
+  function freezePoint(point) {
+    return Object.freeze({ x: point.x, y: point.y });
+  }
+
   function rectangle(left, top, width, height) {
     return Object.freeze({
       left,
@@ -37,6 +41,16 @@
       width,
       height
     });
+  }
+
+  function rectangleForPoints(points) {
+    const xs = points.map(point => point.x);
+    const ys = points.map(point => point.y);
+    const left = Math.min(...xs);
+    const top = Math.min(...ys);
+    const right = Math.max(...xs);
+    const bottom = Math.max(...ys);
+    return rectangle(left, top, right - left, bottom - top);
   }
 
   function snapshot() {
@@ -62,15 +76,17 @@
       });
     }
 
+    function aperturePointsAt(z, requestedHalfWidth = finalHalfWidth) {
+      return Object.freeze([
+        freezePoint(project(-requestedHalfWidth, halfHeight, z)),
+        freezePoint(project(requestedHalfWidth, halfHeight, z)),
+        freezePoint(project(requestedHalfWidth, -halfHeight, z)),
+        freezePoint(project(-requestedHalfWidth, -halfHeight, z))
+      ]);
+    }
+
     function apertureAt(z, requestedHalfWidth = finalHalfWidth) {
-      const topLeft = project(-requestedHalfWidth, halfHeight, z);
-      const bottomRight = project(requestedHalfWidth, -halfHeight, z);
-      return rectangle(
-        topLeft.x,
-        topLeft.y,
-        bottomRight.x - topLeft.x,
-        bottomRight.y - topLeft.y
-      );
+      return rectangleForPoints(aperturePointsAt(z, requestedHalfWidth));
     }
 
     const camera = {
@@ -88,10 +104,12 @@
       finalHalfWidth,
       project,
       scaleAt: z => CONFIG.near / Math.max(0.0001, Number(z) || CONFIG.near),
-      apertureAt
+      apertureAt,
+      aperturePointsAt
     };
 
-    camera.nearAperture = apertureAt(CONFIG.near);
+    camera.nearAperturePoints = aperturePointsAt(CONFIG.near);
+    camera.nearAperture = rectangleForPoints(camera.nearAperturePoints);
     return Object.freeze(camera);
   }
 
@@ -102,6 +120,7 @@
     chamber.getCameraSnapshot = snapshot;
     chamber.projectPoint = (x, y, z) => snapshot().project(x, y, z);
     chamber.getApertureAt = (z, halfWidth) => snapshot().apertureAt(z, halfWidth);
+    chamber.getAperturePointsAt = (z, halfWidth) => snapshot().aperturePointsAt(z, halfWidth);
     return true;
   }
 
@@ -109,7 +128,8 @@
     CONFIG,
     snapshot,
     project: (x, y, z) => snapshot().project(x, y, z),
-    apertureAt: (z, halfWidth) => snapshot().apertureAt(z, halfWidth)
+    apertureAt: (z, halfWidth) => snapshot().apertureAt(z, halfWidth),
+    aperturePointsAt: (z, halfWidth) => snapshot().aperturePointsAt(z, halfWidth)
   });
 
   window.NCNChamberCamera = API;
