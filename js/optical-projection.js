@@ -79,10 +79,10 @@ window.OpticalProjection = (() => {
 
   /*
     A chamber plane is scaled by near / z around the chamber centre.
-    Pre-expanding each clone by the inverse scale makes all semantic
-    parts assemble at the exact source article position when viewed
-    straight on. A later camera-origin shift can then reveal parallax
-    without changing the underlying article layout.
+    The clone is moved outward by the inverse projection and its visual
+    contents are enlarged by the same inverse factor. The plane scale
+    then returns the semantic part to the source article's exact size
+    and position when viewed straight on.
   */
   function compensatedGeometry(geometry, scale) {
     const centreX = CHAMBER_CAMERA.centreX();
@@ -91,8 +91,9 @@ window.OpticalProjection = (() => {
     return {
       left: centreX + (geometry.left - centreX) / scale,
       top: centreY + (geometry.top - centreY) / scale,
-      width: geometry.width / scale,
-      height: geometry.height / scale
+      width: geometry.width,
+      height: geometry.height,
+      contentScale: 1 / scale
     };
   }
 
@@ -106,6 +107,10 @@ window.OpticalProjection = (() => {
     clone.style.left = `${geometry.left}px`;
     clone.style.width = `${geometry.width}px`;
     clone.style.height = `${geometry.height}px`;
+    clone.style.setProperty(
+      "--optical-content-compensation",
+      geometry.contentScale.toFixed(6)
+    );
 
     return clone;
   }
