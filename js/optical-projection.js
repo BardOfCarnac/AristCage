@@ -201,7 +201,12 @@ window.OpticalProjection = (() => {
   }
 
   function updateRecordGeometry(record, animate = false) {
-    if (!record?.source?.isConnected || record.pendingCollapse) return;
+    if (
+      !record?.source?.isConnected
+      || record.pendingCollapse
+      || record.pendingExpansion
+    ) return;
+
     const geometry = recordGeometry(record);
     if (!geometry) return;
 
@@ -235,6 +240,7 @@ window.OpticalProjection = (() => {
       removalTimer: 0,
       expansionTimer: 0,
       collapseTimer: 0,
+      pendingExpansion: false,
       pendingCollapse: false,
       removed: false
     };
@@ -265,6 +271,8 @@ window.OpticalProjection = (() => {
     record.clones = replacements;
     record.signature = sourceSignature(record.source);
     record.expanded = record.source.classList.contains("expanded");
+    record.pendingExpansion = false;
+    record.pendingCollapse = false;
     updateRecordGeometry(record, false);
   }
 
@@ -323,15 +331,18 @@ window.OpticalProjection = (() => {
 
     if (expanded) {
       record.pendingCollapse = false;
+      record.pendingExpansion = true;
       record.expansionTimer = window.setTimeout(() => {
         record.expansionTimer = 0;
         setExpandedClass(record, true);
+        record.pendingExpansion = false;
         updateRecordGeometry(record, true);
         resolveBody(record);
       }, 55);
       return;
     }
 
+    record.pendingExpansion = false;
     record.pendingCollapse = true;
     dismissBody(record);
     record.collapseTimer = window.setTimeout(() => {
@@ -376,7 +387,11 @@ window.OpticalProjection = (() => {
     root.style.setProperty("--optical-aperture-width", `${bounds.width}px`);
     root.style.setProperty("--optical-aperture-height", `${bounds.height}px`);
 
-    const polygon = points.map(point => {
+    const clipPoints = points.map(point => ({
+      x: point.x + (point.x < camera.centreX ? -CLIP_BLEED : CLIP_BLEED),
+      y: point.y + (point.y < camera.centreY ? -CLIP_BLEED : CLIP_BLEED)
+    }));
+    const polygon = clipPoints.map(point => {
       const x = point.x - bounds.left;
       const y = point.y - bounds.top;
       return `${x.toFixed(2)}px ${y.toFixed(2)}px`;
