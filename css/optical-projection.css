@@ -138,7 +138,7 @@
   }
   55% {
     opacity: .72;
-    filter: brightness(calc(1 + .55 * var(--optical-resolve-glow, .5))) saturate(1.12);
+    filter: brightness(calc(1 + var(--optical-resolve-glow, .5))) saturate(1.12);
   }
   100% {
     opacity: 1;
@@ -156,15 +156,27 @@
    borrowing the hidden source DOM's lifecycle classes. */
 .optical-mode .optical-plane[data-optical-role="frame"] .optical-resolving .frame,
 .optical-mode .optical-plane[data-optical-role="corners"] .optical-resolving .corners {
-  animation: optical-line-lock var(--optical-resolve-duration, 280ms) ease-out both !important;
+  animation: optical-line-lock
+    var(--optical-resolve-duration, 280ms)
+    ease-out
+    var(--optical-resolve-delay, 0ms)
+    both !important;
 }
 
 .optical-mode .optical-plane[data-optical-role="priority"] .optical-resolving .priority {
-  animation: optical-priority-charge var(--optical-resolve-duration, 260ms) ease-out both !important;
+  animation: optical-priority-charge
+    var(--optical-resolve-duration, 260ms)
+    ease-out
+    var(--optical-resolve-delay, 0ms)
+    both !important;
 }
 
 .optical-mode .optical-plane[data-optical-role="headline"] .optical-resolving .headline {
-  animation: optical-headline-focus var(--optical-resolve-duration, 310ms) ease-out both !important;
+  animation: optical-headline-focus
+    var(--optical-resolve-duration, 310ms)
+    ease-out
+    var(--optical-resolve-delay, 0ms)
+    both !important;
 }
 
 @keyframes optical-line-lock {
