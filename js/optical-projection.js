@@ -14,14 +14,16 @@ window.OpticalProjection = (() => {
   const STORAGE_KEY = "ncn-optical-projection";
   const ROOT_CLASS = "optical-mode";
 
+  /* These values mirror the settled LayeredChamber camera. */
   const CHAMBER_CAMERA = Object.freeze({
     near: 2.5,
-    centreX: () => window.innerWidth * 0.5,
-    centreY: () => window.innerHeight * 0.5
+    cell: 0.5,
+    focalRatio: 0.84,
+    wallShiftCells: 2
   });
 
-  /* Far to near. Every plane contains the same article list, but only
-     the semantic role assigned to that plane remains visible. */
+  /* Far to near. Every pane contains the same article list, but only
+     the semantic role assigned to that pane remains visible. */
   const SEMANTIC_PLANES = Object.freeze([
     { role: "frame",    z: 5.0 },
     { role: "corners",  z: 4.5 },
@@ -38,6 +40,40 @@ window.OpticalProjection = (() => {
   let frameRequest = 0;
   let observer = null;
   let resizeObserver = null;
+
+  function snapCells(value) {
+    const { cell } = CHAMBER_CAMERA;
+    return Math.max(cell, Math.round(value / cell) * cell);
+  }
+
+  function chamberGeometry() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const focal = Math.min(width, height) * CHAMBER_CAMERA.focalRatio;
+    const centreX = width * 0.5;
+    const centreY = height * 0.5;
+    const halfWidth = snapCells(
+      (width * 0.5) * CHAMBER_CAMERA.near / focal
+    );
+    const halfHeight = snapCells(
+      (height * 0.5) * CHAMBER_CAMERA.near / focal
+    );
+    const visibleHalfWidth = halfWidth
+      + CHAMBER_CAMERA.wallShiftCells * CHAMBER_CAMERA.cell;
+    const apertureHalfWidth = visibleHalfWidth * focal / CHAMBER_CAMERA.near;
+    const apertureHalfHeight = halfHeight * focal / CHAMBER_CAMERA.near;
+
+    return {
+      centreX,
+      centreY,
+      nearAperture: {
+        left: centreX - apertureHalfWidth,
+        top: centreY - apertureHalfHeight,
+        width: apertureHalfWidth * 2,
+        height: apertureHalfHeight * 2
+      }
+    };
+  }
 
   function sourceEntries() {
     if (!feed) return [];
@@ -77,23 +113,12 @@ window.OpticalProjection = (() => {
     };
   }
 
-  /*
-    A chamber plane is scaled by near / z around the chamber centre.
-    The clone is moved outward by the inverse projection and its visual
-    contents are enlarged by the same inverse factor. The plane scale
-    then returns the semantic part to the source article's exact size
-    and position when viewed straight on.
-  */
-  function compensatedGeometry(geometry, scale) {
-    const centreX = CHAMBER_CAMERA.centreX();
-    const centreY = CHAMBER_CAMERA.centreY();
-
+  function paneLocalGeometry(geometry, aperture) {
     return {
-      left: centreX + (geometry.left - centreX) / scale,
-      top: centreY + (geometry.top - centreY) / scale,
+      top: geometry.top - aperture.top,
+      left: geometry.left - aperture.left,
       width: geometry.width,
-      height: geometry.height,
-      contentScale: 1 / scale
+      height: geometry.height
     };
   }
 
@@ -107,36 +132,33 @@ window.OpticalProjection = (() => {
     clone.style.left = `${geometry.left}px`;
     clone.style.width = `${geometry.width}px`;
     clone.style.height = `${geometry.height}px`;
-    clone.style.setProperty(
-      "--optical-content-compensation",
-      geometry.contentScale.toFixed(6)
-    );
 
     return clone;
   }
 
-  function buildPlane(definition, index, sources) {
+  function buildPlane(definition, index, sources, camera) {
     const plane = document.createElement("div");
     const scale = CHAMBER_CAMERA.near / definition.z;
+    const aperture = camera.nearAperture;
 
     plane.className = "optical-plane";
     plane.dataset.opticalRole = definition.role;
     plane.dataset.chamberDepth = definition.z.toFixed(2);
     plane.style.setProperty("--optical-plane-scale", scale.toFixed(6));
     plane.style.setProperty("--optical-plane-order", String(index));
+    plane.style.setProperty("--optical-pane-left", `${aperture.left}px`);
+    plane.style.setProperty("--optical-pane-top", `${aperture.top}px`);
+    plane.style.setProperty("--optical-pane-width", `${aperture.width}px`);
+    plane.style.setProperty("--optical-pane-height", `${aperture.height}px`);
 
     sources.forEach(({ entry, geometry }) => {
-      plane.append(cloneArticle(entry, compensatedGeometry(geometry, scale)));
+      plane.append(cloneArticle(
+        entry,
+        paneLocalGeometry(geometry, aperture)
+      ));
     });
 
     return plane;
-  }
-
-  function syncCameraOrigin() {
-    if (!planeSystem) return;
-
-    planeSystem.style.setProperty("--optical-camera-x", `${CHAMBER_CAMERA.centreX()}px`);
-    planeSystem.style.setProperty("--optical-camera-y", `${CHAMBER_CAMERA.centreY()}px`);
   }
 
   function rebuildPlanes() {
@@ -144,6 +166,7 @@ window.OpticalProjection = (() => {
     if (!enabled || !feed) return;
 
     const root = ensurePlaneSystem();
+    const camera = chamberGeometry();
     const sources = sourceEntries().map(entry => ({
       entry,
       geometry: sourceGeometry(entry)
@@ -151,11 +174,12 @@ window.OpticalProjection = (() => {
     const fragment = document.createDocumentFragment();
 
     SEMANTIC_PLANES.forEach((definition, index) => {
-      fragment.append(buildPlane(definition, index, sources));
+      fragment.append(buildPlane(definition, index, sources, camera));
     });
 
     root.replaceChildren(fragment);
-    syncCameraOrigin();
+    root.style.setProperty("--optical-camera-x", `${camera.centreX}px`);
+    root.style.setProperty("--optical-camera-y", `${camera.centreY}px`);
   }
 
   function requestSync() {
