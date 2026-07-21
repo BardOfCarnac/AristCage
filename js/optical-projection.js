@@ -17,6 +17,7 @@ window.OpticalProjection = (() => {
   const LAYOUT_DURATION = 300;
   const DISMISS_DURATION = 190;
   const BODY_DISMISS_DURATION = 180;
+  const OPTICAL_BASE_SCALE = 1.08;
 
   const SOURCE_LIFECYCLE_CLASSES = Object.freeze([
     "entering",
@@ -34,19 +35,19 @@ window.OpticalProjection = (() => {
     "optical-dismissing"
   ]);
 
-  /* Far to near. Compensation restores part of each rear plane's apparent
-     size around the article centre without cancelling its projected position. */
+  /* Far to near. The object now spans three chamber cells. Compensation
+     preserves readable apparent size while the positions retain real depth. */
   const SEMANTIC_PLANES = Object.freeze([
-    Object.freeze({ role: "plate",         z: 3.00, compensation: 0.82, delay: 0,   duration: 250, glow: 0.25 }),
-    Object.freeze({ role: "frame",         z: 2.96, compensation: 0.72, delay: 20,  duration: 290, glow: 0.48 }),
-    Object.freeze({ role: "corners",       z: 2.88, compensation: 0.62, delay: 42,  duration: 270, glow: 0.58 }),
-    Object.freeze({ role: "priority",      z: 2.82, compensation: 0.48, delay: 62,  duration: 260, glow: 0.78 }),
-    Object.freeze({ role: "detail-labels", z: 2.76, compensation: 0.36, delay: 115, duration: 250, glow: 0.42 }),
-    Object.freeze({ role: "detail-values", z: 2.72, compensation: 0.28, delay: 132, duration: 260, glow: 0.52 }),
-    Object.freeze({ role: "body",          z: 2.68, compensation: 0.18, delay: 102, duration: 280, glow: 0.56 }),
-    Object.freeze({ role: "meta",          z: 2.62, compensation: 0.12, delay: 88,  duration: 240, glow: 0.46 }),
-    Object.freeze({ role: "tags",          z: 2.56, compensation: 0.06, delay: 110, duration: 250, glow: 0.62 }),
-    Object.freeze({ role: "headline",      z: 2.50, compensation: 0.00, delay: 145, duration: 310, glow: 1.00 })
+    Object.freeze({ role: "plate",         z: 4.00, compensation: 0.90, roleScale: 1.03, delay: 0,   duration: 250, glow: 0.25 }),
+    Object.freeze({ role: "frame",         z: 3.88, compensation: 0.84, roleScale: 1.06, delay: 20,  duration: 290, glow: 0.48 }),
+    Object.freeze({ role: "corners",       z: 3.72, compensation: 0.80, roleScale: 1.06, delay: 42,  duration: 270, glow: 0.58 }),
+    Object.freeze({ role: "priority",      z: 3.52, compensation: 0.72, roleScale: 1.03, delay: 62,  duration: 260, glow: 0.78 }),
+    Object.freeze({ role: "detail-labels", z: 3.34, compensation: 0.62, roleScale: 0.99, delay: 115, duration: 250, glow: 0.42 }),
+    Object.freeze({ role: "detail-values", z: 3.22, compensation: 0.56, roleScale: 1.00, delay: 132, duration: 260, glow: 0.52 }),
+    Object.freeze({ role: "body",          z: 3.04, compensation: 0.46, roleScale: 1.00, delay: 102, duration: 280, glow: 0.56 }),
+    Object.freeze({ role: "meta",          z: 2.86, compensation: 0.34, roleScale: 1.00, delay: 88,  duration: 240, glow: 0.46 }),
+    Object.freeze({ role: "tags",          z: 2.68, compensation: 0.20, roleScale: 1.02, delay: 110, duration: 250, glow: 0.62 }),
+    Object.freeze({ role: "headline",      z: 2.50, compensation: 0.00, roleScale: 1.08, delay: 145, duration: 310, glow: 1.00 })
   ]);
 
   const BODY_ROLES = new Set(["body", "detail-labels", "detail-values"]);
@@ -431,10 +432,14 @@ window.OpticalProjection = (() => {
       const apparentScale = projectedScale
         + (1 - projectedScale) * definition.compensation;
       const compensationScale = apparentScale / projectedScale;
+      const neutralScale = OPTICAL_BASE_SCALE * definition.roleScale;
+      const articleScale = compensationScale * neutralScale;
 
       plane.style.setProperty("--optical-plane-scale", projectedScale.toFixed(6));
       plane.style.setProperty("--optical-apparent-scale", apparentScale.toFixed(6));
       plane.style.setProperty("--optical-compensation-scale", compensationScale.toFixed(6));
+      plane.style.setProperty("--optical-neutral-scale", neutralScale.toFixed(6));
+      plane.style.setProperty("--optical-article-scale", articleScale.toFixed(6));
     });
   }
 
