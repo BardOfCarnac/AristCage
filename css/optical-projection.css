@@ -7,8 +7,6 @@
   module. Optics distributes article semantics across its panes.
 ==================================================*/
 
-/* Chamber canvas below, optical copies in the middle, real interactive
-   articles above. The real articles keep all layout and hit testing. */
 .optical-mode .viewer {
   position: relative;
   z-index: 20;
@@ -19,9 +17,8 @@
   display: none;
 }
 
-/* All semantic panes now pass through one shared chamber-mouth aperture.
-   The system owns clipping; individual depth panes remain overflow-visible
-   so every article component enters and exits through the same boundary. */
+/* All semantic panes pass through the projected chamber mouth. The two-pixel
+   tolerance retains the outer glow while the polygon remains the real clip. */
 .optical-mode .optical-plane-system {
   display: block;
   position: fixed;
@@ -31,24 +28,21 @@
   height: var(--optical-aperture-height, 100vh);
   z-index: 15;
   overflow: hidden;
+  clip-path: var(--optical-aperture-clip, inset(0));
   pointer-events: none;
   contain: layout paint;
 }
 
-/* The standard feed fade is useful in the flat viewer, but Optics should
-   meet the chamber aperture directly without a dark veil beneath the rail. */
 .optical-mode .rail-occlusion {
   background: transparent !important;
 }
 
-/* Chamber LAB has its own canvas-drawn article feed. Optics replaces
-   that foreground only, while retaining the chamber geometry. */
 .optical-mode #layered-chamber-fg {
   opacity: 0;
 }
 
-/* Each semantic pane begins as the shared settled near aperture. Scaling
-   it by near / z gives the real projected rectangle for that depth. */
+/* The shared camera moves each semantic pane. The article then receives only
+   partial size compensation around its own centre, preserving depth parallax. */
 .optical-mode .optical-plane {
   position: absolute;
   inset: 0;
@@ -60,14 +54,23 @@
   backface-visibility: hidden;
 }
 
-/* Article geometry is authored on the near aperture. The pane itself
-   supplies all perspective scaling, so there is no inverse compensation
-   and no second camera. */
 .optical-mode .optical-plane-article {
   position: absolute;
   margin: 0;
   pointer-events: none;
+  opacity: 1;
+  filter: none;
+  transform: scale(var(--optical-compensation-scale, 1));
+  transform-origin: 50% 50%;
   backface-visibility: hidden;
+}
+
+.optical-mode .optical-plane-article.optical-layout-transition {
+  transition:
+    top 300ms cubic-bezier(.2, .72, .2, 1),
+    left 300ms cubic-bezier(.2, .72, .2, 1),
+    width 300ms cubic-bezier(.2, .72, .2, 1),
+    height 300ms cubic-bezier(.2, .72, .2, 1);
 }
 
 .optical-mode .optical-plane-article > .projection-plate {
@@ -78,15 +81,12 @@
   background: transparent;
 }
 
-/* The source article stays in normal document flow and receives clicks,
-   but its projected plate is visually supplied by the semantic panes. */
+/* The real source remains in flow for sizing, hit testing and accessibility. */
 .optical-mode #feed > .entry:not(.panel) > .projection-plate {
   opacity: 0;
 }
 
-/* Optical copies are stable snapshots, not participants in the legacy
-   dismiss/resolve lifecycle. This prevents repeated blackouts while the
-   hidden source DOM performs an expansion transaction. */
+/* Optical copies do not inherit the source renderer's resolve/dismiss classes. */
 .optical-mode .optical-plane .part,
 .optical-mode .optical-plane .priority {
   animation: none !important;
@@ -95,8 +95,6 @@
   will-change: auto !important;
 }
 
-/* Legacy within-card parallax is disabled in the visual copies. Their
-   only depth now comes from the chamber pane that owns each semantic. */
 .optical-mode .optical-plane .frame,
 .optical-mode .optical-plane .priority,
 .optical-mode .optical-plane .meta,
@@ -107,8 +105,90 @@
   transform: none !important;
 }
 
-/* Hide all semantic pieces by default. Each pane reveals only the part
-   assigned to its role, across every article in the feed. */
+/*==================================================
+  OPTICAL PRESENCE
+==================================================*/
+
+.optical-mode .optical-plane-article.optical-absent {
+  opacity: 0;
+  filter: brightness(.3) saturate(.55);
+}
+
+.optical-mode .optical-plane-article.optical-resolving {
+  animation: optical-article-resolve
+    var(--optical-resolve-duration, 280ms)
+    cubic-bezier(.16, .78, .2, 1)
+    var(--optical-resolve-delay, 0ms)
+    both;
+}
+
+.optical-mode .optical-plane-article.optical-present {
+  opacity: 1;
+  filter: none;
+}
+
+.optical-mode .optical-plane-article.optical-dismissing {
+  animation: optical-article-dismiss 190ms cubic-bezier(.55, 0, .8, .32) both;
+}
+
+@keyframes optical-article-resolve {
+  0% {
+    opacity: 0;
+    filter: brightness(.28) saturate(.5);
+  }
+  55% {
+    opacity: .72;
+    filter: brightness(calc(1 + .55 * var(--optical-resolve-glow, .5))) saturate(1.12);
+  }
+  100% {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+@keyframes optical-article-dismiss {
+  0% { opacity: 1; filter: none; }
+  55% { opacity: .42; filter: brightness(.72) saturate(.75); }
+  100% { opacity: 0; filter: brightness(.25) saturate(.45); }
+}
+
+/* Structural and identity pieces retain distinct optical signatures without
+   borrowing the hidden source DOM's lifecycle classes. */
+.optical-mode .optical-plane[data-optical-role="frame"] .optical-resolving .frame,
+.optical-mode .optical-plane[data-optical-role="corners"] .optical-resolving .corners {
+  animation: optical-line-lock var(--optical-resolve-duration, 280ms) ease-out both !important;
+}
+
+.optical-mode .optical-plane[data-optical-role="priority"] .optical-resolving .priority {
+  animation: optical-priority-charge var(--optical-resolve-duration, 260ms) ease-out both !important;
+}
+
+.optical-mode .optical-plane[data-optical-role="headline"] .optical-resolving .headline {
+  animation: optical-headline-focus var(--optical-resolve-duration, 310ms) ease-out both !important;
+}
+
+@keyframes optical-line-lock {
+  0% { opacity: 0; filter: brightness(.4); }
+  62% { opacity: .86; filter: brightness(1.65); }
+  100% { opacity: 1; filter: none; }
+}
+
+@keyframes optical-priority-charge {
+  0% { opacity: 0; filter: brightness(.35); }
+  48% { opacity: 1; filter: brightness(1.8); }
+  100% { opacity: 1; filter: none; }
+}
+
+@keyframes optical-headline-focus {
+  0% { opacity: 0; filter: blur(1.2px) brightness(.45); }
+  56% { opacity: .84; filter: blur(.15px) brightness(1.32); }
+  100% { opacity: 1; filter: none; }
+}
+
+/*==================================================
+  SEMANTIC OWNERSHIP
+==================================================*/
+
 .optical-mode .optical-plane-article .frame,
 .optical-mode .optical-plane-article .corners,
 .optical-mode .optical-plane-article .priority,
@@ -119,12 +199,13 @@
   visibility: hidden !important;
 }
 
-.optical-mode .optical-plane[data-optical-role="frame"] .frame {
-  visibility: visible !important;
+.optical-mode .optical-plane[data-optical-role="plate"] .projection-plate {
+  background: rgba(2, 2, 2, .16);
+  box-shadow: inset 0 0 34px rgba(0, 0, 0, .2);
 }
 
-.optical-mode .optical-plane[data-optical-role="frame"] .projection-plate {
-  background: rgba(2, 2, 2, 0.12);
+.optical-mode .optical-plane[data-optical-role="frame"] .frame {
+  visibility: visible !important;
 }
 
 .optical-mode .optical-plane[data-optical-role="corners"] .corners {
@@ -135,8 +216,11 @@
   visibility: visible !important;
 }
 
-.optical-mode .optical-plane[data-optical-role="context"] .meta,
-.optical-mode .optical-plane[data-optical-role="context"] .tags {
+.optical-mode .optical-plane[data-optical-role="meta"] .meta {
+  visibility: visible !important;
+}
+
+.optical-mode .optical-plane[data-optical-role="tags"] .tags {
   visibility: visible !important;
 }
 
@@ -144,19 +228,42 @@
   visibility: visible !important;
 }
 
-.optical-mode .optical-plane[data-optical-role="body"] .body {
+.optical-mode .optical-plane[data-optical-role="body"] .body,
+.optical-mode .optical-plane[data-optical-role="detail-labels"] .body,
+.optical-mode .optical-plane[data-optical-role="detail-values"] .body {
   visibility: visible !important;
 }
 
-/* Compact articles never leak their body merely because the optical clone
-   is forced into a stable present state. */
+.optical-mode .optical-plane[data-optical-role="body"] .mobile-inspector-detail-grid {
+  visibility: hidden !important;
+}
+
+.optical-mode .optical-plane[data-optical-role="detail-labels"] .optical-body-copy,
+.optical-mode .optical-plane[data-optical-role="detail-labels"] .detail-value {
+  visibility: hidden !important;
+}
+
+.optical-mode .optical-plane[data-optical-role="detail-labels"] .detail-label {
+  visibility: visible !important;
+}
+
+.optical-mode .optical-plane[data-optical-role="detail-values"] .optical-body-copy,
+.optical-mode .optical-plane[data-optical-role="detail-values"] .detail-label {
+  visibility: hidden !important;
+}
+
+.optical-mode .optical-plane[data-optical-role="detail-values"] .detail-value {
+  visibility: visible !important;
+}
+
+.optical-mode .optical-plane[data-optical-role="detail-values"] .mobile-inspector-detail-grid {
+  border-top-color: transparent !important;
+}
+
 .optical-mode .optical-plane-article:not(.expanded) .body {
   display: none !important;
 }
 
-/* Expansion remains source-driven. The cloned article keeps the source
-   expanded class, so the body pane appears and structural panes grow
-   from the same settled source geometry. */
 .optical-mode .optical-plane-article.expanded .expansion-zone {
   display: block;
 }
@@ -169,16 +276,44 @@
   height: calc(100% - 28px);
 }
 
+/*==================================================
+  EXPANSION BEHAVIOUR
+==================================================*/
+
+.optical-mode .optical-body-resolving .body {
+  animation: optical-body-resolve 360ms cubic-bezier(.16, .78, .2, 1) both !important;
+}
+
+.optical-mode .optical-body-dismissing .body {
+  animation: optical-body-dismiss 180ms cubic-bezier(.55, 0, .8, .32) both !important;
+}
+
+@keyframes optical-body-resolve {
+  0% { opacity: 0; filter: brightness(.38) saturate(.65); }
+  58% { opacity: .78; filter: brightness(1.24) saturate(1.08); }
+  100% { opacity: 1; filter: none; }
+}
+
+@keyframes optical-body-dismiss {
+  0% { opacity: 1; filter: none; }
+  100% { opacity: 0; filter: brightness(.35) saturate(.55); }
+}
+
 .optical-toggle[aria-pressed="true"] {
   color: var(--white);
-  border-color: rgba(255, 180, 110, 0.7);
-  text-shadow: 0 0 9px rgba(255, 100, 45, 0.65);
+  border-color: rgba(255, 180, 110, .7);
+  text-shadow: 0 0 9px rgba(255, 100, 45, .65);
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .optical-mode .optical-plane-article,
   .optical-mode .optical-plane .part,
-  .optical-mode .optical-plane .priority {
+  .optical-mode .optical-plane .priority,
+  .optical-mode .optical-body-resolving .body,
+  .optical-mode .optical-body-dismissing .body {
     animation: none !important;
     transition: none !important;
+    opacity: 1 !important;
+    filter: none !important;
   }
 }
