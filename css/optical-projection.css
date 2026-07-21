@@ -41,8 +41,8 @@
   opacity: 0;
 }
 
-/* The shared camera moves each semantic pane. The article then receives only
-   partial size compensation around its own centre, preserving depth parallax. */
+/* The shared camera moves each semantic pane. Each article then receives a
+   larger neutral footprint plus role-specific partial size compensation. */
 .optical-mode .optical-plane {
   position: absolute;
   inset: 0;
@@ -60,7 +60,7 @@
   pointer-events: none;
   opacity: 1;
   filter: none;
-  transform: scale(var(--optical-compensation-scale, 1));
+  transform: scale(var(--optical-article-scale, 1));
   transform-origin: 50% 50%;
   backface-visibility: hidden;
 }
