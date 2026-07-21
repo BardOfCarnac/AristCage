@@ -22,6 +22,11 @@ let diagnosticsToggle;
 let diagnosticsLiveEntry;
 let diagnosticsLiveOffset;
 let diagnosticsLiveScroll;
+let diagnosticsCameraNear;
+let diagnosticsCameraCell;
+let diagnosticsCameraFocal;
+let diagnosticsCameraAperture;
+let diagnosticsOpticalLayers;
 let diagnosticsLiveListenersBound = false;
 let diagnosticMarkTapCount = 0;
 let diagnosticMarkTapTimer;
@@ -58,9 +63,38 @@ function diagnosticLayerMarkup(layer) {
   `;
 }
 
+function opticalLayerDefinitions() {
+  return window.OpticalProjection?.getPlaneDefinitions?.() || [];
+}
+
+function opticalLayerMarkup(layer, camera) {
+  const scale = camera?.scaleAt?.(layer.z);
+
+  return `
+    <div class="diagnostics-layer">
+      <strong>${String(layer.role || "plane")}</strong>
+      <span class="diagnostics-value">Z ${Number(layer.z).toFixed(2)}</span>
+      <span class="diagnostics-value">S ${Number(scale || 0).toFixed(4)}</span>
+    </div>
+  `;
+}
+
+function cameraSnapshot() {
+  return window.LayeredChamber?.getCameraSnapshot?.()
+    || window.NCNChamberCamera?.snapshot?.()
+    || null;
+}
+
+function opticalLayerListMarkup(camera = cameraSnapshot()) {
+  const layers = opticalLayerDefinitions();
+  if (!layers.length) return `<div class="diagnostics-value">No optical panes</div>`;
+  return layers.map(layer => opticalLayerMarkup(layer, camera)).join("");
+}
+
 function ensureDiagnosticsInterface() {
   if (diagnosticsPanel) return;
 
+  const camera = cameraSnapshot();
   const panel = document.createElement("aside");
   panel.className = "diagnostics-panel";
   panel.setAttribute("aria-label", "Projection diagnostics");
@@ -71,8 +105,21 @@ function ensureDiagnosticsInterface() {
       <div class="diagnostics-spectrum">${energySpectrumMarkup()}</div>
     </section>
     <section class="diagnostics-section">
-      <div class="diagnostics-heading">Layer stack · D depth / X horizontal scale</div>
+      <div class="diagnostics-heading">DOM projection profile · D depth / X horizontal scale</div>
       <div class="diagnostics-layer-list">${NCN_DIAGNOSTIC_LAYERS.map(diagnosticLayerMarkup).join("")}</div>
+    </section>
+    <section class="diagnostics-section">
+      <div class="diagnostics-heading">Optical semantic panes · Z chamber depth / S camera scale</div>
+      <div class="diagnostics-layer-list" data-debug-optical-layers>${opticalLayerListMarkup(camera)}</div>
+    </section>
+    <section class="diagnostics-section">
+      <div class="diagnostics-heading">Shared chamber camera</div>
+      <div class="diagnostics-live">
+        <div><span>Near</span><strong data-debug-camera-near>—</strong></div>
+        <div><span>Cell</span><strong data-debug-camera-cell>—</strong></div>
+        <div><span>Focal</span><strong data-debug-camera-focal>—</strong></div>
+        <div><span>Aperture</span><strong data-debug-camera-aperture>—</strong></div>
+      </div>
     </section>
     <section class="diagnostics-section">
       <div class="diagnostics-heading">Live viewport values</div>
@@ -103,6 +150,11 @@ function ensureDiagnosticsInterface() {
   diagnosticsLiveEntry = panel.querySelector("[data-debug-entry]");
   diagnosticsLiveOffset = panel.querySelector("[data-debug-offset]");
   diagnosticsLiveScroll = panel.querySelector("[data-debug-scroll]");
+  diagnosticsCameraNear = panel.querySelector("[data-debug-camera-near]");
+  diagnosticsCameraCell = panel.querySelector("[data-debug-camera-cell]");
+  diagnosticsCameraFocal = panel.querySelector("[data-debug-camera-focal]");
+  diagnosticsCameraAperture = panel.querySelector("[data-debug-camera-aperture]");
+  diagnosticsOpticalLayers = panel.querySelector("[data-debug-optical-layers]");
 }
 
 function findDiagnosticEntry() {
@@ -123,6 +175,27 @@ function findDiagnosticEntry() {
   return closest;
 }
 
+function updateCameraDiagnostics() {
+  if (!diagnosticsPanel) return;
+
+  const camera = cameraSnapshot();
+
+  if (!camera) {
+    diagnosticsCameraNear.textContent = "—";
+    diagnosticsCameraCell.textContent = "—";
+    diagnosticsCameraFocal.textContent = "—";
+    diagnosticsCameraAperture.textContent = "—";
+    diagnosticsOpticalLayers.innerHTML = opticalLayerListMarkup(null);
+    return;
+  }
+
+  diagnosticsCameraNear.textContent = camera.near.toFixed(2);
+  diagnosticsCameraCell.textContent = camera.cell.toFixed(2);
+  diagnosticsCameraFocal.textContent = `${Math.round(camera.focalLength)} px`;
+  diagnosticsCameraAperture.textContent = `${Math.round(camera.nearAperture.width)} × ${Math.round(camera.nearAperture.height)}`;
+  diagnosticsOpticalLayers.innerHTML = opticalLayerListMarkup(camera);
+}
+
 function updateDiagnosticsLiveValues() {
   if (!document.documentElement.classList.contains("diagnostics-on") || !diagnosticsPanel) return;
 
@@ -134,12 +207,14 @@ function updateDiagnosticsLiveValues() {
   diagnosticsLiveEntry.textContent = entry?.dataset.entryId || "—";
   diagnosticsLiveOffset.textContent = offset.toFixed(3);
   diagnosticsLiveScroll.textContent = Math.round(window.scrollY).toString();
+  updateCameraDiagnostics();
 }
 
 function bindDiagnosticsLiveListeners() {
   if (diagnosticsLiveListenersBound) return;
   window.addEventListener("scroll", updateDiagnosticsLiveValues, { passive: true });
   window.addEventListener("resize", updateDiagnosticsLiveValues);
+  window.addEventListener("ncn:chamber-camera-change", updateDiagnosticsLiveValues);
   diagnosticsLiveListenersBound = true;
 }
 
@@ -147,6 +222,7 @@ function unbindDiagnosticsLiveListeners() {
   if (!diagnosticsLiveListenersBound) return;
   window.removeEventListener("scroll", updateDiagnosticsLiveValues);
   window.removeEventListener("resize", updateDiagnosticsLiveValues);
+  window.removeEventListener("ncn:chamber-camera-change", updateDiagnosticsLiveValues);
   diagnosticsLiveListenersBound = false;
 }
 
