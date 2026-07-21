@@ -4,19 +4,17 @@
   This file is intentionally self-contained. Remove it, the matching
   script include, and the rail toggle to restore the standard viewer.
   Chamber geometry remains the responsibility of the existing chamber
-  module. This file only renders article copies on chamber-world planes.
+  module. Optics distributes article semantics across its planes.
 ==================================================*/
 
-/* Keep the interactive viewer above the optical copies and the chamber
-   canvases below them. The viewer itself remains visually transparent. */
+/* Chamber canvas below, optical copies in the middle, real interactive
+   articles above. The real articles keep all layout and hit testing. */
 .optical-mode .viewer {
   position: relative;
   z-index: 20;
   isolation: isolate;
 }
 
-/* The chamber canvas is z-index 10. Optical articles occupy the gap
-   between it and the real, interactive viewer. */
 .optical-plane-system {
   display: none;
 }
@@ -26,47 +24,36 @@
   position: fixed;
   inset: 0;
   z-index: 15;
-  overflow: visible;
+  overflow: hidden;
   pointer-events: none;
 }
 
-/* Chamber LAB has its own canvas-drawn feed. Optics replaces only that
-   foreground feed while leaving the chamber geometry intact. */
+/* Chamber LAB has its own canvas-drawn article feed. Optics replaces
+   that foreground only, while retaining the chamber geometry. */
 .optical-mode #layered-chamber-fg {
   opacity: 0;
 }
 
-/* Each plane begins as the full near-plane viewport. Scaling it by
-   near / z gives exactly the chamber projection for that world depth.
-   Overflow clips off-chamber articles before the plane is projected. */
+/* Every plane uses the chamber's near/z projection scale. The article
+   clone inside it carries the inverse scale, so semantic pieces align
+   perfectly when viewed straight on while still owning distinct depth. */
 .optical-mode .optical-plane {
   position: fixed;
   inset: 0;
-  overflow: hidden;
-  opacity: var(--optical-plane-opacity, 1);
+  z-index: var(--optical-plane-order, 0);
+  overflow: visible;
   pointer-events: none;
   transform: scale(var(--optical-plane-scale, 1));
   transform-origin: var(--optical-camera-x, 50vw) var(--optical-camera-y, 50vh);
   backface-visibility: hidden;
 }
 
-.optical-mode .optical-plane-content {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  transform: translate3d(
-    var(--optical-scroll-x, 0px),
-    var(--optical-scroll-y, 0px),
-    0
-  );
-  transform-origin: 0 0;
-}
-
 .optical-mode .optical-plane-article {
   position: absolute;
+  margin: 0;
   pointer-events: none;
+  transform: scale(var(--optical-content-compensation, 1));
+  transform-origin: 0 0;
   backface-visibility: hidden;
 }
 
@@ -75,17 +62,17 @@
   width: 100%;
   height: 100%;
   min-height: 100%;
-  background: rgba(2, 2, 2, 0.10);
+  background: transparent;
 }
 
-/* The semantic source entries remain the layout, click and accessibility
-   layer. Only their visual plate is transparent while Optics is active. */
+/* The source article stays in normal document flow and receives clicks,
+   but its projected plate is visually supplied by the semantic planes. */
 .optical-mode #feed > .entry:not(.panel) > .projection-plate {
   opacity: 0;
 }
 
-/* Every clone is still an intact article. Internal legacy parallax is
-   neutralised so depth comes only from its chamber plane. */
+/* Legacy within-card parallax is disabled in the visual copies. Their
+   only depth now comes from the chamber plane that owns each semantic. */
 .optical-mode .optical-plane .frame,
 .optical-mode .optical-plane .priority,
 .optical-mode .optical-plane .meta,
@@ -96,29 +83,50 @@
   transform: none !important;
 }
 
-.optical-mode .optical-plane .frame,
-.optical-mode .optical-plane .priority {
-  --projection-color: var(--optical-plane-structure);
+/* Hide all semantic pieces by default. Each plane reveals only the part
+   assigned to its role, across every article in the feed. */
+.optical-mode .optical-plane-article .frame,
+.optical-mode .optical-plane-article .corners,
+.optical-mode .optical-plane-article .priority,
+.optical-mode .optical-plane-article .meta,
+.optical-mode .optical-plane-article .headline,
+.optical-mode .optical-plane-article .tags,
+.optical-mode .optical-plane-article .body {
+  visibility: hidden !important;
 }
 
-.optical-mode .optical-plane .corners {
-  color: var(--optical-plane-structure);
+.optical-mode .optical-plane[data-optical-role="frame"] .frame {
+  visibility: visible !important;
 }
 
-.optical-mode .optical-plane .meta,
-.optical-mode .optical-plane .tags,
-.optical-mode .optical-plane .body {
-  --projection-color: var(--optical-plane-secondary);
+.optical-mode .optical-plane[data-optical-role="frame"] .projection-plate {
+  background: rgba(2, 2, 2, 0.12);
 }
 
-.optical-mode .optical-plane .headline {
-  --projection-color: var(--optical-plane-headline);
+.optical-mode .optical-plane[data-optical-role="corners"] .corners {
+  visibility: visible !important;
 }
 
-.optical-mode .optical-plane-article .meta {
-  display: none;
+.optical-mode .optical-plane[data-optical-role="priority"] .priority {
+  visibility: visible !important;
 }
 
+.optical-mode .optical-plane[data-optical-role="context"] .meta,
+.optical-mode .optical-plane[data-optical-role="context"] .tags {
+  visibility: visible !important;
+}
+
+.optical-mode .optical-plane[data-optical-role="headline"] .headline {
+  visibility: visible !important;
+}
+
+.optical-mode .optical-plane[data-optical-role="body"] .body {
+  visibility: visible !important;
+}
+
+/* Expansion remains source-driven. The cloned article keeps the source
+   expanded class, so the body plane appears and the structural planes
+   grow to the same live article geometry. */
 .optical-mode .optical-plane-article.expanded .expansion-zone {
   display: block;
 }
