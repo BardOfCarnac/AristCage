@@ -65,6 +65,9 @@
   backface-visibility: hidden;
 }
 
+/* Expansion moves the entire projected feed as one layout event. Scroll and
+   ordinary tracking remain transition-free, so the optical image does not lag. */
+.optical-mode .optical-plane-system.optical-layout-active .optical-plane-article,
 .optical-mode .optical-plane-article.optical-layout-transition {
   transition:
     top 300ms cubic-bezier(.2, .72, .2, 1),
