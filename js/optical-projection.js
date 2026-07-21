@@ -8,51 +8,66 @@
   Each optical plane contains a complete visual copy of every live
   article. The semantic source articles remain in the normal feed and
   continue to own layout, interaction, expansion and accessibility.
+
+  Camera rule: article planes use the same world-depth model as the
+  layered chamber. No independent CSS perspective or vanishing point
+  is created here.
 ==================================================*/
 
 window.OpticalProjection = (() => {
   const STORAGE_KEY = "ncn-optical-projection";
   const ROOT_CLASS = "optical-mode";
 
-  /* Far to near: every plane receives every article. */
+  /* Mirrors the chamber's current near plane and half-cell grid. */
+  const CHAMBER_CAMERA = Object.freeze({
+    near: 2.5,
+    cell: 0.5,
+    centreX: () => window.innerWidth * 0.5,
+    centreY: () => window.innerHeight * 0.5
+  });
+
+  /*
+    Far to near. Each depth is a real chamber-world Z value.
+    The screen scale for a plane is therefore near / z.
+  */
   const ARTICLE_PLANES = Object.freeze([
     {
-      z: -420,
-      opacity: 0.11,
-      structure: "#61100c",
-      headline: "#861b12",
-      secondary: "#9b2b17"
+      z: 7.5,
+      opacity: 0.08,
+      structure: "#5d0d0a",
+      headline: "#7c1510",
+      secondary: "#922316"
     },
     {
-      z: -320,
-      opacity: 0.13,
-      structure: "#78130e",
-      headline: "#a52216",
-      secondary: "#b6341b"
+      z: 6.5,
+      opacity: 0.10,
+      structure: "#74110d",
+      headline: "#991c14",
+      secondary: "#ad2d19"
     },
     {
-      z: -230,
+      z: 5.5,
+      opacity: 0.12,
+      structure: "#8e1711",
+      headline: "#bb281b",
+      secondary: "#ca3c20"
+    },
+    {
+      z: 4.5,
       opacity: 0.15,
-      structure: "#941812",
-      headline: "#c72d1d",
-      secondary: "#d24322"
+      structure: "#ad2018",
+      headline: "#dd3b27",
+      secondary: "#e8542d"
     },
     {
-      z: -150,
-      opacity: 0.18,
-      structure: "#b41f17",
-      headline: "#e34429",
-      secondary: "#eb6335"
+      z: 3.5,
+      opacity: 0.20,
+      structure: "#d42c21",
+      headline: "#ff6d4d",
+      secondary: "#ff9259"
     },
     {
-      z: -75,
-      opacity: 0.22,
-      structure: "#d72d20",
-      headline: "#ff7652",
-      secondary: "#ff9a5f"
-    },
-    {
-      z: 0,
+      z: 2.5,
       opacity: 1,
       structure: "var(--red)",
       headline: "var(--white)",
@@ -79,7 +94,8 @@ window.OpticalProjection = (() => {
     planeSystem = document.createElement("div");
     planeSystem.className = "optical-plane-system";
     planeSystem.setAttribute("aria-hidden", "true");
-    feed.prepend(planeSystem);
+    document.body.append(planeSystem);
+    syncScroll();
     return planeSystem;
   }
 
@@ -92,12 +108,12 @@ window.OpticalProjection = (() => {
     });
   }
 
-  function sourceGeometry(entry, feedRect) {
+  function documentGeometry(entry) {
     const rect = entry.getBoundingClientRect();
 
     return {
-      top: rect.top - feedRect.top,
-      left: rect.left - feedRect.left,
+      top: rect.top + window.scrollY,
+      left: rect.left + window.scrollX,
       width: rect.width,
       height: rect.height
     };
@@ -110,6 +126,7 @@ window.OpticalProjection = (() => {
     const article = document.createElement("div");
     article.className = `optical-plane-article${entry.classList.contains("expanded") ? " expanded" : ""}`;
     article.dataset.entryId = entry.dataset.entryId || "";
+    article.setAttribute("inert", "");
     article.style.top = `${geometry.top}px`;
     article.style.left = `${geometry.left}px`;
     article.style.width = `${geometry.width}px`;
@@ -124,29 +141,41 @@ window.OpticalProjection = (() => {
 
   function buildPlane(definition, index, sources) {
     const plane = document.createElement("div");
+    const content = document.createElement("div");
+    const scale = CHAMBER_CAMERA.near / definition.z;
+
     plane.className = "optical-plane";
     plane.dataset.opticalPlane = String(index);
-    plane.style.setProperty("--optical-plane-z", `${definition.z}px`);
+    plane.dataset.chamberDepth = definition.z.toFixed(2);
+    plane.style.setProperty("--optical-plane-scale", scale.toFixed(6));
     plane.style.setProperty("--optical-plane-opacity", String(definition.opacity));
     plane.style.setProperty("--optical-plane-structure", definition.structure);
     plane.style.setProperty("--optical-plane-headline", definition.headline);
     plane.style.setProperty("--optical-plane-secondary", definition.secondary);
 
+    content.className = "optical-plane-content";
+
     sources.forEach(({ entry, geometry }) => {
       const clone = cloneArticle(entry, geometry);
-      if (clone) plane.append(clone);
+      if (clone) content.append(clone);
     });
 
+    plane.append(content);
     return plane;
   }
 
-  function syncPerspectiveOrigin() {
-    if (!enabled || !feed) return;
+  function syncCameraOrigin() {
+    if (!planeSystem) return;
 
-    const feedRect = feed.getBoundingClientRect();
-    const viewportFocus = window.innerHeight * 0.47;
-    const localFocus = viewportFocus - feedRect.top;
-    feed.style.setProperty("--optical-focus-y", `${localFocus}px`);
+    planeSystem.style.setProperty("--optical-camera-x", `${CHAMBER_CAMERA.centreX()}px`);
+    planeSystem.style.setProperty("--optical-camera-y", `${CHAMBER_CAMERA.centreY()}px`);
+  }
+
+  function syncScroll() {
+    if (!planeSystem) return;
+
+    planeSystem.style.setProperty("--optical-scroll-x", `${-window.scrollX}px`);
+    planeSystem.style.setProperty("--optical-scroll-y", `${-window.scrollY}px`);
   }
 
   function rebuildPlanes() {
@@ -154,11 +183,9 @@ window.OpticalProjection = (() => {
     if (!enabled || !feed) return;
 
     const root = ensurePlaneSystem();
-    const entries = sourceEntries();
-    const feedRect = feed.getBoundingClientRect();
-    const sources = entries.map(entry => ({
+    const sources = sourceEntries().map(entry => ({
       entry,
-      geometry: sourceGeometry(entry, feedRect)
+      geometry: documentGeometry(entry)
     }));
     const fragment = document.createDocumentFragment();
 
@@ -166,15 +193,9 @@ window.OpticalProjection = (() => {
       fragment.append(buildPlane(definition, index, sources));
     });
 
-    const sourceChildren = [...feed.children].filter(child => child !== root);
-    const contentHeight = sourceChildren.reduce((height, child) => {
-      const rect = child.getBoundingClientRect();
-      return Math.max(height, rect.bottom - feedRect.top);
-    }, feedRect.height);
-
     root.replaceChildren(fragment);
-    root.style.height = `${Math.max(0, contentHeight)}px`;
-    syncPerspectiveOrigin();
+    syncCameraOrigin();
+    syncScroll();
   }
 
   function requestSync() {
@@ -206,7 +227,6 @@ window.OpticalProjection = (() => {
 
     planeSystem?.remove();
     planeSystem = null;
-    feed?.style.removeProperty("--optical-focus-y");
 
     setToggleState();
     if (options.persist !== false) localStorage.setItem(STORAGE_KEY, "off");
@@ -217,12 +237,19 @@ window.OpticalProjection = (() => {
     else enable();
   }
 
-  function handleFeedMutations(mutations) {
-    const sourceChanged = mutations.some(mutation => {
-      return !planeSystem || !planeSystem.contains(mutation.target);
-    });
+  function handleFeedMutations() {
+    requestSync();
+  }
 
-    if (sourceChanged) requestSync();
+  function handleScroll() {
+    if (!enabled) return;
+    syncScroll();
+  }
+
+  function handleResize() {
+    if (!enabled) return;
+    syncCameraOrigin();
+    requestSync();
   }
 
   function init(options = {}) {
@@ -231,8 +258,8 @@ window.OpticalProjection = (() => {
     if (!feed) return false;
 
     toggle?.addEventListener("click", toggleMode);
-    window.addEventListener("scroll", syncPerspectiveOrigin, { passive: true });
-    window.addEventListener("resize", requestSync, { passive: true });
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleResize, { passive: true });
 
     observer = new MutationObserver(handleFeedMutations);
     observer.observe(feed, {
@@ -261,8 +288,8 @@ window.OpticalProjection = (() => {
   function destroy() {
     disable({ persist: false });
     toggle?.removeEventListener("click", toggleMode);
-    window.removeEventListener("scroll", syncPerspectiveOrigin);
-    window.removeEventListener("resize", requestSync);
+    window.removeEventListener("scroll", handleScroll);
+    window.removeEventListener("resize", handleResize);
     observer?.disconnect();
     resizeObserver?.disconnect();
 
