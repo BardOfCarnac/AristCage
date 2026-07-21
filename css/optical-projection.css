@@ -3,6 +3,8 @@
 
   This file is intentionally self-contained. Remove it, the matching
   script include, and the rail toggle to restore the standard viewer.
+  It styles projected article layers only; chamber geometry belongs to
+  the existing chamber module.
 ==================================================*/
 
 .optical-mode .viewer {
@@ -10,134 +12,6 @@
   perspective: 1100px;
   perspective-origin: 50% 44%;
   transform-style: preserve-3d;
-}
-
-.optical-chamber {
-  position: fixed;
-  inset: var(--rail-height, 76px) 0 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  perspective: 980px;
-  perspective-origin: 50% 43%;
-  transform-style: preserve-3d;
-  background:
-    radial-gradient(circle at 50% 82%, rgba(255, 52, 20, 0.12), transparent 24%),
-    #020202;
-  transition: opacity 180ms ease;
-}
-
-.optical-mode .optical-chamber {
-  opacity: 1;
-  visibility: visible;
-}
-
-.optical-chamber__rear,
-.optical-chamber__wall,
-.optical-chamber__floor,
-.optical-chamber__beam,
-.optical-chamber__projector,
-.optical-chamber__focus {
-  position: absolute;
-  transform-style: preserve-3d;
-}
-
-.optical-chamber__rear {
-  left: 24%;
-  right: 24%;
-  top: 13%;
-  bottom: 14%;
-  transform: translateZ(-590px) scale(1.72);
-  border: 1px solid rgba(255, 76, 38, 0.28);
-  background:
-    linear-gradient(rgba(255, 64, 30, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 64, 30, 0.07) 1px, transparent 1px),
-    #020202;
-  background-size: 32px 32px;
-}
-
-.optical-chamber__wall {
-  top: 3%;
-  bottom: 6%;
-  width: 42%;
-  opacity: 0.46;
-  background:
-    linear-gradient(rgba(255, 67, 31, 0.075) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 67, 31, 0.085) 1px, transparent 1px);
-  background-size: 38px 38px;
-}
-
-.optical-chamber__wall--left {
-  left: -20%;
-  transform-origin: right center;
-  transform: rotateY(68deg) translateZ(-150px);
-}
-
-.optical-chamber__wall--right {
-  right: -20%;
-  transform-origin: left center;
-  transform: rotateY(-68deg) translateZ(-150px);
-}
-
-.optical-chamber__floor {
-  left: 4%;
-  right: 4%;
-  bottom: -18%;
-  height: 36%;
-  opacity: 0.48;
-  transform-origin: center top;
-  transform: rotateX(67deg) translateZ(-138px);
-  background:
-    linear-gradient(rgba(255, 68, 32, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 68, 32, 0.09) 1px, transparent 1px);
-  background-size: 38px 38px;
-}
-
-.optical-chamber__projector {
-  left: 50%;
-  bottom: 8%;
-  width: 68px;
-  height: 28px;
-  margin-left: -34px;
-  transform: translateZ(-472px);
-  border: 1px solid rgba(255, 72, 35, 0.42);
-  background: #050302;
-}
-
-.optical-chamber__projector::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: -7px;
-  width: 18px;
-  height: 18px;
-  margin-left: -9px;
-  border-radius: 50%;
-  background: #fff9eb;
-  box-shadow: 0 0 8px #fff9eb, 0 0 22px #ff8d49, 0 0 50px #ff3217;
-}
-
-.optical-chamber__beam {
-  left: 50%;
-  bottom: 10%;
-  width: 46%;
-  height: 65%;
-  transform: translateX(-50%) translateZ(-385px);
-  clip-path: polygon(48.7% 100%, 51.3% 100%, 93% 0, 7% 0);
-  background: linear-gradient(to top, rgba(255, 78, 38, 0.28), rgba(255, 76, 38, 0.04) 73%, transparent);
-  filter: blur(10px);
-  opacity: 0.43;
-}
-
-.optical-chamber__focus {
-  left: 7%;
-  right: 7%;
-  top: 43%;
-  height: 1px;
-  transform: translateZ(18px);
-  background: linear-gradient(90deg, transparent, rgba(255, 170, 110, 0.2), transparent);
 }
 
 .optical-mode .app,
