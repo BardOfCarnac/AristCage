@@ -57,6 +57,7 @@ window.OpticalProjection = (() => {
   let enabled = false;
   let geometryFrame = 0;
   let structureTimer = 0;
+  let layoutTimer = 0;
   let observer = null;
   let resizeObserver = null;
   let currentAperture = null;
@@ -107,6 +108,17 @@ window.OpticalProjection = (() => {
     });
 
     return planeSystem;
+  }
+
+  function beginLayoutTransition(duration = LAYOUT_DURATION + 100) {
+    if (!planeSystem) return;
+    window.clearTimeout(layoutTimer);
+    planeSystem.classList.add("optical-layout-active");
+    layoutTimer = window.setTimeout(() => {
+      layoutTimer = 0;
+      planeSystem?.classList.remove("optical-layout-active");
+      requestGeometrySync();
+    }, duration);
   }
 
   function stabiliseProjectionObjects(node) {
@@ -324,10 +336,17 @@ window.OpticalProjection = (() => {
   }
 
   function handleExpansion(record, expanded) {
-    if (!record || record.removed || record.expanded === expanded) return;
+    if (!record || record.removed) return;
+    if (expanded && (record.expanded || record.pendingExpansion)) return;
+    if (!expanded && !record.expanded && !record.pendingExpansion) return;
 
     clearTimer(record, "expansionTimer");
     clearTimer(record, "collapseTimer");
+    beginLayoutTransition(
+      expanded
+        ? LAYOUT_DURATION + 130
+        : BODY_DISMISS_DURATION + LAYOUT_DURATION + 80
+    );
 
     if (expanded) {
       record.pendingCollapse = false;
@@ -339,6 +358,12 @@ window.OpticalProjection = (() => {
         updateRecordGeometry(record, true);
         resolveBody(record);
       }, 55);
+      return;
+    }
+
+    if (record.pendingExpansion && !record.expanded) {
+      record.pendingExpansion = false;
+      requestGeometrySync();
       return;
     }
 
@@ -538,6 +563,8 @@ window.OpticalProjection = (() => {
     geometryFrame = 0;
     window.clearTimeout(structureTimer);
     structureTimer = 0;
+    window.clearTimeout(layoutTimer);
+    layoutTimer = 0;
 
     records.forEach(record => {
       clearTimer(record, "lifecycleTimer");
