@@ -23,13 +23,14 @@ window.OpticalProjection = (() => {
   });
 
   /* Far to near. Every pane contains the same article list, but only
-     the semantic role assigned to that pane remains visible. */
+     the semantic role assigned to that pane remains visible. The
+     complete article now spans one chamber cell rather than five. */
   const SEMANTIC_PLANES = Object.freeze([
-    { role: "frame",    z: 5.0 },
-    { role: "corners",  z: 4.5 },
-    { role: "priority", z: 4.0 },
-    { role: "context",  z: 3.5 },
-    { role: "headline", z: 3.0 },
+    { role: "frame",    z: 3.0 },
+    { role: "corners",  z: 2.9 },
+    { role: "priority", z: 2.8 },
+    { role: "context",  z: 2.7 },
+    { role: "headline", z: 2.6 },
     { role: "body",     z: 2.5 }
   ]);
 
