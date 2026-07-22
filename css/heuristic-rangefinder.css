@@ -1,0 +1,57 @@
+/* Optional full-screen heuristic image rangefinder. */
+.heuristic-rangefinder-system {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  display: none;
+  overflow: hidden;
+  background: #020202;
+  touch-action: none;
+}
+
+html.heuristic-rangefinder-active .heuristic-rangefinder-system {
+  display: block;
+}
+
+.heuristic-rangefinder-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+}
+
+.heuristic-rangefinder-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.heuristic-rangefinder-status {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  translate: -50% 0;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 46, 32, .3);
+  background: rgba(0, 0, 0, .72);
+  color: rgba(255, 177, 166, .85);
+  font: 10px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .1em;
+  pointer-events: none;
+  transition: opacity .3s ease;
+}
+
+html.heuristic-rangefinder-active .app,
+html.heuristic-rangefinder-active .rail-occlusion {
+  visibility: hidden;
+}
+
+.heuristic-rangefinder-toggle[aria-pressed="true"] {
+  color: var(--white, #fff);
+  border-color: var(--red, #ff3828);
+  box-shadow: 0 0 10px rgba(255, 56, 40, .32);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heuristic-rangefinder-status {
+    transition: none;
+  }
+}
