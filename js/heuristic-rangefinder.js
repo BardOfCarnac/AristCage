@@ -4,7 +4,7 @@ window.HeuristicRangefinder = (() => {
   const DEFAULT_SOURCE = 'https://media.craiyon.com/2025-09-28/U_sUqYxjTEuZhc0UIYffDg.webp';
   const PALETTE = [[42,2,5],[104,5,12],[176,10,18],[243,24,24],[255,84,32],[255,174,72],[255,242,220]];
   const CHAMBER = { near: 2.5, cell: 0.5, focal: 0.84, wallShiftCells: 2 };
-  const settings = { depth: 1, focus: 4, zoom: 1.08, softness: .22, recolour: true, showBase: true };
+  const settings = { focus: 4, zoom: 1.08, softness: .22, recolour: true, showBase: true };
 
   let canvas, ctx, hitSurface, status, image, baseCanvas, bands = [];
   let active = false, ready = false, raf = 0, dpr = 1, W = 0, H = 0;
@@ -14,11 +14,14 @@ window.HeuristicRangefinder = (() => {
   let targetZoom = settings.zoom, zoom = settings.zoom, pulse = 0;
   let previousChamberMode = null;
 
-  const clamp01 = v => Math.max(0, Math.min(1, v));
+  const clamp = (v,min,max) => Math.max(min,Math.min(max,v));
+  const clamp01 = v => clamp(v,0,1);
   const luminance = (r,g,b) => (.2126*r + .7152*g + .0722*b) / 255;
   const button = () => document.querySelector('#heuristic-rangefinder-toggle');
   const chamberRoot = () => document.querySelector('#layered-chamber-system');
   const snapCell = value => Math.max(CHAMBER.cell, Math.round(value / CHAMBER.cell) * CHAMBER.cell);
+  const frontDepth = () => CHAMBER.near + CHAMBER.cell;
+  const baseDepth = () => CHAMBER.near + CHAMBER.cell * 8;
 
   function ensureChamber() {
     if (!window.LayeredChamber) return false;
@@ -70,6 +73,7 @@ window.HeuristicRangefinder = (() => {
     canvas.width = Math.round(W*dpr); canvas.height = Math.round(H*dpr);
     canvas.style.width = `${W}px`; canvas.style.height = `${H}px`;
     ctx.setTransform(dpr,0,0,dpr,0,0);
+    constrainTargetView();
   }
 
   function setStatus(message, fade=true) {
@@ -141,7 +145,7 @@ window.HeuristicRangefinder = (() => {
     if (!mount()) return;
     ready=false; setStatus('ANALYSING STREET DEPTH',false);
     image=new Image(); image.crossOrigin='anonymous';
-    image.onload=()=>{ try{ buildBands(); ready=true; setStatus('HEURISTIC DEPTH RESOLVED'); }catch(error){ console.error('HeuristicRangefinder:',error); } };
+    image.onload=()=>{ try{ buildBands(); ready=true; constrainTargetView(); setStatus('HEURISTIC DEPTH RESOLVED'); }catch(error){ console.error('HeuristicRangefinder:',error); } };
     image.onerror=()=>setStatus('IMAGE COULD NOT LOAD',false);
     image.src=source;
   }
@@ -163,30 +167,64 @@ window.HeuristicRangefinder = (() => {
   }
 
   function planeDepthForBand(index){
-    // Depth score band 6 is nearest. It occupies the first grid plane,
-    // then each successively farther slice occupies the next plane back.
     return CHAMBER.near + CHAMBER.cell * (7-index);
   }
 
-  function chamberPlane(z) {
-    const aperture=apertureAt(z);
+  function coverSize(aperture, magnification){
     const aspect=image.naturalWidth/image.naturalHeight;
-    let width=aperture.width*zoom, height=width/aspect;
-    if(height<aperture.height*zoom){ height=aperture.height*zoom; width=height*aspect; }
-    const pivotX=inspection.u*width, pivotY=inspection.v*height;
-    const depthOffset=(z-CHAMBER.near)*settings.depth;
+    let width=aperture.width*magnification, height=width/aspect;
+    if(height<aperture.height*magnification){ height=aperture.height*magnification; width=height*aspect; }
+    return {width,height};
+  }
+
+  function boundedRect(aperture,width,height,x,y){
+    const minX=aperture.right-width, maxX=aperture.left;
+    const minY=aperture.bottom-height, maxY=aperture.top;
+    return {x:clamp(x,minX,maxX),y:clamp(y,minY,maxY),width,height,aperture};
+  }
+
+  function frontRect(useTargets=false){
+    const aperture=apertureAt(frontDepth());
+    const mag=useTargets?targetZoom:zoom;
+    const point=useTargets?targetInspection:inspection;
+    const pan=useTargets?targetLook:look;
+    const size=coverSize(aperture,mag);
+    const x=W*.5-point.u*size.width+pan.x;
+    const y=H*.5-point.v*size.height+pan.y;
+    return boundedRect(aperture,size.width,size.height,x,y);
+  }
+
+  function visibleImageCentre(useTargets=false){
+    const r=frontRect(useTargets);
     return {
-      x:W*.5-pivotX+look.x*(1+depthOffset*.075),
-      y:H*.5-pivotY+look.y*(1+depthOffset*.055),
-      width,height,aperture
+      u:clamp01((W*.5-r.x)/r.width),
+      v:clamp01((H*.5-r.y)/r.height)
     };
+  }
+
+  function chamberPlane(z, useTargets=false) {
+    const aperture=apertureAt(z);
+    const mag=useTargets?targetZoom:zoom;
+    const centre=visibleImageCentre(useTargets);
+    const size=coverSize(aperture,mag);
+    return boundedRect(aperture,size.width,size.height,W*.5-centre.u*size.width,H*.5-centre.v*size.height);
+  }
+
+  function constrainTargetView(){
+    if(!ready||!image||!W||!H)return;
+    const aperture=apertureAt(frontDepth());
+    targetZoom=Math.max(1,Math.min(3.5,targetZoom));
+    const size=coverSize(aperture,targetZoom);
+    const desiredX=W*.5-targetInspection.u*size.width+targetLook.x;
+    const desiredY=H*.5-targetInspection.v*size.height+targetLook.y;
+    const bounded=boundedRect(aperture,size.width,size.height,desiredX,desiredY);
+    targetLook.x=bounded.x-(W*.5-targetInspection.u*size.width);
+    targetLook.y=bounded.y-(H*.5-targetInspection.v*size.height);
   }
 
   function drawPlane(source,z,alpha,glow=0){
     const r=chamberPlane(z);
     ctx.save();
-    // Every image slice is physically clipped to the projected grid rectangle
-    // of the exact chamber plane it occupies.
     ctx.beginPath();
     ctx.rect(r.aperture.left,r.aperture.top,r.aperture.width,r.aperture.height);
     ctx.clip();
@@ -197,7 +235,7 @@ window.HeuristicRangefinder = (() => {
   }
 
   function drawReticle(){
-    const frontAperture=apertureAt(CHAMBER.near+CHAMBER.cell);
+    const frontAperture=apertureAt(frontDepth());
     const x=W/2,y=H/2;
     if(x<frontAperture.left||x>frontAperture.right||y<frontAperture.top||y>frontAperture.bottom)return;
     ctx.save(); ctx.strokeStyle='rgba(255,92,78,.88)'; ctx.fillStyle='rgba(255,92,78,.9)';
@@ -208,14 +246,13 @@ window.HeuristicRangefinder = (() => {
 
   function draw(){
     if(!active||!canvas){raf=0;return;}
+    constrainTargetView();
     look.x+=(targetLook.x-look.x)*.13; look.y+=(targetLook.y-look.y)*.13;
     inspection.u+=(targetInspection.u-inspection.u)*.18; inspection.v+=(targetInspection.v-inspection.v)*.18;
     zoom+=(targetZoom-zoom)*.12; pulse*=.94;
     ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
     if(ready){
-      // Painter order: rear to front. Plane assignment itself fills from the
-      // first front grid plane backwards, one discrete plane per slice.
-      if(settings.showBase) drawPlane(baseCanvas,CHAMBER.near+CHAMBER.cell*8,.10,.5+pulse*3);
+      if(settings.showBase) drawPlane(baseCanvas,baseDepth(),.10,.5+pulse*3);
       for(let index=0;index<bands.length;index++){
         const z=planeDepthForBand(index);
         const distance=Math.abs(index-settings.focus), focused=Math.max(0,1-distance/3.2);
@@ -227,8 +264,7 @@ window.HeuristicRangefinder = (() => {
 
   function pointToImage(x,y){
     if(!ready)return null;
-    const z=CHAMBER.near+CHAMBER.cell;
-    const r=chamberPlane(z);
+    const r=frontRect();
     if(x<r.aperture.left||x>r.aperture.right||y<r.aperture.top||y>r.aperture.bottom)return null;
     const u=(x-r.x)/r.width,v=(y-r.y)/r.height;
     return u>=0&&u<=1&&v>=0&&v<=1?{u,v}:null;
@@ -241,12 +277,17 @@ window.HeuristicRangefinder = (() => {
     hitSurface.setPointerCapture?.(pointerId);
     hitSurface.classList.add('is-dragging');
   }
+
   function pointerMove(event){
     if(!active||!dragging||event.pointerId!==pointerId)return;
     event.preventDefault();
     const dx=event.clientX-lastX,dy=event.clientY-lastY;
-    dragDistance+=Math.hypot(dx,dy); targetLook.x+=dx;targetLook.y+=dy;lastX=event.clientX;lastY=event.clientY;
+    dragDistance+=Math.hypot(dx,dy);
+    targetLook.x+=dx; targetLook.y+=dy;
+    constrainTargetView();
+    lastX=event.clientX; lastY=event.clientY;
   }
+
   function pointerUp(event){
     if(!active||!dragging||event.pointerId!==pointerId)return;
     event.preventDefault();
@@ -254,13 +295,21 @@ window.HeuristicRangefinder = (() => {
     dragging=false; pointerId=null; hitSurface.classList.remove('is-dragging');
     if(dragDistance<10){
       const point=pointToImage(event.clientX,event.clientY);
-      if(point){targetInspection=point;targetLook={x:0,y:0};pulse=1;setStatus(`INSPECTION POINT ${Math.round(point.u*100)} / ${Math.round(point.v*100)}`);}
+      if(point){
+        targetInspection=point;
+        targetLook={x:0,y:0};
+        constrainTargetView();
+        pulse=1;
+        setStatus(`INSPECTION POINT ${Math.round(point.u*100)} / ${Math.round(point.v*100)}`);
+      }
     }
   }
+
   function wheel(event){
     if(!active)return;
     event.preventDefault();
-    targetZoom=Math.max(.5,Math.min(3.5,targetZoom*Math.exp(-event.deltaY*.0012)));
+    targetZoom=Math.max(1,Math.min(3.5,targetZoom*Math.exp(-event.deltaY*.0012)));
+    constrainTargetView();
     setStatus(`MAGNIFICATION ${targetZoom.toFixed(2)}×`);
   }
 
@@ -274,7 +323,12 @@ window.HeuristicRangefinder = (() => {
     if(ctx)ctx.clearRect(0,0,W,H);
   }
   function toggle(){active?disable():enable();}
-  function configure(options={}){Object.assign(settings,options);if(Number.isFinite(options.zoom)){targetZoom=options.zoom;zoom=options.zoom;}if(ready&&('softness'in options||'recolour'in options))buildBands();}
+  function configure(options={}){
+    Object.assign(settings,options);
+    if(Number.isFinite(options.zoom)){targetZoom=Math.max(1,options.zoom);zoom=targetZoom;}
+    constrainTargetView();
+    if(ready&&('softness'in options||'recolour'in options))buildBands();
+  }
 
   document.addEventListener('click',event=>{if(event.target.closest('#heuristic-rangefinder-toggle'))toggle();});
   return {enable,disable,toggle,load,configure,settings};
