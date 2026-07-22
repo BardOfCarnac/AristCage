@@ -19,25 +19,27 @@ window.LayeredChamber = (() => {
 
   const timing = {
     igniteStart: 0.16,
-    ignitePeak: 0.72,
-    igniteSettle: 1.02,
-    travelStart: 0.88,
-    travelDuration: 1.48,
-    infinityHold: 0.16,
-    returnDuration: 0.48,
-    wallOpenDuration: 1.02,
-    settleDuration: 0.42,
-    labDelay: 0.12
+    ignitePeak: 0.74,
+    igniteSettle: 1.08,
+    travelStart: 0.86,
+    travelDuration: 1.54,
+    infinityHold: 0.14,
+    returnDuration: 0.54,
+    wallOpenDuration: 1.06,
+    settleDuration: 0.46,
+    labDelay: 0.12,
+    breathDuration: 2.8
   };
   timing.returnStart = timing.travelStart + timing.travelDuration + timing.infinityHold;
   timing.wallOpenStart = timing.returnStart + timing.returnDuration;
   timing.done = timing.wallOpenStart + timing.wallOpenDuration + timing.settleDuration;
 
   const energy = {
-    operating: 0.64,
+    operating: 0.61,
     bootPeak: 1,
-    rearLockPulse: 0.24,
-    wallLockPulse: 0.14
+    rearLockPulse: 0.26,
+    wallLockPulse: 0.11,
+    settleBreath: 0.012
   };
 
   const lab = {
@@ -75,15 +77,23 @@ window.LayeredChamber = (() => {
   const mix = (a, c, t) => a + (c - a) * t;
   const easeOut = t => 1 - Math.pow(1 - clamp01(t), 3);
   const easeIn = t => Math.pow(clamp01(t), 3);
+  const easeTravel = t => Math.pow(clamp01(t), 2.72);
+  const easeReturn = t => 1 - Math.pow(1 - clamp01(t), 3.35);
   const easeInOut = t => {
     const n = clamp01(t);
     return n < 0.5 ? 4 * n * n * n : 1 - Math.pow(-2 * n + 2, 3) / 2;
   };
-  const pulse = (t, centre, width) => {
+  const sharpPulse = (t, centre, width) => {
     const distance = Math.abs(t - centre) / Math.max(width, 0.001);
     if (distance >= 1) return 0;
     const envelope = 1 - distance;
-    return envelope * envelope * (0.82 + Math.cos(distance * Math.PI * 3) * 0.18);
+    return Math.pow(envelope, 2.35) * (0.94 + Math.cos(distance * Math.PI * 2.5) * 0.06);
+  };
+  const softPulse = (t, centre, width) => {
+    const distance = Math.abs(t - centre) / Math.max(width, 0.001);
+    if (distance >= 1) return 0;
+    const envelope = 1 - distance;
+    return envelope * envelope * (3 - 2 * envelope);
   };
   const snapCells = value => Math.max(geometry.cell, Math.round(value / geometry.cell) * geometry.cell);
 
@@ -192,7 +202,7 @@ window.LayeredChamber = (() => {
   }
 
   function palette(value, alpha) {
-    const stops = [[38,2,6],[104,5,12],[176,10,18],[244,24,24],[255,66,32]];
+    const stops = [[30,1,4],[88,3,9],[160,7,14],[238,20,18],[255,82,34]];
     const scaled = clamp01(value) * (stops.length - 1);
     const index = Math.min(stops.length - 2, Math.floor(scaled));
     const local = scaled - index;
@@ -203,8 +213,18 @@ window.LayeredChamber = (() => {
 
   function bootEnergy(t) {
     if (t < timing.igniteStart) return 0;
-    if (t < timing.ignitePeak) return mix(0.08, energy.bootPeak, easeOut((t - timing.igniteStart) / (timing.ignitePeak - timing.igniteStart)));
-    if (t < timing.igniteSettle) return mix(energy.bootPeak, energy.operating, easeInOut((t - timing.ignitePeak) / (timing.igniteSettle - timing.ignitePeak)));
+    if (t < timing.ignitePeak) {
+      const n = clamp01((t - timing.igniteStart) / (timing.ignitePeak - timing.igniteStart));
+      const rise = mix(0.05, energy.bootPeak, easeOut(n));
+      const irregularity = (Math.sin(n * Math.PI * 5.5) * 0.035 + Math.sin(n * Math.PI * 11.5) * 0.012) * (1 - n);
+      return clamp01(rise + irregularity);
+    }
+    if (t < timing.igniteSettle) {
+      const n = clamp01((t - timing.ignitePeak) / (timing.igniteSettle - timing.ignitePeak));
+      const release = mix(energy.bootPeak, energy.operating, easeInOut(n));
+      const ring = Math.sin(n * Math.PI * 3.2) * 0.025 * (1 - n);
+      return clamp01(release + ring);
+    }
     return energy.operating;
   }
 
@@ -221,20 +241,27 @@ window.LayeredChamber = (() => {
 
   function state(now) {
     const t = (now - startedAt) / 1000;
-    const travel = easeIn((t - timing.travelStart) / timing.travelDuration);
-    const returning = easeOut((t - timing.returnStart) / timing.returnDuration);
+    const travel = easeTravel((t - timing.travelStart) / timing.travelDuration);
+    const returning = easeReturn((t - timing.returnStart) / timing.returnDuration);
     const wallOpen = easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration);
-    const rearLock = pulse(t, timing.returnStart + timing.returnDuration, 0.25);
-    const wallLock = pulse(t, timing.wallOpenStart + timing.wallOpenDuration, 0.32);
+    const rearLock = sharpPulse(t, timing.returnStart + timing.returnDuration, 0.22);
+    const wallLock = softPulse(t, timing.wallOpenStart + timing.wallOpenDuration, 0.38);
     const base = bootEnergy(t);
+    const breathAge = t - timing.done;
+    const breathActive = breathAge > 0 && breathAge < timing.breathDuration;
+    const breathPhase = breathActive ? breathAge / timing.breathDuration : 0;
+    const breathEnvelope = breathActive ? Math.pow(Math.sin(breathPhase * Math.PI), 2) : 0;
+    const breath = breathActive
+      ? Math.sin(breathPhase * Math.PI * 2) * breathEnvelope * energy.settleBreath
+      : 0;
     return {
       t,
       travel,
       returning,
       wallOpen,
-      energy: clamp01(base + rearLock * energy.rearLockPulse + wallLock * energy.wallLockPulse + injectedEnergyAt(now)),
+      energy: clamp01(base + rearLock * energy.rearLockPulse + wallLock * energy.wallLockPulse + breath + injectedEnergyAt(now)),
       lab: mode === MODES.LAB ? easeOut((t - timing.done - timing.labDelay) / 0.55) : 0,
-      done: t >= timing.done && injectedDuration === 0
+      done: t >= timing.done + timing.breathDuration && injectedDuration === 0
     };
   }
 
@@ -266,10 +293,12 @@ window.LayeredChamber = (() => {
     const apparentCell = geometry.cell * focalLength() / z;
     const resolve = clamp01((apparentCell - 0.32) / 2.4);
     const contrast = clamp(Math.pow(zRatio, 0.42), 0.012, 1);
+    const depthBrightness = 1 + Math.sin(z * 4.93 + 0.7) * 0.012;
+    const depthOpacity = 1 + Math.sin(z * 3.17 + 1.2) * 0.008;
     return {
       resolve,
-      brightness: clamp01(energyLevel * (0.22 + contrast * 0.78)),
-      opacity: clamp01(alpha * Math.pow(contrast, 1.28) * (0.22 + resolve * 0.78)),
+      brightness: clamp01(energyLevel * (0.22 + contrast * 0.78) * depthBrightness),
+      opacity: clamp01(alpha * Math.pow(contrast, 1.28) * (0.22 + resolve * 0.78) * depthOpacity),
       width: clamp(0.2 + 1.25 * Math.pow(contrast, 0.72), 0.2, 1.45)
     };
   }
@@ -523,7 +552,7 @@ window.LayeredChamber = (() => {
     if (s.energy > 0) {
       b.save();
       b.globalCompositeOperation = 'lighter';
-      drawChamber(b, s, 0.035 + 0.08 * s.energy);
+      drawChamber(b, s, 0.03 + 0.072 * s.energy);
       b.restore();
     }
     drawLiveFeed(g, s);
