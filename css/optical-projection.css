@@ -1,9 +1,9 @@
 /*==================================================
   OPTIONAL OPTICAL PROJECTION
 
-  Remove this file, the matching script include and the rail toggle to
-  restore the standard viewer. Optics owns no source data and does not
-  replace the normal DOM interaction layer.
+  A complete article now occupies one stable reading plane. The chamber
+  grid provides depth behind it; article parts are not split across
+  intermediate planes.
 ==================================================*/
 
 .optical-mode .viewer {
@@ -12,16 +12,16 @@
   isolation: isolate;
 }
 
-.optical-plane-system {
+.optical-reading-plane {
   display: none;
 }
 
-.optical-mode .optical-plane-system {
+.optical-mode .optical-reading-plane {
   display: block;
   position: fixed;
   inset: 0;
   z-index: 15;
-  overflow: visible;
+  overflow: hidden;
   pointer-events: none;
   contain: layout paint;
 }
@@ -34,190 +34,93 @@
   opacity: 0;
 }
 
-/*==================================================
-  SOURCE GEOMETRY
-
-  The invisible source cards now own the larger real footprint. This
-  gives the optical cards honest spacing and matching click targets.
-==================================================*/
-
+/* The source entry keeps the real layout and click target. Its complete
+   visual copy is drawn above the chamber on one reading plane. */
 .optical-mode #feed > .entry:not(.panel) {
   --optical-card-overhang: clamp(18px, 6vw, 36px);
   width: calc(100% + var(--optical-card-overhang));
   margin-left: calc(var(--optical-card-overhang) * -0.5);
   margin-bottom: 18px;
-}
-
-.optical-mode #feed > .entry:not(.panel) > .projection-plate {
-  min-height: 108px;
-  padding: 16px 18px 17px 48px;
   opacity: 0;
 }
 
-.optical-mode #feed > .entry:not(.panel) .entry-content {
+.optical-mode :is(#feed > .entry:not(.panel), .optical-reading-card) > .projection-plate {
+  min-height: 108px;
+  padding: 16px 18px 17px 48px;
+}
+
+.optical-mode :is(#feed > .entry:not(.panel), .optical-reading-card) .entry-content {
   gap: 8px;
 }
 
-.optical-mode #feed > .entry:not(.panel) .headline {
+.optical-mode :is(#feed > .entry:not(.panel), .optical-reading-card) .headline {
   font-size: clamp(1.9rem, 8.8vw, 3.45rem);
   line-height: .88;
 }
 
-.optical-mode #feed > .entry:not(.panel) .tags {
+.optical-mode :is(#feed > .entry:not(.panel), .optical-reading-card) .tags {
   font-size: .72rem;
   letter-spacing: .18em;
 }
 
-.optical-mode #feed > .entry.expanded:not(.panel) > .projection-plate {
+.optical-mode :is(#feed > .entry.expanded:not(.panel), .optical-reading-card.expanded) > .projection-plate {
   padding-bottom: 20px;
 }
 
-.optical-mode #feed > .entry.expanded:not(.panel) .body {
+.optical-mode :is(#feed > .entry.expanded:not(.panel), .optical-reading-card.expanded) .body {
   font-size: 1.02rem;
   line-height: 1.58;
 }
 
-/*==================================================
-  INDEPENDENT DEPTH PLANES
-
-  Every plane is positioned and clipped to its own chamber aperture by
-  JavaScript. There is no shared front-mouth clip and no whole-card scale.
-==================================================*/
-
-.optical-mode .optical-plane {
-  position: fixed;
-  z-index: var(--optical-plane-order, 0);
-  overflow: hidden;
-  pointer-events: none;
-  backface-visibility: hidden;
-  contain: layout paint;
-}
-
-.optical-mode .optical-semantic-item {
-  position: absolute;
-  margin: 0;
-  pointer-events: none;
-  opacity: 1;
-  filter: none;
-  backface-visibility: hidden;
+.optical-mode .optical-reading-card {
+  position: absolute !important;
+  right: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+  transform: none !important;
   transform-origin: 50% 50%;
-}
-
-.optical-mode .optical-semantic-item > * {
-  box-sizing: border-box;
-}
-
-/* Isolated structural objects no longer retain offsets intended for a
-   complete projection plate. Each object fills its measured semantic box. */
-.optical-mode .optical-semantic-item[data-optical-role="plate"] .optical-plate-surface,
-.optical-mode .optical-semantic-item[data-optical-role="frame"] .frame,
-.optical-mode .optical-semantic-item[data-optical-role="corners"] .corners,
-.optical-mode .optical-semantic-item[data-optical-role="priority"] .priority {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  transform: none !important;
-}
-
-.optical-mode .optical-semantic-item[data-optical-role="plate"] .optical-plate-surface {
-  background: rgba(2, 2, 2, .17);
-  box-shadow: inset 0 0 38px rgba(0, 0, 0, .24);
-}
-
-.optical-mode .optical-semantic-item[data-optical-role="frame"] .frame {
-  border-color: rgba(255, 70, 40, .24);
-  box-shadow: 0 0 10px rgba(255, 70, 40, .12);
-}
-
-.optical-mode .optical-semantic-item[data-optical-role="priority"] .priority {
-  min-width: 6px;
-}
-
-.optical-mode .optical-semantic-item[data-optical-role="headline"] .headline,
-.optical-mode .optical-semantic-item[data-optical-role="tags"] .tags,
-.optical-mode .optical-semantic-item[data-optical-role="meta"] .meta,
-.optical-mode .optical-semantic-item[data-optical-role="body"] .body {
-  width: 100%;
-  margin: 0;
-  transform: none !important;
-}
-
-.optical-mode .optical-semantic-item[data-optical-role="headline"] .headline {
-  font-size: clamp(1.95rem, 9.2vw, 3.6rem);
-  line-height: .88;
-}
-
-.optical-mode .optical-semantic-item[data-optical-role="tags"] .tags {
-  font-size: .72rem;
-  letter-spacing: .18em;
-}
-
-.optical-mode .optical-semantic-item[data-optical-role="body"] .body {
-  opacity: 1 !important;
-  padding: 0;
-  font-size: 1.02rem;
-  line-height: 1.58;
-}
-
-.optical-mode .optical-semantic-item .mobile-inspector-detail-grid {
-  display: grid !important;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-}
-
-.optical-mode .optical-detail-labels .detail-value,
-.optical-mode .optical-detail-values .detail-label {
-  visibility: hidden !important;
-}
-
-.optical-mode .optical-detail-values {
-  border-top-color: transparent !important;
-}
-
-/*==================================================
-  OPTICAL PRESENCE
-==================================================*/
-
-.optical-mode .optical-semantic-item.optical-absent {
-  opacity: 0;
-  filter: brightness(.3) saturate(.55);
-}
-
-.optical-mode .optical-semantic-item.optical-resolving {
-  animation: optical-semantic-resolve
-    var(--optical-resolve-duration, 280ms)
-    cubic-bezier(.16, .78, .2, 1)
-    var(--optical-resolve-delay, 0ms)
-    both;
-}
-
-.optical-mode .optical-semantic-item.optical-present {
+  backface-visibility: hidden;
   opacity: 1;
   filter: none;
 }
 
-.optical-mode .optical-semantic-item.optical-dismissing {
-  animation: optical-semantic-dismiss 190ms cubic-bezier(.55, 0, .8, .32) both;
+.optical-mode .optical-reading-card > .projection-plate {
+  width: 100%;
+  height: 100%;
 }
 
-.optical-mode .optical-semantic-item.optical-body-resolving {
-  animation: optical-body-resolve 360ms cubic-bezier(.16, .78, .2, 1) both;
+.optical-mode .optical-reading-card .part,
+.optical-mode .optical-reading-card .priority,
+.optical-mode .optical-reading-card .body {
+  opacity: 1 !important;
 }
 
-.optical-mode .optical-semantic-item.optical-body-dismissing {
-  animation: optical-body-dismiss 180ms cubic-bezier(.55, 0, .8, .32) both;
+.optical-mode .optical-reading-card .mobile-inspector-detail-grid {
+  display: grid !important;
 }
 
-@keyframes optical-semantic-resolve {
+.optical-mode .optical-reading-card.optical-resolving {
+  animation: optical-card-resolve 320ms cubic-bezier(.16, .78, .2, 1) both;
+}
+
+.optical-mode .optical-reading-card.optical-present {
+  opacity: 1;
+  filter: none;
+}
+
+.optical-mode .optical-reading-card.optical-dismissing {
+  animation: optical-card-dismiss 190ms cubic-bezier(.55, 0, .8, .32) both;
+}
+
+@keyframes optical-card-resolve {
   0% {
     opacity: 0;
-    filter: brightness(.3) saturate(.55);
+    filter: blur(1px) brightness(.35) saturate(.55);
   }
-  55% {
-    opacity: .74;
-    filter: brightness(calc(1 + var(--optical-resolve-glow, .5))) saturate(1.12);
+  58% {
+    opacity: .82;
+    filter: blur(.12px) brightness(1.26) saturate(1.08);
   }
   100% {
     opacity: 1;
@@ -225,66 +128,10 @@
   }
 }
 
-@keyframes optical-semantic-dismiss {
+@keyframes optical-card-dismiss {
   0% { opacity: 1; filter: none; }
   55% { opacity: .42; filter: brightness(.72) saturate(.75); }
   100% { opacity: 0; filter: brightness(.25) saturate(.45); }
-}
-
-@keyframes optical-body-resolve {
-  0% { opacity: 0; filter: brightness(.38) saturate(.65); }
-  58% { opacity: .78; filter: brightness(1.24) saturate(1.08); }
-  100% { opacity: 1; filter: none; }
-}
-
-@keyframes optical-body-dismiss {
-  0% { opacity: 1; filter: none; }
-  100% { opacity: 0; filter: brightness(.35) saturate(.55); }
-}
-
-/* Role-specific identity remains separate from the source renderer's old
-   gone/leaving/energy classes. */
-.optical-mode .optical-plane[data-optical-role="frame"] .optical-resolving .frame,
-.optical-mode .optical-plane[data-optical-role="corners"] .optical-resolving .corners {
-  animation: optical-line-lock
-    var(--optical-resolve-duration, 280ms)
-    ease-out
-    var(--optical-resolve-delay, 0ms)
-    both !important;
-}
-
-.optical-mode .optical-plane[data-optical-role="priority"] .optical-resolving .priority {
-  animation: optical-priority-charge
-    var(--optical-resolve-duration, 260ms)
-    ease-out
-    var(--optical-resolve-delay, 0ms)
-    both !important;
-}
-
-.optical-mode .optical-plane[data-optical-role="headline"] .optical-resolving .headline {
-  animation: optical-headline-focus
-    var(--optical-resolve-duration, 310ms)
-    ease-out
-    var(--optical-resolve-delay, 0ms)
-    both !important;
-}
-
-@keyframes optical-line-lock {
-  0% { opacity: 0; filter: brightness(.4); }
-  62% { opacity: .86; filter: brightness(1.65); }
-  100% { opacity: 1; filter: none; }
-}
-
-@keyframes optical-priority-charge {
-  0% { opacity: 0; filter: brightness(.35); }
-  48% { opacity: 1; filter: brightness(1.8); }
-  100% { opacity: 1; filter: none; }
-}
-
-@keyframes optical-headline-focus {
-  0% { opacity: 0; filter: blur(1.2px) brightness(.45); }
-  56% { opacity: .84; filter: blur(.15px) brightness(1.32); }
-  100% { opacity: 1; filter: none; }
 }
 
 .optical-toggle[aria-pressed="true"] {
@@ -294,14 +141,14 @@
 }
 
 @media (max-width: 420px) {
-  .optical-mode #feed > .entry:not(.panel) > .projection-plate {
+  .optical-mode :is(#feed > .entry:not(.panel), .optical-reading-card) > .projection-plate {
     padding: 16px 14px 16px 34px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .optical-mode .optical-semantic-item,
-  .optical-mode .optical-semantic-item > * {
+  .optical-mode .optical-reading-card,
+  .optical-mode .optical-reading-card * {
     animation: none !important;
     transition: none !important;
     opacity: 1 !important;
