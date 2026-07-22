@@ -1,0 +1,188 @@
+name: Apply native chamber refinement on PR
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  refine:
+    if: github.head_ref == 'refine-native-chamber-breath'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refine-native-chamber-breath
+
+      - name: Apply restrained native-only changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('js/layered-chamber.js')
+          source = path.read_text()
+
+          def swap(old, new, label):
+              global source
+              if source.count(old) != 1:
+                  raise SystemExit(f'{label}: expected one match, found {source.count(old)}')
+              source = source.replace(old, new, 1)
+
+          for old, new in [
+              ('ignitePeak: 0.72', 'ignitePeak: 0.74'),
+              ('igniteSettle: 1.02', 'igniteSettle: 1.08'),
+              ('travelStart: 0.88', 'travelStart: 0.86'),
+              ('travelDuration: 1.48', 'travelDuration: 1.54'),
+              ('infinityHold: 0.16', 'infinityHold: 0.14'),
+              ('returnDuration: 0.48', 'returnDuration: 0.54'),
+              ('wallOpenDuration: 1.02', 'wallOpenDuration: 1.06'),
+              ('settleDuration: 0.42', 'settleDuration: 0.46'),
+              ('labDelay: 0.12\n  };', 'labDelay: 0.12,\n    breathDuration: 2.8\n  };'),
+              ('operating: 0.64', 'operating: 0.61'),
+              ('rearLockPulse: 0.24', 'rearLockPulse: 0.26'),
+              ('wallLockPulse: 0.14\n  };', 'wallLockPulse: 0.11,\n    settleBreath: 0.012\n  };'),
+          ]:
+              swap(old, new, old)
+
+          swap(
+              "  const easeIn = t => Math.pow(clamp01(t), 3);\n",
+              "  const easeIn = t => Math.pow(clamp01(t), 3);\n  const easeTravel = t => Math.pow(clamp01(t), 2.72);\n  const easeReturn = t => 1 - Math.pow(1 - clamp01(t), 3.35);\n",
+              'travel easing')
+
+          source, count = re.subn(
+              r"  const pulse = \(t, centre, width\) => \{.*?\n  \};",
+              """  const sharpPulse = (t, centre, width) => {
+    const distance = Math.abs(t - centre) / Math.max(width, 0.001);
+    if (distance >= 1) return 0;
+    const envelope = 1 - distance;
+    return Math.pow(envelope, 2.35) * (0.94 + Math.cos(distance * Math.PI * 2.5) * 0.06);
+  };
+  const softPulse = (t, centre, width) => {
+    const distance = Math.abs(t - centre) / Math.max(width, 0.001);
+    if (distance >= 1) return 0;
+    const envelope = 1 - distance;
+    return envelope * envelope * (3 - 2 * envelope);
+  };""",
+              source,
+              count=1,
+              flags=re.S)
+          if count != 1:
+              raise SystemExit(f'pulse functions: expected one match, found {count}')
+
+          source, count = re.subn(
+              r"  function palette\(value, alpha\) \{.*?\n  \}\n\n  function bootEnergy\(t\) \{.*?\n  \}",
+              """  function palette(value, alpha) {
+    const stops = [[30,1,4],[88,3,9],[160,7,14],[238,20,18],[255,82,34]];
+    const scaled = clamp01(value) * (stops.length - 1);
+    const index = Math.min(stops.length - 2, Math.floor(scaled));
+    const local = scaled - index;
+    const a = stops[index];
+    const c = stops[index + 1];
+    return `rgba(${Math.round(mix(a[0],c[0],local))},${Math.round(mix(a[1],c[1],local))},${Math.round(mix(a[2],c[2],local))},${clamp01(alpha)})`;
+  }
+
+  function bootEnergy(t) {
+    if (t < timing.igniteStart) return 0;
+    if (t < timing.ignitePeak) {
+      const n = clamp01((t - timing.igniteStart) / (timing.ignitePeak - timing.igniteStart));
+      const rise = mix(0.05, energy.bootPeak, easeOut(n));
+      const irregularity = (Math.sin(n * Math.PI * 5.5) * 0.035 + Math.sin(n * Math.PI * 11.5) * 0.012) * (1 - n);
+      return clamp01(rise + irregularity);
+    }
+    if (t < timing.igniteSettle) {
+      const n = clamp01((t - timing.ignitePeak) / (timing.igniteSettle - timing.ignitePeak));
+      const release = mix(energy.bootPeak, energy.operating, easeInOut(n));
+      const ring = Math.sin(n * Math.PI * 3.2) * 0.025 * (1 - n);
+      return clamp01(release + ring);
+    }
+    return energy.operating;
+  }""",
+              source,
+              count=1,
+              flags=re.S)
+          if count != 1:
+              raise SystemExit(f'palette and boot energy: expected one match, found {count}')
+
+          swap(
+              """    return {
+      resolve,
+      brightness: clamp01(energyLevel * (0.22 + contrast * 0.78)),
+      opacity: clamp01(alpha * Math.pow(contrast, 1.28) * (0.22 + resolve * 0.78)),
+      width: clamp(0.2 + 1.25 * Math.pow(contrast, 0.72), 0.2, 1.45)
+    };""",
+              """    const depthBrightness = 1 + Math.sin(z * 4.93 + 0.7) * 0.012;
+    const depthOpacity = 1 + Math.sin(z * 3.17 + 1.2) * 0.008;
+    return {
+      resolve,
+      brightness: clamp01(energyLevel * (0.22 + contrast * 0.78) * depthBrightness),
+      opacity: clamp01(alpha * Math.pow(contrast, 1.28) * (0.22 + resolve * 0.78) * depthOpacity),
+      width: clamp(0.2 + 1.25 * Math.pow(contrast, 0.72), 0.2, 1.45)
+    };""",
+              'depth variation')
+
+          source, count = re.subn(
+              r"  function state\(now\) \{.*?\n  \}\n\n  function rearDepth",
+              """  function state(now) {
+    const t = (now - startedAt) / 1000;
+    const travel = easeTravel((t - timing.travelStart) / timing.travelDuration);
+    const returning = easeReturn((t - timing.returnStart) / timing.returnDuration);
+    const wallOpen = easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration);
+    const rearLock = sharpPulse(t, timing.returnStart + timing.returnDuration, 0.22);
+    const wallLock = softPulse(t, timing.wallOpenStart + timing.wallOpenDuration, 0.38);
+    const base = bootEnergy(t);
+    const breathAge = t - timing.done;
+    const breathActive = breathAge > 0 && breathAge < timing.breathDuration;
+    const breathPhase = breathActive ? breathAge / timing.breathDuration : 0;
+    const breathEnvelope = breathActive ? Math.pow(Math.sin(breathPhase * Math.PI), 2) : 0;
+    const breath = breathActive
+      ? Math.sin(breathPhase * Math.PI * 2) * breathEnvelope * energy.settleBreath
+      : 0;
+    return {
+      t,
+      travel,
+      returning,
+      wallOpen,
+      energy: clamp01(base + rearLock * energy.rearLockPulse + wallLock * energy.wallLockPulse + breath + injectedEnergyAt(now)),
+      lab: mode === MODES.LAB ? easeOut((t - timing.done - timing.labDelay) / 0.55) : 0,
+      done: t >= timing.done + timing.breathDuration && injectedDuration === 0
+    };
+  }
+
+  function rearDepth""",
+              source,
+              count=1,
+              flags=re.S)
+          if count != 1:
+              raise SystemExit(f'state: expected one match, found {count}')
+
+          swap('drawChamber(b, s, 0.035 + 0.08 * s.energy);', 'drawChamber(b, s, 0.03 + 0.072 * s.energy);', 'secondary glow')
+          path.write_text(source)
+
+          index = Path('index.html')
+          html = index.read_text()
+          swap_key = 'js/layered-chamber.js?v=continuous-depth-2'
+          if html.count(swap_key) != 1:
+              raise SystemExit(f'cache key: expected one match, found {html.count(swap_key)}')
+          index.write_text(html.replace(swap_key, 'js/layered-chamber.js?v=native-breath-1', 1))
+
+          for workflow in [
+              Path('.github/workflows/apply-native-chamber-breath.yml'),
+              Path('.github/workflows/apply-native-chamber-breath-pr.yml'),
+          ]:
+              workflow.unlink(missing_ok=True)
+          PY
+
+      - name: Check JavaScript syntax
+        run: node --check js/layered-chamber.js
+
+      - name: Commit refinement
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Give the native chamber subtler timing and colour life"
+          git push origin HEAD:refine-native-chamber-breath
