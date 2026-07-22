@@ -6,8 +6,8 @@
   chamber renderer and ordinary feed remain unchanged.
 
   Port 1: headline and corners
-  Port 2: priority, compact tags and metadata
-  Port 3: body, expanded information, frame and backing plate
+  Port 2: priority, compact tags, metadata and expanded detail labels
+  Port 3: body, expanded detail values, frame and backing plate
 ==================================================*/
 
 (() => {
@@ -20,8 +20,8 @@
     [5.30, 3.50], // frame -> body/info port
     [5.00, 2.50], // corners -> headline port
     [4.70, 3.00], // priority
-    [4.30, 3.50], // detail labels -> body/info port
-    [4.10, 3.50], // detail values -> body/info port
+    [4.30, 3.00], // expanded red detail labels -> metadata port
+    [4.10, 3.50], // expanded detail values -> body/info port
     [3.70, 3.50], // body
     [3.30, 3.00], // meta -> priority/tags port
     [2.90, 3.00], // compact tags
