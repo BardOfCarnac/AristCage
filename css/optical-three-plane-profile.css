@@ -6,17 +6,16 @@
   overridden here so each grouped slab assembles as one readable card.
 ==================================================*/
 
-/* Port 1 — headline */
+/* Port 1 — headline and corners */
 .optical-mode .optical-semantic-item[data-optical-role="headline"] {
   --optical-item-scale: 1.06 !important;
 }
 
-/* Port 2 — frame, corners, priority and both compact tag lines */
-.optical-mode .optical-semantic-item[data-optical-role="frame"],
 .optical-mode .optical-semantic-item[data-optical-role="corners"] {
-  --optical-item-scale: 1.03 !important;
+  --optical-item-scale: 1.04 !important;
 }
 
+/* Port 2 — priority and both compact tag lines */
 .optical-mode .optical-semantic-item[data-optical-role="priority"] {
   --optical-item-scale: 1.00 !important;
 }
@@ -26,11 +25,15 @@
   --optical-item-scale: 0.99 !important;
 }
 
-/* Port 3 — body, expanded information and backing surface */
+/* Port 3 — body, expanded information, frame and backing surface */
 .optical-mode .optical-semantic-item[data-optical-role="body"],
 .optical-mode .optical-semantic-item[data-optical-role="detail-labels"],
 .optical-mode .optical-semantic-item[data-optical-role="detail-values"] {
   --optical-item-scale: 0.96 !important;
+}
+
+.optical-mode .optical-semantic-item[data-optical-role="frame"] {
+  --optical-item-scale: 1.03 !important;
 }
 
 .optical-mode .optical-semantic-item[data-optical-role="plate"] {
