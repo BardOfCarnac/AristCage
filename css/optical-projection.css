@@ -128,9 +128,17 @@
   transform: none !important;
 }
 
+/* A nearly opaque centre keeps the card readable. Transparency is confined
+   to the outer edge, avoiding a large blurred inset shadow over every panel. */
 .optical-mode .optical-semantic-item[data-optical-role="plate"] .optical-plate-surface {
-  background: rgba(2, 2, 2, .17);
-  box-shadow: inset 0 0 38px rgba(0, 0, 0, .24);
+  background: radial-gradient(
+    140% 115% at 50% 50%,
+    rgba(0, 0, 0, .94) 0%,
+    rgba(0, 0, 0, .94) 68%,
+    rgba(0, 0, 0, .82) 84%,
+    rgba(0, 0, 0, .28) 100%
+  );
+  box-shadow: none;
 }
 
 .optical-mode .optical-semantic-item[data-optical-role="frame"] .frame {
