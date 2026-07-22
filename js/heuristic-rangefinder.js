@@ -8,6 +8,7 @@ window.HeuristicRangefinder = (() => {
   const FOLLOW_WEIGHTS = [1,.85,.70,.55,.40,.25,.10];
   const MAX_DEPTH_DRIFT = 120;
   const INSPECTION_ZOOM = 1.35;
+  const FRONT_CARRIER_ALPHA = .24;
   const settings = { focus: 4, zoom: 1.08, softness: .22, recolour: true, showBase: true };
 
   let canvas, ctx, hitSurface, status, image, baseCanvas, bands = [];
@@ -212,6 +213,8 @@ window.HeuristicRangefinder = (() => {
         const focused=Math.max(0,1-Math.abs(index-settings.focus)/3.2);
         drawPlane(bands[index],planeDepthForBand(index),index,.20+focused*.70);
       }
+      drawPlane(baseCanvas,frontDepth(),0,FRONT_CARRIER_ALPHA);
+      drawPlane(bands[0],frontDepth(),0,.72);
     }
     drawReticle();raf=requestAnimationFrame(draw);
   }
