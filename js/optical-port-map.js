@@ -5,9 +5,9 @@
   objects are grouped onto three exact chamber grid ports while the
   chamber renderer and ordinary feed remain unchanged.
 
-  Port 1: headline
-  Port 2: priority, frame, corners, compact tags and metadata
-  Port 3: body, expanded information and backing plate
+  Port 1: headline and corners
+  Port 2: priority, compact tags and metadata
+  Port 3: body, expanded information, frame and backing plate
 ==================================================*/
 
 (() => {
@@ -16,9 +16,9 @@
   if (!chamber || typeof baseSnapshot !== "function") return;
 
   const PORT_DEPTHS = new Map([
-    [5.50, 3.50], // plate -> body/info port
-    [5.30, 3.00], // frame -> priority/tags port
-    [5.00, 3.00], // corners -> priority/tags port
+    [5.50, 3.50], // plate -> body/info/frame port
+    [5.30, 3.50], // frame -> body/info port
+    [5.00, 2.50], // corners -> headline port
     [4.70, 3.00], // priority
     [4.30, 3.50], // detail labels -> body/info port
     [4.10, 3.50], // detail values -> body/info port
