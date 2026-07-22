@@ -1,23 +1,25 @@
 /*==================================================
   OPTICAL THREE-PLANE PROFILE
 
-  Optional sizing profile for the three grouped chamber ports.
-  Inline semantic scales from optical-projection.js are deliberately
-  overridden here so each grouped slab assembles as one readable card.
+  Moderate depth profile for the three grouped chamber ports. The
+  planes remain visibly distinct, but their scale differences are kept
+  small enough for the article to read as one assembled object.
 ==================================================*/
 
 /* Port 1 — headline and corners */
 .optical-mode .optical-semantic-item[data-optical-role="headline"] {
-  --optical-item-scale: 1.06 !important;
+  --optical-item-scale: 1.05 !important;
 }
 
 .optical-mode .optical-semantic-item[data-optical-role="corners"] {
-  --optical-item-scale: 1.04 !important;
+  --optical-item-scale: 1.02 !important;
 }
 
 /* Port 2 — priority and both compact tag lines */
 .optical-mode .optical-semantic-item[data-optical-role="priority"] {
-  --optical-item-scale: 1.00 !important;
+  --optical-item-scale: 1.02 !important;
+  transform: translateX(-7px) scale(var(--optical-item-scale, 1));
+  transform-origin: 100% 50%;
 }
 
 .optical-mode .optical-semantic-item[data-optical-role="tags"],
@@ -33,9 +35,9 @@
 }
 
 .optical-mode .optical-semantic-item[data-optical-role="frame"] {
-  --optical-item-scale: 1.03 !important;
+  --optical-item-scale: 0.98 !important;
 }
 
 .optical-mode .optical-semantic-item[data-optical-role="plate"] {
-  --optical-item-scale: 1.02 !important;
+  --optical-item-scale: 0.97 !important;
 }
