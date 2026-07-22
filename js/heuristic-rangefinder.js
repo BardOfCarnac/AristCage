@@ -2,11 +2,12 @@
 window.HeuristicRangefinder = (() => {
   const ROOT_CLASS = 'heuristic-rangefinder-active';
   const DEFAULT_SOURCE = 'https://media.craiyon.com/2025-09-28/U_sUqYxjTEuZhc0UIYffDg.webp';
-  const PALETTE = [[42,2,5],[104,5,12],[176,10,18],[243,24,24],[255,84,32],[255,174,72],[255,242,220]];
+  const PALETTE = [[54,3,7],[122,7,16],[194,13,24],[255,32,32],[255,98,42],[255,188,88],[255,247,230]];
   const CHAMBER = { near: 2.5, cell: 0.5, focal: 0.84, wallShiftCells: 2 };
   const BAND_COUNT = 7;
   const FOLLOW_WEIGHTS = [1,.85,.70,.55,.40,.25,.10];
   const MAX_DEPTH_DRIFT = 120;
+  const INSPECTION_ZOOM = 1.35;
   const settings = { focus: 4, zoom: 1.08, softness: .22, recolour: true, showBase: true };
 
   let canvas, ctx, hitSurface, status, image, baseCanvas, bands = [];
@@ -23,8 +24,9 @@ window.HeuristicRangefinder = (() => {
   const button = () => document.querySelector('#heuristic-rangefinder-toggle');
   const chamberRoot = () => document.querySelector('#layered-chamber-system');
   const snapCell = value => Math.max(CHAMBER.cell,Math.round(value/CHAMBER.cell)*CHAMBER.cell);
-  const frontDepth = () => CHAMBER.near;
-  const baseDepth = () => CHAMBER.near + CHAMBER.cell * (BAND_COUNT - 1);
+  const glassDepth = () => CHAMBER.near;
+  const frontDepth = () => glassDepth() + CHAMBER.cell;
+  const baseDepth = () => frontDepth() + CHAMBER.cell * (BAND_COUNT - 1);
 
   function ensureChamber(){
     if(!window.LayeredChamber)return false;
@@ -148,8 +150,7 @@ window.HeuristicRangefinder = (() => {
     return {left:W*.5-width*.5,top:H*.5-height*.5,width,height,right:W*.5+width*.5,bottom:H*.5+height*.5};
   }
   function planeDepthForBand(index){
-    const t=index/Math.max(1,BAND_COUNT-1);
-    return baseDepth()-(baseDepth()-frontDepth())*t;
+    return frontDepth()+CHAMBER.cell*index;
   }
   function coverSize(aperture,magnification){
     const aspect=image.naturalWidth/image.naturalHeight;
@@ -168,7 +169,6 @@ window.HeuristicRangefinder = (() => {
   function depthRect(z,index,useTargets=false){
     const aperture=apertureAt(z),mag=useTargets?targetZoom:zoom,point=useTargets?targetInspection:inspection;
     const size=coverSize(aperture,mag),front=frontRect(useTargets),weight=FOLLOW_WEIGHTS[index]??FOLLOW_WEIGHTS.at(-1);
-    const frontCentreX=front.x+front.width*.5,frontCentreY=front.y+front.height*.5;
     const desiredX=(front.x+point.u*front.width)-point.u*size.width;
     const desiredY=(front.y+point.v*front.height)-point.v*size.height;
     const neutralX=W*.5-size.width*.5,neutralY=H*.5-size.height*.5;
@@ -176,7 +176,7 @@ window.HeuristicRangefinder = (() => {
     const rawY=neutralY+(desiredY-neutralY)*weight;
     const driftX=clamp(rawX-neutralX,-MAX_DEPTH_DRIFT,MAX_DEPTH_DRIFT);
     const driftY=clamp(rawY-neutralY,-MAX_DEPTH_DRIFT,MAX_DEPTH_DRIFT);
-    return {x:neutralX+driftX,y:neutralY+driftY,width:size.width,height:size.height,aperture,frontCentreX,frontCentreY};
+    return {x:neutralX+driftX,y:neutralY+driftY,width:size.width,height:size.height,aperture};
   }
   function constrainTargetView(){
     if(!ready||!image||!W||!H)return;
@@ -193,8 +193,8 @@ window.HeuristicRangefinder = (() => {
     ctx.drawImage(source,r.x,r.y,r.width,r.height);ctx.restore();
   }
   function drawReticle(){
-    const a=apertureAt(frontDepth()),x=W/2,y=H/2;if(x<a.left||x>a.right||y<a.top||y>a.bottom)return;
-    ctx.save();ctx.strokeStyle='rgba(255,92,78,.88)';ctx.fillStyle='rgba(255,92,78,.9)';
+    const a=apertureAt(glassDepth()),x=W/2,y=H/2;if(x<a.left||x>a.right||y<a.top||y>a.bottom)return;
+    ctx.save();ctx.strokeStyle='rgba(255,112,92,.9)';ctx.fillStyle='rgba(255,112,92,.94)';
     ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.stroke();
     ctx.beginPath();ctx.moveTo(x-18,y);ctx.lineTo(x-5,y);ctx.moveTo(x+5,y);ctx.lineTo(x+18,y);ctx.moveTo(x,y-18);ctx.lineTo(x,y-5);ctx.moveTo(x,y+5);ctx.lineTo(x,y+18);ctx.stroke();
     ctx.beginPath();ctx.arc(x,y,1.5,0,Math.PI*2);ctx.fill();ctx.restore();
@@ -207,10 +207,10 @@ window.HeuristicRangefinder = (() => {
     zoom+=(targetZoom-zoom)*.12;
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
     if(ready){
-      if(settings.showBase)drawPlane(baseCanvas,baseDepth(),0,.08);
-      for(let index=0;index<bands.length;index++){
+      if(settings.showBase)drawPlane(baseCanvas,baseDepth(),BAND_COUNT-1,.10);
+      for(let index=bands.length-1;index>=0;index--){
         const focused=Math.max(0,1-Math.abs(index-settings.focus)/3.2);
-        drawPlane(bands[index],planeDepthForBand(index),index,.16+focused*.68);
+        drawPlane(bands[index],planeDepthForBand(index),index,.20+focused*.70);
       }
     }
     drawReticle();raf=requestAnimationFrame(draw);
@@ -237,7 +237,16 @@ window.HeuristicRangefinder = (() => {
     if(!active||!pointers.has(event.pointerId))return;event.preventDefault();const wasSingle=pointers.size===1;pointers.delete(event.pointerId);hitSurface.releasePointerCapture?.(event.pointerId);
     if(!pointers.size)hitSurface.classList.remove('is-dragging');
     if(pointers.size===1){const remaining=[...pointers.values()][0];lastX=remaining.x;lastY=remaining.y;}
-    if(wasSingle&&dragDistance<10){const point=pointToImage(event.clientX,event.clientY);if(point){targetInspection=point;setStatus(`CONVERGING ${Math.round(point.u*100)} / ${Math.round(point.v*100)}`);}}
+    if(wasSingle&&dragDistance<10){
+      const point=pointToImage(event.clientX,event.clientY);
+      if(point){
+        targetInspection=point;
+        targetLook={x:0,y:0};
+        targetZoom=Math.max(targetZoom,INSPECTION_ZOOM);
+        constrainTargetView();
+        setStatus(`INSPECTING ${Math.round(point.u*100)} / ${Math.round(point.v*100)} · ${targetZoom.toFixed(2)}×`);
+      }
+    }
   }
   function wheel(event){
     if(!active)return;event.preventDefault();event.stopPropagation();targetZoom=clamp(targetZoom*Math.exp(-event.deltaY*.0015),1,3.5);constrainTargetView();setStatus(`MAGNIFICATION ${targetZoom.toFixed(2)}×`);
