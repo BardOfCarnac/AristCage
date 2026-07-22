@@ -10,10 +10,30 @@ html.heuristic-rangefinder-active #heuristic-rangefinder-plane {
   display: block;
 }
 
+.heuristic-rangefinder-hit-surface {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: none;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+html.heuristic-rangefinder-active .heuristic-rangefinder-hit-surface {
+  display: block;
+}
+
+.heuristic-rangefinder-hit-surface.is-dragging {
+  cursor: grabbing;
+}
+
 html.heuristic-rangefinder-active,
 html.heuristic-rangefinder-active body {
   overscroll-behavior: none;
-  touch-action: none;
 }
 
 .heuristic-rangefinder-status {
@@ -42,8 +62,9 @@ html.heuristic-rangefinder-active .rail-occlusion {
   pointer-events: none;
 }
 
-html.heuristic-rangefinder-active .layered-chamber-system {
-  cursor: grab;
+html.heuristic-rangefinder-active .rail {
+  position: relative;
+  z-index: 50;
 }
 
 html.heuristic-rangefinder-active .heuristic-rangefinder-toggle[aria-pressed="true"] {
