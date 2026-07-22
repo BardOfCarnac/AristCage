@@ -15,21 +15,31 @@
   --optical-item-scale: 1.02 !important;
 }
 
-/* Port 2 — priority and both compact tag lines */
+/* Port 2 — priority, compact metadata and expanded red labels */
+.optical-mode .optical-plane[data-optical-role="priority"] {
+  z-index: 9 !important;
+}
+
 .optical-mode .optical-semantic-item[data-optical-role="priority"] {
-  --optical-item-scale: 1.02 !important;
-  transform: translateX(-7px) scale(var(--optical-item-scale, 1));
+  --optical-item-scale: 1.03 !important;
+  width: 8px !important;
+  transform: translateX(-15px) scale(var(--optical-item-scale, 1));
   transform-origin: 100% 50%;
 }
 
+.optical-mode .optical-semantic-item[data-optical-role="priority"] .priority {
+  width: 100% !important;
+  min-width: 8px;
+}
+
 .optical-mode .optical-semantic-item[data-optical-role="tags"],
-.optical-mode .optical-semantic-item[data-optical-role="meta"] {
+.optical-mode .optical-semantic-item[data-optical-role="meta"],
+.optical-mode .optical-semantic-item[data-optical-role="detail-labels"] {
   --optical-item-scale: 0.99 !important;
 }
 
-/* Port 3 — body, expanded information, frame and backing surface */
+/* Port 3 — body, expanded values, frame and backing surface */
 .optical-mode .optical-semantic-item[data-optical-role="body"],
-.optical-mode .optical-semantic-item[data-optical-role="detail-labels"],
 .optical-mode .optical-semantic-item[data-optical-role="detail-values"] {
   --optical-item-scale: 0.96 !important;
 }
