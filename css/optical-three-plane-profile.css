@@ -30,7 +30,7 @@
 .optical-mode .optical-semantic-item[data-optical-role="priority"] {
   --optical-item-scale: 1.00 !important;
   width: 8px !important;
-  transform: translateX(-12px) scale(var(--optical-item-scale, 1));
+  transform: translateX(-26px) scale(var(--optical-item-scale, 1));
   transform-origin: 100% 50%;
 }
 
