@@ -23,8 +23,8 @@ window.HeuristicRangefinder = (() => {
   const button = () => document.querySelector('#heuristic-rangefinder-toggle');
   const chamberRoot = () => document.querySelector('#layered-chamber-system');
   const snapCell = value => Math.max(CHAMBER.cell,Math.round(value/CHAMBER.cell)*CHAMBER.cell);
-  const frontDepth = () => CHAMBER.near + CHAMBER.cell;
-  const baseDepth = () => CHAMBER.near + CHAMBER.cell * 8;
+  const frontDepth = () => CHAMBER.near;
+  const baseDepth = () => CHAMBER.near + CHAMBER.cell * (BAND_COUNT - 1);
 
   function ensureChamber(){
     if(!window.LayeredChamber)return false;
