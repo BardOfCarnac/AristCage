@@ -1,0 +1,45 @@
+name: Refine chamber acquisition guard
+
+on:
+  push:
+    branches:
+      - beautify-chamber-acquisition
+
+permissions:
+  contents: write
+
+jobs:
+  refine:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: beautify-chamber-acquisition
+
+      - name: Limit acquisition observer to chamber mode changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('js/chamber-acquisition.js')
+          source = path.read_text()
+          old = "attributeFilter: ['class', 'data-chamber-mode']"
+          new = "attributeFilter: ['data-chamber-mode']"
+          if source.count(old) != 1:
+              raise SystemExit(f'expected one observer filter, found {source.count(old)}')
+          path.write_text(source.replace(old, new, 1))
+          PY
+          node --check js/chamber-acquisition.js
+
+      - name: Remove one-shot files
+        run: |
+          rm .github/workflows/refine-chamber-acquisition.yml
+          rm -f .chamber-acquisition-refine-trigger
+
+      - name: Commit refinement
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Limit chamber acquisition restarts"
+          git push origin HEAD:beautify-chamber-acquisition
