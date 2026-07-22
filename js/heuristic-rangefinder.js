@@ -37,23 +37,19 @@ window.HeuristicRangefinder = (() => {
     if(!ensureChamber())return false;
     const root=chamberRoot();
     if(!root)return false;
-
     canvas=document.createElement('canvas');
     canvas.id='heuristic-rangefinder-plane';
     canvas.className='layered-chamber-canvas heuristic-rangefinder-plane';
     root.insertBefore(canvas,root.querySelector('#layered-chamber-fg')||null);
     ctx=canvas.getContext('2d');
-
     hitSurface=document.createElement('div');
     hitSurface.className='heuristic-rangefinder-hit-surface';
     hitSurface.setAttribute('aria-label','Rangefinder interaction surface');
     document.body.append(hitSurface);
-
     status=document.createElement('div');
     status.className='heuristic-rangefinder-status';
     status.textContent='RANGEFINDER STANDBY';
     document.body.append(status);
-
     addEventListener('resize',resize,{passive:true});
     hitSurface.addEventListener('pointerdown',pointerDown,{passive:false});
     hitSurface.addEventListener('pointermove',pointerMove,{passive:false});
@@ -66,40 +62,37 @@ window.HeuristicRangefinder = (() => {
 
   function resize(){
     if(!canvas)return;
-    dpr=Math.min(devicePixelRatio||1,2); W=innerWidth; H=innerHeight;
-    canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
-    canvas.style.width=`${W}px`; canvas.style.height=`${H}px`;
+    dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;
+    canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);
+    canvas.style.width=`${W}px`;canvas.style.height=`${H}px`;
     ctx.setTransform(dpr,0,0,dpr,0,0);
     constrainTargetView();
   }
 
   function setStatus(message,fade=true){
     if(!status)return;
-    status.textContent=message; status.style.opacity='1';
+    status.textContent=message;status.style.opacity='1';
     if(fade)setTimeout(()=>{if(status)status.style.opacity='.35';},1100);
   }
 
   function buildBands(){
     bands=[];
     baseCanvas=document.createElement('canvas');
-    baseCanvas.width=image.naturalWidth; baseCanvas.height=image.naturalHeight;
-    const bx=baseCanvas.getContext('2d'); bx.drawImage(image,0,0);
+    baseCanvas.width=image.naturalWidth;baseCanvas.height=image.naturalHeight;
+    const bx=baseCanvas.getContext('2d');bx.drawImage(image,0,0);
     let source;
     try{source=bx.getImageData(0,0,baseCanvas.width,baseCanvas.height);}
     catch(error){setStatus('IMAGE HOST BLOCKED CANVAS ACCESS',false);throw error;}
-
     const w=baseCanvas.width,h=baseCanvas.height,count=w*h;
     const gray=new Float32Array(count),edge=new Float32Array(count),contrast=new Float32Array(count),depth=new Float32Array(count);
     for(let p=0;p<count;p++){const i=p*4;gray[p]=luminance(source.data[i],source.data[i+1],source.data[i+2]);}
-
     let edgeMax=.0001;
     for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
       const p=y*w+x;
       const gx=-gray[p-w-1]+gray[p-w+1]-2*gray[p-1]+2*gray[p+1]-gray[p+w-1]+gray[p+w+1];
       const gy=-gray[p-w-1]-2*gray[p-w]-gray[p-w+1]+gray[p+w-1]+2*gray[p+w]+gray[p+w+1];
-      edge[p]=Math.hypot(gx,gy); edgeMax=Math.max(edgeMax,edge[p]);
+      edge[p]=Math.hypot(gx,gy);edgeMax=Math.max(edgeMax,edge[p]);
     }
-
     let contrastMax=.0001;
     for(let y=0;y<h;y++)for(let x=0;x<w;x++){
       let sum=0,sum2=0,n=0;
@@ -109,7 +102,6 @@ window.HeuristicRangefinder = (() => {
       const mean=sum/n,c=Math.sqrt(Math.max(0,sum2/n-mean*mean));
       contrast[y*w+x]=c;contrastMax=Math.max(contrastMax,c);
     }
-
     const horizon=.43;
     for(let y=0;y<h;y++){
       const yn=y/Math.max(1,h-1),below=clamp01((yn-horizon)/(1-horizon)),above=clamp01((horizon-yn)/horizon);
@@ -119,7 +111,6 @@ window.HeuristicRangefinder = (() => {
         depth[p]=clamp01(below*.58+e*.20+c*.14+dark*.08-above*centre*.22+(1-centre)*above*(e*.55+c*.45)*.28);
       }
     }
-
     for(let bi=0;bi<BAND_COUNT;bi++){
       const layer=document.createElement('canvas');layer.width=w;layer.height=h;
       const lx=layer.getContext('2d'),out=lx.createImageData(w,h),centre=(bi+.5)/BAND_COUNT,half=.5/BAND_COUNT;
@@ -162,9 +153,9 @@ window.HeuristicRangefinder = (() => {
   }
   function coverSize(aperture,magnification){
     const aspect=image.naturalWidth/image.naturalHeight;
-    let width=aperture.width*magnification,height=width/aspect;
-    if(height<aperture.height*magnification){height=aperture.height*magnification;width=height*aspect;}
-    return {width,height};
+    const shortSide=Math.min(aperture.width,aperture.height)*magnification;
+    if(aspect>=1)return {width:shortSide*aspect,height:shortSide};
+    return {width:shortSide,height:shortSide/aspect};
   }
   function boundedFrontRect(aperture,width,height,x,y){
     return {x:clamp(x,aperture.right-width,aperture.left),y:clamp(y,aperture.bottom-height,aperture.top),width,height,aperture};
