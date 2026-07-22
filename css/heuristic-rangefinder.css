@@ -1,57 +1,57 @@
-/* Optional full-screen heuristic image rangefinder. */
-.heuristic-rangefinder-system {
-  position: fixed;
-  inset: 0;
-  z-index: 18;
+/* Heuristic rangefinder: image planes rendered within LayeredChamber. */
+#heuristic-rangefinder-plane {
+  z-index: .5;
   display: none;
-  overflow: hidden;
-  background: #020202;
+  pointer-events: none;
+  filter: blur(.2px);
+}
+
+html.heuristic-rangefinder-active #heuristic-rangefinder-plane {
+  display: block;
+}
+
+html.heuristic-rangefinder-active,
+html.heuristic-rangefinder-active body {
+  overscroll-behavior: none;
   touch-action: none;
 }
 
-html.heuristic-rangefinder-active .heuristic-rangefinder-system {
-  display: block;
-}
-
-.heuristic-rangefinder-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-  cursor: grab;
-}
-
-.heuristic-rangefinder-canvas.is-dragging {
-  cursor: grabbing;
-}
-
 .heuristic-rangefinder-status {
-  position: absolute;
+  position: fixed;
+  z-index: 46;
   left: 50%;
   bottom: 30px;
   translate: -50% 0;
   padding: 6px 10px;
-  border: 1px solid rgba(255, 46, 32, .3);
-  background: rgba(0, 0, 0, .72);
-  color: rgba(255, 177, 166, .85);
-  font: 10px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  border: 1px solid rgba(255,46,32,.3);
+  background: rgba(0,0,0,.72);
+  color: rgba(255,177,166,.85);
+  font: 10px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   letter-spacing: .1em;
   pointer-events: none;
   transition: opacity .3s ease;
 }
 
+html:not(.heuristic-rangefinder-active) .heuristic-rangefinder-status {
+  display: none;
+}
+
 html.heuristic-rangefinder-active .app,
 html.heuristic-rangefinder-active .rail-occlusion {
   visibility: hidden;
+  pointer-events: none;
 }
 
-.heuristic-rangefinder-toggle[aria-pressed="true"] {
-  color: var(--white, #fff);
-  border-color: var(--red, #ff3828);
-  box-shadow: 0 0 10px rgba(255, 56, 40, .32);
+html.heuristic-rangefinder-active .layered-chamber-system {
+  cursor: grab;
+}
+
+html.heuristic-rangefinder-active .heuristic-rangefinder-toggle[aria-pressed="true"] {
+  color: var(--white,#fff);
+  border-color: var(--red,#ff3828);
+  box-shadow: 0 0 10px rgba(255,56,40,.32);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .heuristic-rangefinder-status {
-    transition: none;
-  }
+  .heuristic-rangefinder-status { transition: none; }
 }
