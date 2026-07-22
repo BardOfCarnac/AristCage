@@ -1,0 +1,54 @@
+name: Apply chamber depth repair
+
+on:
+  push:
+    branches:
+      - fix-continuous-chamber-depth
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-continuous-chamber-depth
+
+      - name: Apply continuous chamber repair
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          chamber = Path('js/layered-chamber.js')
+          source = chamber.read_text()
+          old_depth = 'finalDepthCells: 12,'
+          new_depth = 'finalDepthCells: 16,'
+          if source.count(old_depth) != 1:
+              raise SystemExit(f'Expected exactly one {old_depth!r} entry')
+          chamber.write_text(source.replace(old_depth, new_depth, 1))
+
+          index = Path('index.html')
+          html = index.read_text()
+          extension_tag = '  <script src="js/chamber-grid-extension.js?v=deeper-grid-1"></script>\n'
+          if html.count(extension_tag) != 1:
+              raise SystemExit('Expected exactly one chamber grid extension script tag')
+          index.write_text(html.replace(extension_tag, '', 1))
+
+          extension = Path('js/chamber-grid-extension.js')
+          if not extension.exists():
+              raise SystemExit('Chamber grid extension file is missing')
+          extension.unlink()
+
+          Path('.github/workflows/apply-chamber-depth-fix.yml').unlink()
+          PY
+
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Use one continuous sixteen-cell chamber"
+          git push origin HEAD:fix-continuous-chamber-depth
