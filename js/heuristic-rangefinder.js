@@ -1,4 +1,4 @@
-/* Optional heuristic image rangefinder rendered inside the LayeredChamber stack. */
+/* Heuristic image rangefinder rendered inside the LayeredChamber stack. */
 window.HeuristicRangefinder = (() => {
   const ROOT_CLASS = 'heuristic-rangefinder-active';
   const DEFAULT_SOURCE = 'https://media.craiyon.com/2025-09-28/U_sUqYxjTEuZhc0UIYffDg.webp';
@@ -8,11 +8,12 @@ window.HeuristicRangefinder = (() => {
 
   let canvas, ctx, hitSurface, status, image, baseCanvas, bands = [];
   let active = false, ready = false, raf = 0, dpr = 1, W = 0, H = 0;
-  let pointerId = null, dragging = false, dragDistance = 0, lastX = 0, lastY = 0;
   let targetLook = {x:0,y:0}, look = {x:0,y:0};
   let targetInspection = {u:.5,v:.5}, inspection = {u:.5,v:.5};
   let targetZoom = settings.zoom, zoom = settings.zoom, pulse = 0;
-  let previousChamberMode = null;
+  const pointers = new Map();
+  let dragDistance = 0, lastX = 0, lastY = 0;
+  let pinchDistance = 0, pinchZoom = settings.zoom;
 
   const clamp = (v,min,max) => Math.max(min,Math.min(max,v));
   const clamp01 = v => clamp(v,0,1);
@@ -25,10 +26,7 @@ window.HeuristicRangefinder = (() => {
 
   function ensureChamber() {
     if (!window.LayeredChamber) return false;
-    if (!LayeredChamber.isEnabled()) {
-      previousChamberMode = LayeredChamber.MODES.OFF;
-      LayeredChamber.setMode(LayeredChamber.MODES.BACKGROUND);
-    } else if (previousChamberMode === null) previousChamberMode = LayeredChamber.getMode();
+    if (!LayeredChamber.isEnabled()) LayeredChamber.setMode(LayeredChamber.MODES.BACKGROUND);
     return true;
   }
 
@@ -42,8 +40,7 @@ window.HeuristicRangefinder = (() => {
     canvas.id = 'heuristic-rangefinder-plane';
     canvas.className = 'layered-chamber-canvas heuristic-rangefinder-plane';
     canvas.setAttribute('aria-label', 'Heuristic image depth planes');
-    const foreground = root.querySelector('#layered-chamber-fg');
-    root.insertBefore(canvas, foreground || null);
+    root.insertBefore(canvas, root.querySelector('#layered-chamber-fg') || null);
     ctx = canvas.getContext('2d');
 
     hitSurface = document.createElement('div');
@@ -78,7 +75,8 @@ window.HeuristicRangefinder = (() => {
 
   function setStatus(message, fade=true) {
     if (!status) return;
-    status.textContent = message; status.style.opacity = '1';
+    status.textContent = message;
+    status.style.opacity = '1';
     if (fade) setTimeout(() => { if (status) status.style.opacity = '.35'; }, 1100);
   }
 
@@ -86,7 +84,8 @@ window.HeuristicRangefinder = (() => {
     bands = [];
     baseCanvas = document.createElement('canvas');
     baseCanvas.width = image.naturalWidth; baseCanvas.height = image.naturalHeight;
-    const bx = baseCanvas.getContext('2d'); bx.drawImage(image,0,0);
+    const bx = baseCanvas.getContext('2d');
+    bx.drawImage(image,0,0);
     let source;
     try { source = bx.getImageData(0,0,baseCanvas.width,baseCanvas.height); }
     catch (error) { setStatus('IMAGE HOST BLOCKED CANVAS ACCESS', false); throw error; }
@@ -151,69 +150,57 @@ window.HeuristicRangefinder = (() => {
   }
 
   function focalLength(){ return Math.min(W,H)*CHAMBER.focal; }
-
   function chamberGeometry(){
     const focal=focalLength();
-    const halfWidth=snapCell((W*.5)*CHAMBER.near/focal)+CHAMBER.wallShiftCells*CHAMBER.cell;
-    const halfHeight=snapCell((H*.5)*CHAMBER.near/focal);
-    return {focal,halfWidth,halfHeight};
+    return {
+      focal,
+      halfWidth:snapCell((W*.5)*CHAMBER.near/focal)+CHAMBER.wallShiftCells*CHAMBER.cell,
+      halfHeight:snapCell((H*.5)*CHAMBER.near/focal)
+    };
   }
-
   function apertureAt(z){
     const {focal,halfWidth,halfHeight}=chamberGeometry();
-    const width=halfWidth*2*focal/z;
-    const height=halfHeight*2*focal/z;
+    const width=halfWidth*2*focal/z, height=halfHeight*2*focal/z;
     return {left:W*.5-width*.5,top:H*.5-height*.5,width,height,right:W*.5+width*.5,bottom:H*.5+height*.5};
   }
-
-  function planeDepthForBand(index){
-    return CHAMBER.near + CHAMBER.cell * (7-index);
-  }
-
-  function coverSize(aperture, magnification){
+  function planeDepthForBand(index){ return CHAMBER.near + CHAMBER.cell * (7-index); }
+  function coverSize(aperture,magnification){
     const aspect=image.naturalWidth/image.naturalHeight;
     let width=aperture.width*magnification, height=width/aspect;
     if(height<aperture.height*magnification){ height=aperture.height*magnification; width=height*aspect; }
     return {width,height};
   }
-
   function boundedRect(aperture,width,height,x,y){
-    const minX=aperture.right-width, maxX=aperture.left;
-    const minY=aperture.bottom-height, maxY=aperture.top;
-    return {x:clamp(x,minX,maxX),y:clamp(y,minY,maxY),width,height,aperture};
+    return {
+      x:clamp(x,aperture.right-width,aperture.left),
+      y:clamp(y,aperture.bottom-height,aperture.top),
+      width,height,aperture
+    };
   }
-
   function frontRect(useTargets=false){
     const aperture=apertureAt(frontDepth());
     const mag=useTargets?targetZoom:zoom;
     const point=useTargets?targetInspection:inspection;
     const pan=useTargets?targetLook:look;
     const size=coverSize(aperture,mag);
-    const x=W*.5-point.u*size.width+pan.x;
-    const y=H*.5-point.v*size.height+pan.y;
-    return boundedRect(aperture,size.width,size.height,x,y);
+    return boundedRect(aperture,size.width,size.height,W*.5-point.u*size.width+pan.x,H*.5-point.v*size.height+pan.y);
   }
-
-  function visibleImageCentre(useTargets=false){
+  function registration(useTargets=false){
     const r=frontRect(useTargets);
-    return {
-      u:clamp01((W*.5-r.x)/r.width),
-      v:clamp01((H*.5-r.y)/r.height)
-    };
+    const point=useTargets?targetInspection:inspection;
+    return {x:r.x+point.u*r.width,y:r.y+point.v*r.height,u:point.u,v:point.v};
   }
-
-  function chamberPlane(z, useTargets=false) {
+  function chamberPlane(z,useTargets=false){
     const aperture=apertureAt(z);
     const mag=useTargets?targetZoom:zoom;
-    const centre=visibleImageCentre(useTargets);
+    const anchor=registration(useTargets);
     const size=coverSize(aperture,mag);
-    return boundedRect(aperture,size.width,size.height,W*.5-centre.u*size.width,H*.5-centre.v*size.height);
+    return boundedRect(aperture,size.width,size.height,anchor.x-anchor.u*size.width,anchor.y-anchor.v*size.height);
   }
-
   function constrainTargetView(){
     if(!ready||!image||!W||!H)return;
     const aperture=apertureAt(frontDepth());
-    targetZoom=Math.max(1,Math.min(3.5,targetZoom));
+    targetZoom=clamp(targetZoom,1,3.5);
     const size=coverSize(aperture,targetZoom);
     const desiredX=W*.5-targetInspection.u*size.width+targetLook.x;
     const desiredY=H*.5-targetInspection.v*size.height+targetLook.y;
@@ -222,41 +209,34 @@ window.HeuristicRangefinder = (() => {
     targetLook.y=bounded.y-(H*.5-targetInspection.v*size.height);
   }
 
-  function drawPlane(source,z,alpha,glow=0){
+  function drawPlane(source,z,alpha){
     const r=chamberPlane(z);
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(r.aperture.left,r.aperture.top,r.aperture.width,r.aperture.height);
-    ctx.clip();
+    ctx.beginPath(); ctx.rect(r.aperture.left,r.aperture.top,r.aperture.width,r.aperture.height); ctx.clip();
     ctx.globalAlpha=alpha;
-    if(glow){ ctx.shadowColor='rgba(255,55,35,.82)'; ctx.shadowBlur=glow; }
     ctx.drawImage(source,r.x,r.y,r.width,r.height);
     ctx.restore();
   }
-
   function drawReticle(){
-    const frontAperture=apertureAt(frontDepth());
-    const x=W/2,y=H/2;
-    if(x<frontAperture.left||x>frontAperture.right||y<frontAperture.top||y>frontAperture.bottom)return;
+    const a=apertureAt(frontDepth()), x=W/2, y=H/2;
+    if(x<a.left||x>a.right||y<a.top||y>a.bottom)return;
     ctx.save(); ctx.strokeStyle='rgba(255,92,78,.88)'; ctx.fillStyle='rgba(255,92,78,.9)';
     ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.stroke();
     ctx.beginPath();ctx.moveTo(x-18,y);ctx.lineTo(x-5,y);ctx.moveTo(x+5,y);ctx.lineTo(x+18,y);ctx.moveTo(x,y-18);ctx.lineTo(x,y-5);ctx.moveTo(x,y+5);ctx.lineTo(x,y+18);ctx.stroke();
     ctx.beginPath();ctx.arc(x,y,1.5,0,Math.PI*2);ctx.fill();ctx.restore();
   }
-
   function draw(){
     if(!active||!canvas){raf=0;return;}
     constrainTargetView();
-    look.x+=(targetLook.x-look.x)*.13; look.y+=(targetLook.y-look.y)*.13;
-    inspection.u+=(targetInspection.u-inspection.u)*.18; inspection.v+=(targetInspection.v-inspection.v)*.18;
-    zoom+=(targetZoom-zoom)*.12; pulse*=.94;
+    look.x+=(targetLook.x-look.x)*.16; look.y+=(targetLook.y-look.y)*.16;
+    inspection.u+=(targetInspection.u-inspection.u)*.2; inspection.v+=(targetInspection.v-inspection.v)*.2;
+    zoom+=(targetZoom-zoom)*.16; pulse*=.9;
     ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
     if(ready){
-      if(settings.showBase) drawPlane(baseCanvas,baseDepth(),.10,.5+pulse*3);
+      if(settings.showBase) drawPlane(baseCanvas,baseDepth(),.10);
       for(let index=0;index<bands.length;index++){
-        const z=planeDepthForBand(index);
-        const distance=Math.abs(index-settings.focus), focused=Math.max(0,1-distance/3.2);
-        drawPlane(bands[index],z,.18+focused*.78,1+focused*10+pulse*(6+focused*22));
+        const focused=Math.max(0,1-Math.abs(index-settings.focus)/3.2);
+        drawPlane(bands[index],planeDepthForBand(index),.18+focused*.78);
       }
     }
     drawReticle(); raf=requestAnimationFrame(draw);
@@ -266,70 +246,94 @@ window.HeuristicRangefinder = (() => {
     if(!ready)return null;
     const r=frontRect();
     if(x<r.aperture.left||x>r.aperture.right||y<r.aperture.top||y>r.aperture.bottom)return null;
-    const u=(x-r.x)/r.width,v=(y-r.y)/r.height;
+    const u=(x-r.x)/r.width, v=(y-r.y)/r.height;
     return u>=0&&u<=1&&v>=0&&v<=1?{u,v}:null;
   }
-
+  function pointerDistance(){
+    const points=[...pointers.values()];
+    return points.length<2?0:Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y);
+  }
   function pointerDown(event){
     if(!active||event.button>0)return;
     event.preventDefault();
-    dragging=true; pointerId=event.pointerId; lastX=event.clientX; lastY=event.clientY; dragDistance=0;
-    hitSurface.setPointerCapture?.(pointerId);
+    pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
+    hitSurface.setPointerCapture?.(event.pointerId);
+    dragDistance=0;
+    if(pointers.size===1){ lastX=event.clientX; lastY=event.clientY; }
+    if(pointers.size===2){ pinchDistance=pointerDistance(); pinchZoom=targetZoom; }
     hitSurface.classList.add('is-dragging');
   }
-
   function pointerMove(event){
-    if(!active||!dragging||event.pointerId!==pointerId)return;
+    if(!active||!pointers.has(event.pointerId))return;
     event.preventDefault();
-    const dx=event.clientX-lastX,dy=event.clientY-lastY;
-    dragDistance+=Math.hypot(dx,dy);
+    const previous=pointers.get(event.pointerId);
+    pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
+    if(pointers.size>=2){
+      const distance=pointerDistance();
+      if(pinchDistance>0) targetZoom=clamp(pinchZoom*(distance/pinchDistance),1,3.5);
+      constrainTargetView();
+      setStatus(`MAGNIFICATION ${targetZoom.toFixed(2)}×`);
+      return;
+    }
+    const dx=event.clientX-lastX, dy=event.clientY-lastY;
+    dragDistance+=Math.hypot(event.clientX-previous.x,event.clientY-previous.y);
     targetLook.x+=dx; targetLook.y+=dy;
     constrainTargetView();
     lastX=event.clientX; lastY=event.clientY;
   }
-
   function pointerUp(event){
-    if(!active||!dragging||event.pointerId!==pointerId)return;
+    if(!active||!pointers.has(event.pointerId))return;
     event.preventDefault();
-    hitSurface.releasePointerCapture?.(pointerId);
-    dragging=false; pointerId=null; hitSurface.classList.remove('is-dragging');
-    if(dragDistance<10){
+    const wasSingle=pointers.size===1;
+    pointers.delete(event.pointerId);
+    hitSurface.releasePointerCapture?.(event.pointerId);
+    if(!pointers.size) hitSurface.classList.remove('is-dragging');
+    if(pointers.size===1){
+      const remaining=[...pointers.values()][0];
+      lastX=remaining.x; lastY=remaining.y;
+    }
+    if(wasSingle&&dragDistance<10){
       const point=pointToImage(event.clientX,event.clientY);
       if(point){
         targetInspection=point;
         targetLook={x:0,y:0};
         constrainTargetView();
         pulse=1;
-        setStatus(`INSPECTION POINT ${Math.round(point.u*100)} / ${Math.round(point.v*100)}`);
+        setStatus(`ALIGNED ${Math.round(point.u*100)} / ${Math.round(point.v*100)}`);
       }
     }
   }
-
   function wheel(event){
     if(!active)return;
-    event.preventDefault();
-    targetZoom=Math.max(1,Math.min(3.5,targetZoom*Math.exp(-event.deltaY*.0012)));
+    event.preventDefault(); event.stopPropagation();
+    targetZoom=clamp(targetZoom*Math.exp(-event.deltaY*.0015),1,3.5);
     constrainTargetView();
     setStatus(`MAGNIFICATION ${targetZoom.toFixed(2)}×`);
   }
 
-  function setButtonState(){ const control=button(); if(control){control.setAttribute('aria-pressed',String(active));control.textContent=active?'Range On':'Range Off';} }
+  function setButtonState(){
+    const control=button();
+    if(control){ control.setAttribute('aria-pressed',String(active)); control.textContent=active?'Range On':'Range Off'; }
+  }
   function enable(source){
-    if(!mount())return; if(source||!image)load(source||DEFAULT_SOURCE);
-    active=true; document.documentElement.classList.add(ROOT_CLASS); setButtonState(); LayeredChamber.refresh(); if(!raf)raf=requestAnimationFrame(draw);
+    if(!mount())return;
+    if(source||!image)load(source||DEFAULT_SOURCE);
+    active=true; document.documentElement.classList.add(ROOT_CLASS); setButtonState(); LayeredChamber.refresh();
+    if(!raf)raf=requestAnimationFrame(draw);
   }
   function disable(){
-    active=false; document.documentElement.classList.remove(ROOT_CLASS); setButtonState(); if(raf)cancelAnimationFrame(raf);raf=0;
+    active=false; pointers.clear(); document.documentElement.classList.remove(ROOT_CLASS); setButtonState();
+    if(raf)cancelAnimationFrame(raf); raf=0;
     if(ctx)ctx.clearRect(0,0,W,H);
   }
-  function toggle(){active?disable():enable();}
+  function toggle(){ active?disable():enable(); }
   function configure(options={}){
     Object.assign(settings,options);
-    if(Number.isFinite(options.zoom)){targetZoom=Math.max(1,options.zoom);zoom=targetZoom;}
+    if(Number.isFinite(options.zoom)){ targetZoom=clamp(options.zoom,1,3.5); zoom=targetZoom; }
     constrainTargetView();
     if(ready&&('softness'in options||'recolour'in options))buildBands();
   }
 
-  document.addEventListener('click',event=>{if(event.target.closest('#heuristic-rangefinder-toggle'))toggle();});
+  document.addEventListener('click',event=>{ if(event.target.closest('#heuristic-rangefinder-toggle'))toggle(); });
   return {enable,disable,toggle,load,configure,settings};
 })();
