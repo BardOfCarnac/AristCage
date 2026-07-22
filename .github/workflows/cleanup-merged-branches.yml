@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - .github/workflows/cleanup-merged-branches.yml
+  pull_request:
+    types:
+      - reopened
 
 permissions:
   contents: write
@@ -25,8 +28,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          deleted=0
-          skipped=0
           echo "## Branch cleanup" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
@@ -38,8 +39,8 @@ jobs:
                 fi
 
                 if [[ "$protected" == "true" ]]; then
+                  echo "KEPT protected: $branch"
                   echo "- Kept protected branch: \`$branch\`" >> "$GITHUB_STEP_SUMMARY"
-                  skipped=$((skipped + 1))
                   continue
                 fi
 
@@ -47,8 +48,8 @@ jobs:
                   -f state=open -f head="$OWNER:$branch" -f per_page=100 \
                   | jq 'flatten | length')
                 if (( open_count > 0 )); then
+                  echo "KEPT open PR: $branch"
                   echo "- Kept branch with an open pull request: \`$branch\`" >> "$GITHUB_STEP_SUMMARY"
-                  skipped=$((skipped + 1))
                   continue
                 fi
 
@@ -70,8 +71,8 @@ PY
                 elif [[ "$ahead_by" == "0" ]]; then
                   reason="fully absorbed into $DEFAULT_BRANCH"
                 else
+                  echo "KEPT unique commits: $branch"
                   echo "- Kept branch with unique unmerged commits: \`$branch\`" >> "$GITHUB_STEP_SUMMARY"
-                  skipped=$((skipped + 1))
                   continue
                 fi
 
@@ -82,8 +83,8 @@ print(quote(sys.argv[1], safe=""))
 PY
                 )
                 gh api --method DELETE "repos/$REPOSITORY/git/refs/heads/$encoded_branch"
+                echo "DELETED $branch — $reason"
                 echo "- Deleted \`$branch\` — $reason" >> "$GITHUB_STEP_SUMMARY"
-                deleted=$((deleted + 1))
               done
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
