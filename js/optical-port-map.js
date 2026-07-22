@@ -1,10 +1,13 @@
 /*==================================================
   OPTICAL PORT MAP
 
-  Optional bridge used only by the Optics renderer. The semantic profile
-  names readable design depths, while this adapter maps those depths onto
-  exact 0.5-cell chamber grid ports. The chamber renderer itself is not
-  changed and the normal feed does not depend on this file.
+  Optional bridge used only by the Optics renderer. Semantic article
+  objects are grouped onto three exact chamber grid ports while the
+  chamber renderer and ordinary feed remain unchanged.
+
+  Port 1: headline
+  Port 2: priority, frame, corners, compact tags and metadata
+  Port 3: body, expanded information and backing plate
 ==================================================*/
 
 (() => {
@@ -13,15 +16,15 @@
   if (!chamber || typeof baseSnapshot !== "function") return;
 
   const PORT_DEPTHS = new Map([
-    [5.50, 7.00], // plate
-    [5.30, 6.50], // frame
-    [5.00, 6.00], // corners
-    [4.70, 5.50], // priority
-    [4.30, 5.00], // detail labels
-    [4.10, 4.50], // detail values
-    [3.70, 4.00], // body
-    [3.30, 3.50], // meta
-    [2.90, 3.00], // tags
+    [5.50, 3.50], // plate -> body/info port
+    [5.30, 3.00], // frame -> priority/tags port
+    [5.00, 3.00], // corners -> priority/tags port
+    [4.70, 3.00], // priority
+    [4.30, 3.50], // detail labels -> body/info port
+    [4.10, 3.50], // detail values -> body/info port
+    [3.70, 3.50], // body
+    [3.30, 3.00], // meta -> priority/tags port
+    [2.90, 3.00], // compact tags
     [2.50, 2.50]  // headline
   ]);
 
