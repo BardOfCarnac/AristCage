@@ -3,7 +3,6 @@
   z-index: .5;
   display: none;
   pointer-events: none;
-  filter: blur(.2px);
 }
 
 html.heuristic-rangefinder-active #heuristic-rangefinder-plane {
