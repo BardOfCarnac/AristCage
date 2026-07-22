@@ -8,7 +8,7 @@ window.LayeredChamber = (() => {
     cell: 0.5,
     near: 2.5,
     initialDepthCells: 2,
-    finalDepthCells: 12,
+    finalDepthCells: 16,
     infinityDepthCells: 1000,
     focal: 0.84,
     halfWidth: 3,
