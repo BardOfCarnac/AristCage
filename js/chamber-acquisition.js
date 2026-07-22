@@ -648,7 +648,7 @@ window.NCNChamberAcquisition = (() => {
     stateObserver = new MutationObserver(syncMode);
     stateObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['class', 'data-chamber-mode']
+      attributeFilter: ['data-chamber-mode']
     });
     window.addEventListener('resize', handleResize, { passive: true });
 
