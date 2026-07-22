@@ -165,27 +165,42 @@ window.HeuristicRangefinder = (() => {
     if(height<aperture.height*magnification){height=aperture.height*magnification;width=height*aspect;}
     return {width,height};
   }
-  function boundedRect(aperture,width,height,x,y){
+
+  // The front photograph is physically trapped inside the front aperture.
+  // This is the only rangefinder rectangle that is allowed to clamp.
+  function boundedFrontRect(aperture,width,height,x,y){
     return {x:clamp(x,aperture.right-width,aperture.left),y:clamp(y,aperture.bottom-height,aperture.top),width,height,aperture};
   }
   function frontRect(useTargets=false){
     const aperture=apertureAt(frontDepth()),mag=useTargets?targetZoom:zoom,point=useTargets?targetInspection:inspection,pan=useTargets?targetLook:look;
     const size=coverSize(aperture,mag);
-    return boundedRect(aperture,size.width,size.height,W*.5-point.u*size.width+pan.x,H*.5-point.v*size.height+pan.y);
+    return boundedFrontRect(aperture,size.width,size.height,W*.5-point.u*size.width+pan.x,H*.5-point.v*size.height+pan.y);
   }
   function registration(useTargets=false){
     const r=frontRect(useTargets),point=useTargets?targetInspection:inspection;
     return {x:r.x+point.u*r.width,y:r.y+point.v*r.height,u:point.u,v:point.v};
   }
+
+  // Deeper photographs slide freely behind their perspective apertures. Their
+  // overflow is clipped while drawing, never corrected by positional bounds.
+  function unboundedDepthRect(aperture,size,anchor){
+    return {
+      x:anchor.x-anchor.u*size.width,
+      y:anchor.y-anchor.v*size.height,
+      width:size.width,
+      height:size.height,
+      aperture
+    };
+  }
   function chamberPlane(z,useTargets=false){
     const aperture=apertureAt(z),mag=useTargets?targetZoom:zoom,anchor=registration(useTargets),size=coverSize(aperture,mag);
-    return {x:anchor.x-anchor.u*size.width,y:anchor.y-anchor.v*size.height,width:size.width,height:size.height,aperture};
+    return unboundedDepthRect(aperture,size,anchor);
   }
   function constrainTargetView(){
     if(!ready||!image||!W||!H)return;
     const aperture=apertureAt(frontDepth());targetZoom=clamp(targetZoom,1,3.5);
     const size=coverSize(aperture,targetZoom);
-    const bounded=boundedRect(aperture,size.width,size.height,W*.5-targetInspection.u*size.width+targetLook.x,H*.5-targetInspection.v*size.height+targetLook.y);
+    const bounded=boundedFrontRect(aperture,size.width,size.height,W*.5-targetInspection.u*size.width+targetLook.x,H*.5-targetInspection.v*size.height+targetLook.y);
     targetLook.x=bounded.x-(W*.5-targetInspection.u*size.width);
     targetLook.y=bounded.y-(H*.5-targetInspection.v*size.height);
   }
