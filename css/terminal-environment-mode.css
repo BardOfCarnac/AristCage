@@ -1,0 +1,128 @@
+/* Optional terminal environment mode. Nothing is mounted until explicitly enabled. */
+.terminal-environment-toggle[aria-pressed="true"] {
+  color: #fff;
+  border-color: #ff593f;
+  box-shadow: 0 0 13px rgba(255, 69, 46, .34);
+}
+
+.terminal-environment-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+#terminal-environment-rear { z-index: 15; }
+#terminal-environment-front { z-index: 35; }
+
+.terminal-environment-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+html.terminal-environment-mode .viewer {
+  position: relative;
+  z-index: 20;
+}
+
+html.terminal-environment-mode .rail {
+  z-index: 50;
+}
+
+html.terminal-environment-mode #feed .entry:not(.panel) {
+  filter: brightness(var(--terminal-card-brightness, 1));
+}
+
+html.terminal-environment-mode #feed .entry:not(.panel) .headline,
+html.terminal-environment-mode #feed .entry:not(.panel) .meta,
+html.terminal-environment-mode #feed .entry:not(.panel) .body,
+html.terminal-environment-mode #feed .entry:not(.panel) .tags {
+  text-shadow:
+    calc(var(--terminal-ghost-strength, 0) * 8px) 0 0 rgba(135, 215, 255, calc(var(--terminal-ghost-strength, 0) * .18)),
+    calc(var(--terminal-ghost-strength, 0) * -5px) 0 0 rgba(255, 67, 42, calc(var(--terminal-ghost-strength, 0) * .15)),
+    0 0 calc(12px + var(--terminal-bloom-strength, 0) * 16px) rgba(255, 92, 57, calc(.16 + var(--terminal-bloom-strength, 0) * .20));
+}
+
+.terminal-environment-controls {
+  position: fixed;
+  z-index: 60;
+  right: 14px;
+  bottom: 14px;
+  width: min(420px, calc(100vw - 28px));
+  border: 1px solid rgba(255, 68, 48, .50);
+  border-left: 3px solid rgba(255, 82, 54, .86);
+  background: rgba(7, 0, 2, .86);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, .52), 0 0 24px rgba(255, 35, 28, .10);
+  color: #f6d8d1;
+  font: 10px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .055em;
+  backdrop-filter: blur(9px);
+}
+
+.terminal-environment-controls header,
+.terminal-environment-row,
+.terminal-environment-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.terminal-environment-controls header {
+  justify-content: space-between;
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(255, 68, 48, .25);
+  text-transform: uppercase;
+}
+
+.terminal-environment-controls header span { color: #ff826c; text-align: right; }
+.terminal-environment-controls.fault header span { color: #fff2d9; }
+.terminal-environment-controls.hard-fault { border-color: rgba(176, 221, 255, .72); border-left-color: #b6e2ff; }
+
+.terminal-environment-row { padding: 9px 10px 5px; }
+.terminal-environment-row label { color: #b98f89; }
+.terminal-environment-row input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid rgba(255, 70, 48, .36);
+  background: rgba(30, 2, 6, .76);
+  color: #fff;
+  padding: 6px 7px;
+  font: inherit;
+  text-transform: uppercase;
+}
+
+.terminal-environment-controls button {
+  border: 1px solid rgba(255, 70, 48, .40);
+  background: rgba(255, 48, 34, .08);
+  color: #f6d8d1;
+  padding: 6px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.terminal-environment-controls button:hover,
+.terminal-environment-controls button:focus-visible {
+  outline: none;
+  border-color: rgba(255, 121, 86, .88);
+  background: rgba(255, 69, 43, .15);
+}
+
+.terminal-environment-controls button:disabled { opacity: .28; cursor: default; }
+.terminal-environment-readout { padding: 4px 10px 9px; color: #9f7470; }
+.terminal-environment-actions { padding: 0 10px 10px; }
+.terminal-environment-actions button { flex: 1; }
+
+@media (max-width: 720px) {
+  .terminal-environment-controls {
+    right: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+  }
+  .terminal-environment-controls header { padding: 7px 8px; }
+  .terminal-environment-row { padding: 7px 8px 4px; }
+  .terminal-environment-actions { padding: 0 8px 8px; }
+  .terminal-environment-readout { padding: 4px 8px 7px; }
+}
