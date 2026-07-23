@@ -1,4 +1,4 @@
-/* Optional terminal environment mode. Nothing is mounted until explicitly enabled. */
+/* Optional Terminal FX lab mode. Loaded only when ?terminalfx=1 is present. */
 .terminal-environment-toggle[aria-pressed="true"] {
   color: #fff;
   border-color: #ff593f;
@@ -8,12 +8,11 @@
 .terminal-environment-layer {
   position: fixed;
   inset: 0;
+  z-index: 25;
   pointer-events: none;
   overflow: hidden;
+  contain: strict;
 }
-
-#terminal-environment-rear { z-index: 15; }
-#terminal-environment-front { z-index: 35; }
 
 .terminal-environment-canvas {
   position: absolute;
@@ -23,17 +22,12 @@
   pointer-events: none;
 }
 
-html.terminal-environment-mode .viewer {
-  position: relative;
-  z-index: 20;
-}
-
-html.terminal-environment-mode .rail {
-  z-index: 50;
-}
-
 html.terminal-environment-mode #feed .entry:not(.panel) {
   filter: brightness(var(--terminal-card-brightness, 1));
+}
+
+html.terminal-environment-mode #feed .entry:not(.panel) > .projection-plate {
+  translate: var(--terminal-slip-x, 0) var(--terminal-slip-y, 0);
 }
 
 html.terminal-environment-mode #feed .entry:not(.panel) .headline,
@@ -43,23 +37,24 @@ html.terminal-environment-mode #feed .entry:not(.panel) .tags {
   text-shadow:
     calc(var(--terminal-ghost-strength, 0) * 8px) 0 0 rgba(135, 215, 255, calc(var(--terminal-ghost-strength, 0) * .18)),
     calc(var(--terminal-ghost-strength, 0) * -5px) 0 0 rgba(255, 67, 42, calc(var(--terminal-ghost-strength, 0) * .15)),
-    0 0 calc(12px + var(--terminal-bloom-strength, 0) * 16px) rgba(255, 92, 57, calc(.16 + var(--terminal-bloom-strength, 0) * .20));
+    0 0 calc(var(--terminal-bloom-strength, 0) * 18px) rgba(255, 92, 57, calc(var(--terminal-bloom-strength, 0) * .32));
 }
 
 .terminal-environment-controls {
   position: fixed;
-  z-index: 60;
+  z-index: 1100;
   right: 14px;
   bottom: 14px;
-  width: min(420px, calc(100vw - 28px));
+  width: min(430px, calc(100vw - 28px));
   border: 1px solid rgba(255, 68, 48, .50);
   border-left: 3px solid rgba(255, 82, 54, .86);
-  background: rgba(7, 0, 2, .86);
+  background: rgba(7, 0, 2, .94);
   box-shadow: 0 14px 42px rgba(0, 0, 0, .52), 0 0 24px rgba(255, 35, 28, .10);
   color: #f6d8d1;
   font: 10px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   letter-spacing: .055em;
-  backdrop-filter: blur(9px);
+  pointer-events: auto;
+  contain: content;
 }
 
 .terminal-environment-controls header,
@@ -77,12 +72,20 @@ html.terminal-environment-mode #feed .entry:not(.panel) .tags {
   text-transform: uppercase;
 }
 
-.terminal-environment-controls header span { color: #ff826c; text-align: right; }
+.terminal-environment-controls header span {
+  color: #ff826c;
+  text-align: right;
+}
+
 .terminal-environment-controls.fault header span { color: #fff2d9; }
-.terminal-environment-controls.hard-fault { border-color: rgba(176, 221, 255, .72); border-left-color: #b6e2ff; }
+.terminal-environment-controls.hard-fault {
+  border-color: rgba(176, 221, 255, .72);
+  border-left-color: #b6e2ff;
+}
 
 .terminal-environment-row { padding: 9px 10px 5px; }
 .terminal-environment-row label { color: #b98f89; }
+
 .terminal-environment-row input {
   min-width: 0;
   flex: 1;
@@ -110,19 +113,34 @@ html.terminal-environment-mode #feed .entry:not(.panel) .tags {
   background: rgba(255, 69, 43, .15);
 }
 
-.terminal-environment-controls button:disabled { opacity: .28; cursor: default; }
+.terminal-environment-controls [hidden] { display: none !important; }
 .terminal-environment-readout { padding: 4px 10px 9px; color: #9f7470; }
 .terminal-environment-actions { padding: 0 10px 10px; }
+.terminal-environment-actions:empty { display: none; }
 .terminal-environment-actions button { flex: 1; }
+
+.rail-actions button:disabled {
+  opacity: .34;
+  cursor: default;
+}
 
 @media (max-width: 720px) {
   .terminal-environment-controls {
     right: 8px;
     bottom: 8px;
     width: calc(100vw - 16px);
+    max-height: calc(100svh - 16px);
+    overflow: auto;
   }
+
   .terminal-environment-controls header { padding: 7px 8px; }
   .terminal-environment-row { padding: 7px 8px 4px; }
-  .terminal-environment-actions { padding: 0 8px 8px; }
+  .terminal-environment-actions { padding: 0 8px 8px; flex-wrap: wrap; }
   .terminal-environment-readout { padding: 4px 8px 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.terminal-environment-mode #feed .entry:not(.panel) > .projection-plate {
+    translate: 0 0;
+  }
 }
