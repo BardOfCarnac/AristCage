@@ -1,0 +1,14 @@
+/* Loaded after the legacy overlay sheet so shared-rail Dripfeed rules win. */
+html[data-ncn-app="dripfeed"] .rail-title > span::after {
+  content: none !important;
+}
+
+html[data-ncn-app="dripfeed"] .rail-actions {
+  display: none !important;
+}
+
+#dripfeed-root .view-tabs,
+#dripfeed-root .terminal-header,
+#dripfeed-root .rear-wall {
+  display: none !important;
+}
