@@ -2,51 +2,27 @@
   APPLICATION STATE
 ==================================================*/
 
-const NCN_APP_FILTER_OPTIONS = Object.freeze({
-  redwire: Object.freeze({
-    category: ["Business", "Community", "Crime", "Infrastructure", "Politics", "Culture"],
-    area: ["City Core", "Urban Sprawl", "Industrial Fringe", "Private Enclave", "Frontier Zone"],
-    priority: ["Bulletin", "Advisory", "Alert", "Warning", "Emergency"],
-    sourceType: ["Corporate", "Civic Notice", "Press Report", "Eyewitness", "Scanner Traffic", "Anonymous Leak", "Underground"]
-  }),
-  dripfeed: Object.freeze({
-    category: ["Items", "Services", "Housing", "Jobs", "Rides", "Community"],
-    area: ["City Center", "Heywood", "Little Europe", "South Night City", "The Glen", "Watson", "Wellsprings"],
-    priority: ["Offer", "Wanted", "Event"],
-    sourceType: ["Image", "Text"]
-  })
-});
-
-let NCN_FILTER_OPTIONS = NCN_APP_FILTER_OPTIONS.redwire;
+const NCN_FILTER_OPTIONS = {
+  category: ["Business", "Community", "Crime", "Infrastructure", "Politics", "Culture"],
+  area: ["City Core", "Urban Sprawl", "Industrial Fringe", "Private Enclave", "Frontier Zone"],
+  priority: ["Bulletin", "Advisory", "Alert", "Warning", "Emergency"],
+  sourceType: ["Corporate", "Civic Notice", "Press Report", "Eyewitness", "Scanner Traffic", "Anonymous Leak", "Underground"]
+};
 
 const NCN_STATE = {
   activeApp: "redwire",
   activePanel: null,
   expandedEntryId: null,
   selectedEntryId: null,
-  filters: createDefaultFilters(NCN_FILTER_OPTIONS)
-};
-
-function createDefaultFilters(options) {
-  return {
+  filters: {
     search: "",
     time: "Now",
-    category: new Set(options.category),
-    area: new Set(options.area),
-    priority: new Set(options.priority),
-    sourceType: new Set(options.sourceType)
-  };
-}
-
-function activateApplicationState(name) {
-  const next = NCN_APP_FILTER_OPTIONS[name] ? name : "redwire";
-  NCN_STATE.activeApp = next;
-  NCN_FILTER_OPTIONS = NCN_APP_FILTER_OPTIONS[next];
-  NCN_STATE.activePanel = null;
-  NCN_STATE.expandedEntryId = null;
-  NCN_STATE.selectedEntryId = null;
-  NCN_STATE.filters = createDefaultFilters(NCN_FILTER_OPTIONS);
-}
+    category: new Set(NCN_FILTER_OPTIONS.category),
+    area: new Set(NCN_FILTER_OPTIONS.area),
+    priority: new Set(NCN_FILTER_OPTIONS.priority),
+    sourceType: new Set(NCN_FILTER_OPTIONS.sourceType)
+  }
+};
 
 /*==================================================
   ENTRY HELPERS
@@ -110,5 +86,10 @@ function getVisibleEntries() {
 }
 
 function resetFilters() {
-  NCN_STATE.filters = createDefaultFilters(NCN_FILTER_OPTIONS);
+  NCN_STATE.filters.search = "";
+  NCN_STATE.filters.time = "Now";
+
+  Object.entries(NCN_FILTER_OPTIONS).forEach(([key, values]) => {
+    NCN_STATE.filters[key] = new Set(values);
+  });
 }

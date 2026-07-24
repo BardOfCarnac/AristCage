@@ -44,20 +44,23 @@
     });
   }
 
+  function detailRow(label, value) {
+    return `
+      <div class="detail-label">${escapeHTML(label)}</div>
+      <div class="detail-value">${escapeHTML(value || "—")}</div>`;
+  }
+
   function storyInspectorMarkup(story) {
     if (!story) {
       return `<div class="inspector-placeholder">Select a transmission</div>`;
     }
 
     const priorityName = String(story.priorityLabel || "Bulletin").toLowerCase();
-    const isDripfeed = story.app === "dripfeed";
-    const saved = isDripfeed && (window.DripfeedApp?.isSaved?.(story.id) || false);
-    const seen = isDripfeed && (window.DripfeedApp?.isSeen?.(story.id) || false);
 
     return `
-<article class="entry inspector-entry active expanded ${isDripfeed ? "dripfeed-entry" : "redwire-entry"} ${saved ? "dripfeed-saved" : ""} ${seen ? "dripfeed-seen" : ""}" data-entry-id="inspector-${escapeHTML(story.id)}" data-application="${escapeHTML(story.app || NCN_STATE.activeApp)}">
+<article class="entry inspector-entry active expanded" data-entry-id="inspector-${escapeHTML(story.id)}">
   <div class="projection-plate">
-    ${entryFrameMarkup(story)}
+    <div class="part frame gone"></div>
     <div class="part corners gone" aria-hidden="true">
       <i class="corner corner-tl"></i>
       <i class="corner corner-tr"></i>
@@ -69,12 +72,17 @@
     <div class="entry-content">
       <div class="part meta gone">${escapeHTML(story.meta)}</div>
       <h2 class="part headline gone">${escapeHTML(story.headline)}</h2>
-      <div class="part tags gone">${entryTagsMarkup(story)}</div>
+      <div class="part tags gone">${escapeHTML(story.tags)}</div>
 
       <div class="part body gone">
         <p>${escapeHTML(story.body || "No further details available.")}</p>
-        ${detailGridMarkup(story, "inspector-detail-grid")}
-        ${dripfeedTerminalActions(story)}
+        <div class="inspector-detail-grid">
+          ${detailRow("Category", story.category)}
+          ${detailRow("Area", story.area)}
+          ${detailRow("Source type", story.sourceType)}
+          ${detailRow("Priority", story.priorityLabel)}
+          ${detailRow("Time scope", story.timeScope)}
+        </div>
       </div>
     </div>
   </div>
@@ -133,7 +141,7 @@
       return;
     }
 
-    if (event.target.closest("form, button, input, select, textarea, label, summary, details, a")) {
+    if (event.target.closest("form, button, input, select, textarea, label, summary, details")) {
       return;
     }
 
@@ -165,14 +173,6 @@
       showImmediately(inspectorProjectionObjects());
     }
   }).observe(feed, { childList: true, subtree: true });
-
-  window.addEventListener("ncn:application-change", () => {
-    if (!isDesktop()) return;
-    ensureSelection();
-    markFeedSelection();
-    commitInspector();
-    showImmediately(inspectorProjectionObjects());
-  });
 
   desktopQuery.addEventListener("change", event => {
     render();

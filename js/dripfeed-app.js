@@ -1,442 +1,133 @@
 /*==================================================
-  DRIPFEED APPLICATION LAYER
+  DRIPFEED APPLICATION
 
-  Owns classified persistence, terminal-local SAVED / SEEN state and the
-  submission image picker. Chamber geometry and semantic depth remain owned by
-  the shared terminal.
+  Own renderer and interaction model. The terminal supplies the chamber and
+  shared camera; RedWire's article renderer is not involved.
 ==================================================*/
 
-window.DripfeedApp = (() => {
-  const PUBLICATIONS_KEY = "ncn-dripfeed-publications-v1";
-  const TERMINAL_KEY = "ncn-dripfeed-terminal-v1";
-  const formPhotos = new WeakMap();
-  const selectedPhotos = new WeakMap();
+(function (DF) {
+  function shell() {
+    const categoryButtons=Object.entries(DF.model.CATEGORIES).map(([key,value])=>`<button class="filter-chip" data-category="${key}">${value.mark} ${value.label}</button>`).join('');
+    return `<div class="dripfeed-app">
+      <header class="terminal-header">
+        <section class="brand-block"><div class="eyebrow">NCN TERMINAL APPLICATION // PUBLIC CLASSIFIEDS</div><div class="brand-line"><h1>DRIP<span>FEED</span></h1><div class="version">DF/${DF.render.esc(DF.config.appVersion)}<br>APP SLOT 02</div></div><div class="brand-bottom"><span>BUY. SELL. BECOME NOTICEABLE.</span><span class="sponsor">SPONSORED BY DRIP™ // FEEL BETTER ABOUT COMMERCE</span></div></section>
+        <section class="system-block"><div class="system-line"><span class="online">● SYSTEM ONLINE</span><span>TERMINAL ${DF.render.esc(DF.config.terminalId)}</span><span id="clock">--:--:--</span><span id="api-mode">UNSPLASH DEMO</span></div><div class="toolbar"><label class="search-box">⌕ <input id="feed-search" type="search" placeholder="Search classified transmissions…"></label><button class="button secondary" data-action="peek">PEEK REAR</button><button class="button secondary" data-action="reset">RESET LOCAL</button><button class="button primary" data-action="open-submit">+ TRANSMIT</button></div></section>
+      </header>
+      <nav class="view-tabs" aria-label="Terminal state"><button class="view-tab active" data-view="live">LIVE <span data-count="live">0</span></button><button class="view-tab" data-view="saved">SAVED <span data-count="saved">0</span></button><button class="view-tab" data-view="seen">SEEN <span data-count="seen">0</span></button><button class="view-tab" data-view="expired">EXPIRED <span data-count="expired">0</span></button></nav>
+      <section class="filter-row"><div class="filter-chips"><button class="filter-chip active" data-category="all">ALL SIGNALS</button>${categoryButtons}</div><div class="display-note"><strong id="result-count">0</strong> TRANSMISSIONS</div></section>
+      <main class="demo-stage" data-depth-host><section class="listing-wall rear-wall" data-depth-plane="rear"></section><section class="listing-wall live-wall" data-depth-plane="live"></section></main>
+      <footer class="drip-footer"><div><strong>DRIPFEED:</strong> Posts are public transmissions. SAVED and SEEN are private terminal states.</div><div>DRIP™ reminds you that dissatisfaction is a treatable market condition.</div></footer>
+      <section class="overlay reader-overlay" data-overlay="reader" aria-hidden="true"><div data-reader-target></div></section>
+      <section class="overlay submit-overlay" data-overlay="submit" aria-hidden="true">
+        <article class="submit-card"><button class="icon-close" data-submit-action="close" aria-label="Close">×</button><header class="submit-header"><div class="eyebrow">DRIPFEED PUBLIC TRANSMISSION</div><h2>Place a classified</h2><p>Three steps. No account. Your terminal identity remains visible only to you.</p></header>
+        <div class="stepper"><div data-step-indicator="1" class="active"><span>01</span> DETAILS</div><div data-step-indicator="2"><span>02</span> IMAGE</div><div data-step-indicator="3"><span>03</span> REVIEW</div></div>
+        <form id="submit-form" novalidate>
+          <section class="wizard-panel active" data-wizard-step="1"><div class="form-columns"><div class="field"><label>POSTER NAME / HANDLE</label><input id="poster-alias" maxlength="40" required placeholder="WrenchWitch"></div><div class="field"><label>TRANSMISSION TYPE</label><select id="listing-type"><option value="offer">Offering</option><option value="wanted">Wanted</option><option value="event">Public notice / event</option></select></div><div class="field full"><label>HEADLINE</label><input id="listing-title" maxlength="90" required placeholder="What are you offering or looking for?"></div><div class="field"><label>CATEGORY</label><select id="listing-category">${Object.entries(DF.model.CATEGORIES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></div><div class="field"><label>DISTRICT</label><input id="district" maxlength="45" required placeholder="Watson"></div><div class="field"><label>PRICE / COMPENSATION</label><input id="value-label" maxlength="30" required placeholder="€$200 / NEGOTIABLE / FREE"></div><div class="field"><label>CONTACT METHOD</label><input id="contact-method" maxlength="55" required placeholder="PING DF-706 / dead drop / venue"></div><div class="field"><label>EXPIRES AFTER</label><select id="expiry-days"><option value="1">24 hours</option><option value="3" selected>3 days</option><option value="7">7 days</option><option value="14">14 days</option></select></div><div class="field full"><label>DETAILS</label><textarea id="listing-body" maxlength="520" required placeholder="Condition, requirements, collection point, restrictions…"></textarea></div></div><div class="wizard-actions"><span></span><button type="button" class="button primary" data-submit-action="next">IMAGE →</button></div></section>
+          <section class="wizard-panel" data-wizard-step="2"><div class="image-source-tabs"><button type="button" class="source-tab active" data-image-source="unsplash">SEARCH UNSPLASH</button><button type="button" class="source-tab" data-image-source="url">IMAGE URL</button><button type="button" class="source-tab" data-image-source="none">TEXT ONLY</button></div><div class="source-panel active" data-source-panel="unsplash"><div class="unsplash-bar"><input id="unsplash-query" type="search" value="neon city" maxlength="80"><select id="unsplash-orientation"><option value="">Any shape</option><option value="landscape">Landscape</option><option value="portrait">Portrait</option><option value="squarish">Square</option></select><button type="button" class="button primary" data-submit-action="search">SEARCH</button></div><p class="network-note"><strong>The image stays on Unsplash.</strong> Dripfeed stores its URL, photo ID and attribution metadata—not a copy of the file.</p><div id="picker-state" class="picker-state">Search to choose an image.</div><div id="photo-results" class="photo-results"></div><div class="result-pager"><button type="button" class="button" data-submit-action="prev">PREV</button><button type="button" class="button" data-submit-action="next-results">NEXT</button></div></div><div class="source-panel" data-source-panel="url"><div class="field"><label>PUBLIC HTTPS IMAGE URL</label><input id="custom-image-url" type="url" placeholder="https://…"></div><p class="network-note">Only publish an image you own or have permission to use. Dripfeed does not re-host it.</p></div><div class="source-panel" data-source-panel="none"><div class="text-only-sample"><strong>TEXT-ONLY PLATE</strong><span>The category code becomes the visual anchor.</span></div></div><div id="selected-image-preview" class="selected-image-preview"></div><div class="wizard-actions"><button type="button" class="button" data-submit-action="back">← DETAILS</button><button type="button" class="button primary" data-submit-action="next">REVIEW →</button></div></section>
+          <section class="wizard-panel" data-wizard-step="3"><div id="review-target"></div><label class="confirm-row"><input id="image-safeguard" type="checkbox"><span>I will not use an identifiable person’s photograph to falsely imply criminal, sexual, medical or defamatory conduct.</span></label><label class="confirm-row"><input id="review-confirm" type="checkbox"><span>I have checked the price, district, contact method and expiry.</span></label><div class="wizard-actions"><button type="button" class="button" data-submit-action="back">← IMAGE</button><button type="button" class="button primary" data-submit-action="transmit">TRANSMIT</button></div></section>
+        </form></article>
+      </section>
+      <div class="toast" role="status" aria-live="polite"></div>
+    </div>`;
+  }
 
-  function readJSON(key, fallback) {
-    try {
-      const value = JSON.parse(localStorage.getItem(key) || "null");
-      return value ?? fallback;
-    } catch {
-      return fallback;
+  class App {
+    constructor(root, options={}) {
+      this.root=root;
+      this.store=options.store||new DF.model.Store();
+      this.unsplash=options.unsplash||new DF.unsplash.UnsplashClient(DF.config);
+      this.state={view:'live',category:'all',query:'',active:null,peek:false};
+      this.depth=options.depthAdapter||new DF.depth.SharedDepthAdapter(this);
+      this.submit=new DF.submit.SubmitController(this);
     }
-  }
-
-  let customPublications = readJSON(PUBLICATIONS_KEY, []);
-  const terminalRecord = readJSON(TERMINAL_KEY, { seenIds: [], savedIds: [] });
-  const seenIds = new Set(terminalRecord.seenIds || []);
-  const savedIds = new Set(terminalRecord.savedIds || []);
-
-  function persistPublications() {
-    localStorage.setItem(PUBLICATIONS_KEY, JSON.stringify(customPublications));
-  }
-
-  function persistTerminal() {
-    localStorage.setItem(TERMINAL_KEY, JSON.stringify({
-      seenIds: [...seenIds],
-      savedIds: [...savedIds]
-    }));
-  }
-
-  function entries() {
-    return [
-      ...customPublications.map(createDripfeedEntry),
-      ...NCN_DRIPFEED_ENTRIES
-    ].map(entry => ({ ...entry, image: entry.image ? { ...entry.image } : null }));
-  }
-
-  function isSeen(id) {
-    return seenIds.has(String(id));
-  }
-
-  function isSaved(id) {
-    return savedIds.has(String(id));
-  }
-
-  function syncTerminalButtons(id) {
-    const saved = isSaved(id);
-    const seen = isSeen(id);
-
-    document.querySelectorAll(`[data-drip-action="save"][data-entry-id="${CSS.escape(String(id))}"]`).forEach(button => {
-      button.setAttribute("aria-pressed", String(saved));
-      button.textContent = saved ? "Saved" : "Save";
-      button.closest(".entry")?.classList.toggle("dripfeed-saved", saved);
-    });
-
-    document.querySelectorAll(`[data-drip-action="seen"][data-entry-id="${CSS.escape(String(id))}"]`).forEach(button => {
-      button.setAttribute("aria-pressed", String(seen));
-      button.textContent = seen ? "Seen" : "Mark seen";
-      button.closest(".entry")?.classList.toggle("dripfeed-seen", seen);
-    });
-  }
-
-  function toggleTerminalState(kind, id) {
-    const collection = kind === "save" ? savedIds : seenIds;
-    if (collection.has(id)) collection.delete(id);
-    else collection.add(id);
-    persistTerminal();
-    syncTerminalButtons(id);
-    window.dispatchEvent(new CustomEvent("ncn:dripfeed-terminal-state", {
-      detail: { id, saved: isSaved(id), seen: isSeen(id) }
-    }));
-  }
-
-  function setStep(form, step) {
-    const next = Math.min(3, Math.max(1, Number(step) || 1));
-    form.dataset.dripStep = String(next);
-    form.querySelectorAll("[data-drip-step-marker]").forEach(marker => {
-      marker.classList.toggle("active", Number(marker.dataset.dripStepMarker) === next);
-    });
-    updateReview(form);
-  }
-
-  function formValue(form, name) {
-    return String(new FormData(form).get(name) || "").trim();
-  }
-
-  function imageSource(form) {
-    return form.dataset.dripImageSource || "unsplash";
-  }
-
-  function setImageSource(form, source) {
-    const next = ["unsplash", "url", "none"].includes(source) ? source : "none";
-    form.dataset.dripImageSource = next;
-    form.querySelectorAll("[data-drip-image-source]").forEach(button => {
-      button.classList.toggle("active", button.dataset.dripImageSource === next);
-      button.setAttribute("aria-pressed", String(button.dataset.dripImageSource === next));
-    });
-    form.querySelectorAll("[data-drip-image-panel]").forEach(panel => {
-      panel.classList.toggle("active", panel.dataset.dripImagePanel === next);
-    });
-    updateSelectedImage(form);
-    updateReview(form);
-  }
-
-  function demoPhoto(label, from, to, index) {
-    const image = dripfeedDemoImage(label, from, to);
-    return {
-      id: `demo-${index}`,
-      provider: "demo",
-      alt: label.toLowerCase(),
-      urls: { thumb: image.url, small: image.url, regular: image.url },
-      photographer: { name: "Dripfeed demo", url: "#" },
-      photoUrl: "#",
-      unsplashUrl: "#",
-      downloadLocation: ""
-    };
-  }
-
-  const DEMO_PHOTOS = [
-    demoPhoto("NEON MARKET", "#22060a", "#f04439", 1),
-    demoPhoto("CONCRETE TOWER", "#111218", "#4c5b70", 2),
-    demoPhoto("NIGHT ROAD", "#07131b", "#e77632", 3),
-    demoPhoto("WAREHOUSE", "#1a1008", "#854117", 4),
-    demoPhoto("ROOFTOP", "#09091a", "#7a2a86", 5),
-    demoPhoto("OLD MACHINE", "#15100d", "#706052", 6)
-  ];
-
-  function renderPhotoResults(form, photos) {
-    formPhotos.set(form, photos);
-    const results = form.querySelector("[data-drip-photo-results]");
-    if (!results) return;
-    results.replaceChildren();
-
-    photos.forEach((photo, index) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "dripfeed-photo-result";
-      button.dataset.dripPhotoIndex = String(index);
-
-      const image = document.createElement("img");
-      image.src = photo.urls?.small || photo.urls?.thumb || "";
-      image.alt = photo.alt || "Image search result";
-      image.loading = "lazy";
-
-      const label = document.createElement("span");
-      label.textContent = photo.photographer?.name || "Unsplash photographer";
-      button.append(image, label);
-      results.append(button);
-    });
-  }
-
-  async function searchPhotos(form) {
-    const state = form.querySelector("[data-drip-photo-state]");
-    const query = formValue(form, "unsplashQuery");
-    if (query.length < 2) {
-      if (state) state.textContent = "Enter at least two characters.";
-      return;
+    mount(){
+      if(this.mounted)return this;
+      this.mounted=true;
+      this.root.innerHTML=shell();
+      this.bind();
+      this.submit.bind();
+      this.depth.bind();
+      this.render();
+      this.updateClock();
+      this.clockTimer=setInterval(()=>this.updateClock(),1000);
+      return this;
     }
-
-    if (state) state.textContent = "Searching image wire…";
-    const endpoint = NCN_CONFIG.dripfeed.unsplashSearchEndpoint;
-
-    if (!endpoint) {
-      await new Promise(resolvePromise => window.setTimeout(resolvePromise, 180));
-      renderPhotoResults(form, DEMO_PHOTOS);
-      if (state) state.textContent = "Demo results. Configure the Supabase proxy for live Unsplash search.";
-      return;
-    }
-
-    try {
-      const url = new URL(endpoint);
-      url.searchParams.set("query", query);
-      url.searchParams.set("page", "1");
-      const response = await fetch(url);
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Search failed");
-      renderPhotoResults(form, payload.results || []);
-      if (state) state.textContent = `${payload.total || payload.results?.length || 0} results returned.`;
-    } catch (error) {
-      if (state) state.textContent = `Search unavailable: ${error.message}`;
-    }
-  }
-
-  function selectedPhoto(form) {
-    return selectedPhotos.get(form) || null;
-  }
-
-  async function trackPhotoSelection(photo, form) {
-    if (photo.provider !== "unsplash" || !photo.downloadLocation) return;
-    const endpoint = NCN_CONFIG.dripfeed.unsplashTrackEndpoint;
-    const state = form.querySelector("[data-drip-photo-state]");
-    if (!endpoint) {
-      if (state) state.textContent = "Photo selected. Tracking proxy is not configured in this build.";
-      return;
-    }
-
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ downloadLocation: photo.downloadLocation })
+    bind(){
+      this.root.addEventListener('click',event=>{
+        const view=event.target.closest('[data-view]')?.dataset.view;
+        if(view){this.state.view=view;this.render();return;}
+        const category=event.target.closest('[data-category]')?.dataset.category;
+        if(category){this.state.category=category;this.render();return;}
+        const tile=event.target.closest('[data-post-id]');
+        if(tile){const post=this.store.posts.find(p=>p.id===tile.dataset.postId);if(post)this.openReader(post);return;}
+        const action=event.target.closest('[data-action]')?.dataset.action;
+        if(action==='open-submit')this.submit.open();
+        if(action==='reset'){this.store.clearLocal();this.state={...this.state,view:'live',category:'all',query:'',active:null};this.render();this.toast('Local posts and terminal states cleared.');}
+        if(action==='close-reader')this.closeOverlay('reader');
+        if(action==='toggle-save'&&this.state.active){this.store.toggleSaved(this.state.active.id);this.openReader(this.state.active);this.renderWalls();}
+        if(action==='toggle-seen'&&this.state.active){const seen=this.store.terminal.seenIds.has(this.state.active.id);this.store.markSeen(this.state.active.id,!seen);this.closeOverlay('reader');this.render();this.toast(seen?'Transmission returned to live wall.':'Transmission filed as seen.');}
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Selection tracking failed");
-      if (state) state.textContent = "Photo selected and registered with Unsplash.";
-    } catch (error) {
-      if (state) state.textContent = `Photo selected; tracking failed: ${error.message}`;
+      this.root.addEventListener('keydown',event=>{
+        const tile=event.target.closest('[data-post-id]');
+        if(!tile||!['Enter',' '].includes(event.key))return;
+        event.preventDefault();
+        tile.click();
+      });
+      this.root.querySelector('#feed-search').addEventListener('input',event=>{this.state.query=event.target.value;this.renderWalls();});
+      this.root.querySelector('[data-overlay="reader"]').addEventListener('click',event=>{if(event.target===event.currentTarget)this.closeOverlay('reader');});
+      this.root.querySelector('[data-overlay="submit"]').addEventListener('click',event=>{if(event.target===event.currentTarget)this.submit.close();});
     }
+    postsForView(){
+      const q=this.state.query.trim().toLowerCase();
+      return this.store.posts.filter(post=>{
+        const effective=DF.model.effectiveState(post),seen=this.store.terminal.seenIds.has(post.id),saved=this.store.terminal.savedIds.has(post.id);
+        if(effective==='removed') return false;
+        const viewMatch=this.state.view==='live'?(effective==='live'&&!seen):this.state.view==='seen'?seen:this.state.view==='saved'?saved:this.state.view==='expired'?effective==='expired':true;
+        const catMatch=this.state.category==='all'||post.category===this.state.category;
+        const text=`${post.title} ${post.body} ${post.posterAlias} ${post.district} ${post.valueLabel}`.toLowerCase();
+        return viewMatch&&catMatch&&(!q||text.includes(q));
+      });
+    }
+    render(){
+      this.root.querySelectorAll('[data-view]').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===this.state.view));
+      this.root.querySelectorAll('[data-category]').forEach(btn=>btn.classList.toggle('active',btn.dataset.category===this.state.category));
+      this.renderWalls();
+      this.updateCounts();
+    }
+    renderWalls(){
+      const visible=this.postsForView(),liveWall=this.root.querySelector('.live-wall'),rearWall=this.root.querySelector('.rear-wall');
+      liveWall.replaceChildren(...visible.map((post,index)=>DF.render.tile(post,index,this.store,this.state.view==='seen'?'rear':'live')));
+      const rear=this.store.posts.filter(post=>DF.model.effectiveState(post)!=='removed'&&this.store.terminal.seenIds.has(post.id)&&!visible.includes(post));
+      rearWall.replaceChildren(...rear.map((post,index)=>DF.render.tile(post,index,this.store,'rear')));
+      if(!visible.length){const empty=document.createElement('div');empty.className='empty-state';empty.innerHTML='<strong>NO MATCHING TRANSMISSIONS</strong><span>Change the terminal state, category or search.</span>';liveWall.append(empty);}
+      this.root.querySelector('#result-count').textContent=visible.length;
+      this.depth.afterRender();
+    }
+    updateCounts(){
+      const live=this.store.posts.filter(p=>DF.model.effectiveState(p)==='live'&&!this.store.terminal.seenIds.has(p.id)).length;
+      const saved=this.store.terminal.savedIds.size;
+      const seen=this.store.terminal.seenIds.size;
+      const expired=this.store.posts.filter(p=>DF.model.effectiveState(p)==='expired').length;
+      [['live',live],['saved',saved],['seen',seen],['expired',expired]].forEach(([key,value])=>{const el=this.root.querySelector(`[data-count="${key}"]`);if(el)el.textContent=value;});
+    }
+    openReader(post){this.state.active=post;this.root.querySelector('[data-reader-target]').innerHTML=DF.render.readerMarkup(post,this.store);this.openOverlay('reader');this.depth.setReading(true);}
+    openOverlay(name){const overlay=this.root.querySelector(`[data-overlay="${name}"]`);overlay?.classList.add('open');overlay?.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';}
+    closeOverlay(name){const overlay=this.root.querySelector(`[data-overlay="${name}"]`);overlay?.classList.remove('open');overlay?.setAttribute('aria-hidden','true');document.body.style.overflow='';if(name==='reader'){this.depth.setReading(false);this.state.active=null;}}
+    toast(message){const el=this.root.querySelector('.toast');el.textContent=message;el.classList.add('show');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.remove('show'),2600);}
+    updateClock(){const el=this.root.querySelector('#clock');if(el)el.textContent=new Date().toLocaleTimeString('en-GB',{hour12:false});}
+    updateApiMode(mode){const el=this.root.querySelector('#api-mode');if(el)el.textContent=mode==='live'?'UNSPLASH LIVE':'UNSPLASH DEMO';}
+    activate(){this.root.hidden=false;this.depth.resume?.();this.render();}
+    deactivate(){this.depth.pause?.();this.closeOverlay('reader');this.closeOverlay('submit');}
+    destroy(){clearInterval(this.clockTimer);this.depth.destroy?.();this.root.replaceChildren();this.mounted=false;}
+    getDepthPlaneDefinitions(){return this.depth.getPlaneDefinitions?.() || [];}
   }
 
-  function choosePhoto(form, index) {
-    const photo = formPhotos.get(form)?.[index];
-    if (!photo) return;
-    selectedPhotos.set(form, photo);
-    form.querySelectorAll("[data-drip-photo-index]").forEach((button, candidateIndex) => {
-      button.classList.toggle("selected", candidateIndex === index);
-    });
-    updateSelectedImage(form);
-    updateReview(form);
-    void trackPhotoSelection(photo, form);
-  }
-
-  function imageRecord(form) {
-    const source = imageSource(form);
-    if (source === "none") return null;
-
-    if (source === "url") {
-      const url = formValue(form, "customImageUrl");
-      if (!url) return null;
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== "https:") return null;
-        return { provider: "custom", url: parsed.toString(), alt: "User-supplied classified image" };
-      } catch {
-        return null;
-      }
-    }
-
-    const photo = selectedPhoto(form);
-    if (!photo) return null;
-    return {
-      provider: photo.provider,
-      id: photo.id,
-      url: photo.urls?.regular || photo.urls?.small || photo.urls?.thumb,
-      alt: photo.alt || "Classified image",
-      photographer: photo.photographer ? { ...photo.photographer } : null,
-      photoUrl: photo.photoUrl || "",
-      unsplashUrl: photo.unsplashUrl || "",
-      downloadLocation: photo.downloadLocation || ""
-    };
-  }
-
-  function updateSelectedImage(form) {
-    const preview = form.querySelector("[data-drip-selected-image]");
-    if (!preview) return;
-    const image = imageRecord(form);
-
-    if (!image) {
-      preview.hidden = true;
-      preview.replaceChildren();
-      return;
-    }
-
-    preview.hidden = false;
-    preview.replaceChildren();
-    const img = document.createElement("img");
-    img.src = image.url;
-    img.alt = image.alt || "Selected image";
-    const copy = document.createElement("span");
-    copy.textContent = image.provider === "unsplash"
-      ? `Photo: ${image.photographer?.name || "Unsplash photographer"} / Unsplash`
-      : image.provider === "demo"
-        ? "Demo image selected"
-        : "External image URL selected";
-    preview.append(img, copy);
-  }
-
-  function updateReview(form) {
-    const review = form.querySelector("[data-drip-review]");
-    if (!review) return;
-    const title = formValue(form, "title") || "UNTITLED CLASSIFIED";
-    const type = formValue(form, "listingType") || "Offer";
-    const category = formValue(form, "category") || "Items";
-    const district = formValue(form, "district") || "City Center";
-    const value = formValue(form, "valueLabel") || "NAME PRICE";
-    const alias = formValue(form, "posterAlias") || "ANONYMOUS";
-    const image = imageRecord(form);
-
-    review.innerHTML = `
-      <span>${escapeHTML(type)} // ${escapeHTML(category)} // ${escapeHTML(district)}</span>
-      <strong>${escapeHTML(title)}</strong>
-      <span>${escapeHTML(value)} // ${escapeHTML(alias)}</span>
-      <small>${image ? `IMAGE: ${escapeHTML(image.provider.toUpperCase())}` : "TEXT-ONLY CATEGORY PLATE"}</small>`;
-  }
-
-  function publicationFromForm(form) {
-    const now = new Date();
-    const expiryDays = Math.max(1, Number.parseInt(formValue(form, "expiryDays"), 10) || 3);
-    const listingLabel = formValue(form, "listingType") || "Offer";
-    const listingType = listingLabel.toLowerCase() === "wanted"
-      ? "wanted"
-      : listingLabel.toLowerCase() === "event"
-        ? "event"
-        : "offer";
-
-    return {
-      id: `DF-${Math.floor(800 + Math.random() * 899)}`,
-      listingType,
-      category: formValue(form, "category") || "Items",
-      title: formValue(form, "title"),
-      body: formValue(form, "body"),
-      posterAlias: formValue(form, "posterAlias"),
-      district: formValue(form, "district") || "City Center",
-      valueLabel: formValue(form, "valueLabel") || "NAME PRICE",
-      contactMethod: formValue(form, "contactMethod") || "NO CONTACT SUPPLIED",
-      createdAt: now.toISOString(),
-      expiresAt: new Date(now.getTime() + expiryDays * 86400000).toISOString(),
-      publicationState: "live",
-      image: imageRecord(form)
-    };
-  }
-
-  async function transmit(form) {
-    const publication = publicationFromForm(form);
-    if (!publication.title || !publication.body || !publication.posterAlias) {
-      form.reportValidity();
-      setStep(form, 1);
-      return;
-    }
-
-    if (imageSource(form) !== "none" && !publication.image) {
-      window.alert("Choose an image, enter a valid HTTPS image URL, or select Text only.");
-      setStep(form, 2);
-      return;
-    }
-
-    if (publication.image && !form.elements.imageSafeguard?.checked) {
-      window.alert("Confirm the image-use safeguard before transmitting.");
-      setStep(form, 2);
-      return;
-    }
-
-    customPublications.unshift(publication);
-    persistPublications();
-
-    await runProjectionTransaction({
-      name: `dripfeed-transmit:${publication.id}`,
-      dismiss: getFeedProjectionObjects,
-      commit: () => {
-        NCN_ENTRIES.splice(0, NCN_ENTRIES.length, ...entries());
-        NCN_STATE.activePanel = null;
-        clearExpandedEntry();
-        resetFilters();
-        render();
-        syncPanelButtons();
-      },
-      resolve: getFeedProjectionObjects
-    });
-
-    window.dispatchEvent(new CustomEvent("ncn:application-change", {
-      detail: { name: "dripfeed", reason: "transmit" }
-    }));
-  }
-
-  document.addEventListener("click", event => {
-    const action = event.target.closest("[data-drip-action]");
-    if (action) {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleTerminalState(action.dataset.dripAction, action.dataset.entryId);
-      return;
-    }
-
-    const form = event.target.closest(".dripfeed-submit-form");
-    if (!form) return;
-
-    const stepButton = event.target.closest("[data-drip-step-next]");
-    if (stepButton) {
-      event.preventDefault();
-      setStep(form, stepButton.dataset.dripStepNext);
-      return;
-    }
-
-    const sourceButton = event.target.closest("[data-drip-image-source]");
-    if (sourceButton) {
-      event.preventDefault();
-      setImageSource(form, sourceButton.dataset.dripImageSource);
-      return;
-    }
-
-    const searchButton = event.target.closest("[data-drip-unsplash-search]");
-    if (searchButton) {
-      event.preventDefault();
-      void searchPhotos(form);
-      return;
-    }
-
-    const photoButton = event.target.closest("[data-drip-photo-index]");
-    if (photoButton) {
-      event.preventDefault();
-      choosePhoto(form, Number(photoButton.dataset.dripPhotoIndex));
-    }
-  });
-
-  document.addEventListener("input", event => {
-    const form = event.target.closest(".dripfeed-submit-form");
-    if (!form) return;
-    updateSelectedImage(form);
-    updateReview(form);
-  });
-
-  document.addEventListener("change", event => {
-    const form = event.target.closest(".dripfeed-submit-form");
-    if (!form) return;
-    updateSelectedImage(form);
-    updateReview(form);
-  });
-
-  document.addEventListener("submit", event => {
-    const form = event.target.closest(".dripfeed-submit-form");
-    if (!form) return;
-    event.preventDefault();
-    void transmit(form);
-  });
-
-  return {
-    entries,
-    isSeen,
-    isSaved,
-    setStep,
-    setImageSource
+  DF.App=App;
+  DF.mount=(root,options={})=>{
+    if(!root)return null;
+    if(root.__dripfeedApp)return root.__dripfeedApp;
+    const app=new App(root,options).mount();
+    root.__dripfeedApp=app;
+    return app;
   };
-})();
+})(window.Dripfeed = window.Dripfeed || {});
