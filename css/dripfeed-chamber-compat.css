@@ -1,0 +1,174 @@
+/*==================================================
+  DRIPFEED · NEUTRAL CHAMBER COMPATIBILITY
+
+  Dripfeed is a single application surface inside the terminal chamber. It must
+  not inherit RedWire's desktop split-pane viewport, and its projected content
+  is fitted to the neutral chamber camera rather than the Optics port map.
+==================================================*/
+
+html[data-ncn-app="dripfeed"],
+html[data-ncn-app="dripfeed"] body {
+  min-height: 100%;
+  height: auto;
+}
+
+html[data-ncn-app="dripfeed"] body {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+html[data-ncn-app="dripfeed"] .viewer {
+  min-height: 100dvh;
+  height: auto;
+  overflow: visible;
+}
+
+html[data-ncn-app="dripfeed"] .app {
+  width: 100%;
+  max-width: none;
+  height: auto;
+  min-height: calc(100dvh - var(--rail-height, 64px));
+  margin: 0;
+  overflow: visible;
+}
+
+html[data-ncn-app="dripfeed"].layered-chamber-mode .layered-chamber-system {
+  display: block;
+  visibility: visible;
+  opacity: 1;
+}
+
+#dripfeed-root,
+#dripfeed-root .dripfeed-app {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+#dripfeed-root .dripfeed-app {
+  padding-inline: clamp(6px, 1.4vw, 14px);
+}
+
+#dripfeed-root .dripfeed-filter-rail,
+#dripfeed-root .dripfeed-utility-rail,
+#dripfeed-root .demo-stage,
+#dripfeed-root .drip-footer {
+  width: min(100%, var(--drip-aperture-width, 100%));
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+#dripfeed-root .demo-stage {
+  min-width: 0;
+  overflow: visible;
+}
+
+#dripfeed-root .listing-wall {
+  min-width: 0;
+}
+
+/* The title is one stable wordmark. The former independent transforms made
+   the lowercase and uppercase halves collide or balloon on narrow screens. */
+html[data-ncn-app="dripfeed"] .rail-title strong {
+  min-width: 0;
+  overflow: visible;
+  line-height: 1;
+}
+
+html[data-ncn-app="dripfeed"] .dripfeed-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  max-width: 100%;
+  color: #f04439;
+  font-family: "Arial Black", Impact, "Helvetica Neue", system-ui, sans-serif;
+  font-size: clamp(2.15rem, 7vw, 4.7rem);
+  font-weight: 900;
+  font-stretch: condensed;
+  line-height: .78;
+  letter-spacing: -.075em;
+  white-space: nowrap;
+  filter: drop-shadow(0 0 10px rgba(240, 68, 57, .17));
+}
+
+html[data-ncn-app="dripfeed"] .drip-word,
+html[data-ncn-app="dripfeed"] .feed-word {
+  display: inline;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-transform: none;
+  transform: none;
+}
+
+html[data-ncn-app="dripfeed"] .drip-word {
+  text-transform: lowercase;
+}
+
+html[data-ncn-app="dripfeed"] .feed-word {
+  margin-left: .035em;
+  color: #991c1a;
+  text-transform: uppercase;
+  letter-spacing: -.045em;
+}
+
+html[data-ncn-app="dripfeed"] .rail-title > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 740px), (hover: none) and (pointer: coarse) {
+  html[data-ncn-app="dripfeed"] .rail {
+    grid-template-columns: 1fr;
+    align-items: start;
+    padding: 9px 12px 10px;
+  }
+
+  html[data-ncn-app="dripfeed"] .rail-mark {
+    display: none;
+  }
+
+  html[data-ncn-app="dripfeed"] .rail-title {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  html[data-ncn-app="dripfeed"] .dripfeed-wordmark {
+    font-size: clamp(2.15rem, 10.5vw, 3.35rem);
+    letter-spacing: -.065em;
+  }
+
+  html[data-ncn-app="dripfeed"] .rail-title > span {
+    max-width: none;
+    margin-top: 8px;
+    font-size: clamp(.53rem, 2.45vw, .68rem);
+    line-height: 1.45;
+  }
+
+  html[data-ncn-app="dripfeed"] .rail-title::after {
+    margin-top: 5px;
+    font-size: clamp(.52rem, 2.4vw, .66rem);
+  }
+
+  #dripfeed-root .dripfeed-filter-rail {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  #dripfeed-root .filter-transmit {
+    min-width: 104px;
+  }
+}
+
+@media (max-width: 390px) {
+  html[data-ncn-app="dripfeed"] .dripfeed-wordmark {
+    font-size: clamp(2rem, 10.2vw, 2.75rem);
+  }
+
+  #dripfeed-root .dripfeed-filter-rail,
+  #dripfeed-root .dripfeed-utility-rail,
+  #dripfeed-root .demo-stage,
+  #dripfeed-root .drip-footer {
+    width: min(100%, var(--drip-aperture-width, calc(100% - 8px)));
+  }
+}
