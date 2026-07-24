@@ -57,6 +57,14 @@ window.NCNApplications = (() => {
     if (submitButton) submitButton.textContent = current.submitLabel;
   }
 
+  function applicationProjectionObjects() {
+    const inspectorEntry = document.querySelector("#desktop-inspector .entry");
+    return [
+      ...getFeedProjectionObjects(),
+      ...(inspectorEntry ? getVisibleProjectionObjects(inspectorEntry) : [])
+    ];
+  }
+
   function commitApplication(name) {
     const next = profile(name).name;
     activateApplicationState(next);
@@ -84,9 +92,9 @@ window.NCNApplications = (() => {
 
     return runProjectionTransaction({
       name: `application:${NCN_STATE.activeApp}->${next}`,
-      dismiss: getFeedProjectionObjects,
+      dismiss: applicationProjectionObjects,
       commit: () => commitApplication(next),
-      resolve: getFeedProjectionObjects
+      resolve: applicationProjectionObjects
     });
   }
 
