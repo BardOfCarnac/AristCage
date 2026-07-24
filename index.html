@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="css/selector-panel-corrections.css" />
   <link rel="stylesheet" href="css/final-interaction-polish.css" />
   <link rel="stylesheet" href="css/layered-chamber.css" />
-  <link rel="stylesheet" href="css/dripfeed-app.css?v=shared-terminal-1" />
+  <link rel="stylesheet" href="css/dripfeed-app.css?v=shared-terminal-2" />
   <link rel="stylesheet" href="css/heuristic-rangefinder.css?v=front-carrier-15" data-optional-module="heuristic-rangefinder" />
   <link rel="stylesheet" href="css/optical-projection.css?v=dark-edge-plate-1" data-optional-module="optical-projection" />
   <link rel="stylesheet" href="css/optical-three-plane-profile.css?v=priority-clear-1" data-optional-module="optical-projection" />
@@ -60,10 +60,11 @@
     <div class="rail-occlusion" aria-hidden="true"></div>
 
     <main class="app">
-      <div class="app-shell">
+      <div class="app-shell" id="redwire-root">
         <section class="feed" id="feed" aria-label="Projected feed"></section>
         <aside class="desktop-inspector" id="desktop-inspector" aria-label="Selected transmission"></aside>
       </div>
+      <section id="dripfeed-root" class="dripfeed-root" aria-label="Dripfeed classifieds application" hidden></section>
     </main>
   </div>
 
@@ -71,7 +72,6 @@
   <script src="js/data.js"></script>
   <script src="js/story-metadata-polish.js"></script>
   <script src="js/state.js"></script>
-  <script src="js/dripfeed-data.js?v=shared-terminal-1"></script>
   <script src="js/render.js"></script>
   <script src="js/controls.js"></script>
   <script src="js/selector-panel-corrections.js"></script>
@@ -79,7 +79,7 @@
   <script src="js/projection-engine.js"></script>
   <script src="js/layout.js"></script>
   <script src="js/actions.js"></script>
-  <script src="js/dripfeed-app.js?v=shared-terminal-1"></script>
+  <script src="js/dripfeed-app.js?v=independent-app-2"></script>
   <script src="js/ui-polish.js"></script>
   <script src="js/selector-interaction-fix.js"></script>
   <script src="js/dropdown-unification.js"></script>
@@ -94,7 +94,7 @@
   <script src="js/optical-port-map.js?v=soft-perspective-1"></script>
   <script src="js/heuristic-rangefinder.js?v=front-carrier-15" data-optional-module="heuristic-rangefinder"></script>
   <script src="js/optical-projection.js?v=semantic-three-ports-2" data-optional-module="optical-projection"></script>
-  <script src="js/application-switcher.js?v=dripfeed-slot-1"></script>
-  <script src="js/diagnostics.js?v=application-slot-1"></script>
+  <script src="js/application-switcher.js?v=independent-app-2"></script>
+  <script src="js/diagnostics.js?v=application-slot-2"></script>
 </body>
 </html>
