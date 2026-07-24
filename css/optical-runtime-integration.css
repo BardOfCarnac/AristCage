@@ -1,0 +1,62 @@
+/* Runtime-only additions. This file must not redefine the established Optical geometry. */
+
+.optical-mode .optical-plane-system {
+  opacity: var(--viewer-power, 1);
+  transform:
+    translate(
+      var(--viewer-registration-x, 0px),
+      var(--viewer-registration-y, 0px)
+    );
+  transform-origin: 50% 50%;
+}
+
+.optical-mode #feed > .entry:not(.panel) {
+  cursor: pointer;
+}
+
+.optical-mode .optical-semantic-item.optical-resolving,
+.optical-mode .optical-semantic-item.optical-dismissing {
+  will-change: opacity, transform, filter;
+}
+
+.optical-hit-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.optical-hit-target {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  background: transparent;
+  touch-action: manipulation;
+}
+
+.optical-semantic-item.optical-hover[data-optical-role="plate"] {
+  filter: brightness(1.08);
+}
+
+.optical-semantic-item.optical-keyboard-focus[data-optical-role="plate"] {
+  outline: 2px solid rgba(255, 196, 150, .9);
+  outline-offset: 5px;
+  box-shadow:
+    0 0 0 1px rgba(255, 62, 40, .55),
+    0 0 18px rgba(255, 62, 40, .42);
+}
+
+html.viewer-fault-active .optical-plane-system {
+  filter: brightness(calc(.86 + var(--viewer-power, 1) * .14));
+}
+
+html.viewer-fault-active .optical-semantic-item[data-optical-role="headline"] .headline {
+  text-shadow: 0 0 10px rgba(255, 84, 44, .34);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .optical-mode .optical-semantic-item.optical-absent,
+  .optical-mode .optical-semantic-item.optical-dismissing {
+    opacity: 0 !important;
+  }
+}
