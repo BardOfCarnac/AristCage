@@ -1,0 +1,122 @@
+/*==================================================
+  NCN TERMINAL ENVIRONMENT LAYERS
+==================================================*/
+
+.ncn-environment-system {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  perspective: 900px;
+}
+
+.ncn-floor-mist {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: .92;
+  filter: blur(.7px);
+  mix-blend-mode: screen;
+}
+
+.ncn-floor-mist.is-enabled {
+  display: block;
+}
+
+.ncn-chamber-block {
+  display: none;
+  position: fixed;
+  opacity: 0;
+  transform-origin: var(--block-origin-x, 0%) 50%;
+  transform: translate3d(0, 0, 0) rotateY(0deg);
+  background: rgba(28, 2, 5, .92);
+  border: 1px solid rgba(255, 66, 43, .42);
+  box-shadow:
+    0 0 8px rgba(255, 52, 36, .18),
+    inset 0 0 10px rgba(255, 54, 37, .08);
+  will-change: transform, opacity;
+}
+
+.ncn-chamber-block.is-profile-enabled,
+.ncn-chamber-block.is-moving {
+  display: block;
+}
+
+.ncn-chamber-block.is-moving {
+  opacity: .88;
+}
+
+.ncn-chamber-block-grid,
+.ncn-chamber-block-edge {
+  position: absolute;
+  inset: 0;
+}
+
+.ncn-chamber-block-grid {
+  background-image:
+    linear-gradient(rgba(255, 62, 40, .18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 62, 40, .16) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+.ncn-chamber-block-edge {
+  box-shadow: inset 0 0 0 1px rgba(255, 118, 76, .12);
+}
+
+/* Application roots have already been hidden when realignment starts, leaving
+   the terminal chamber itself as the visible subject. */
+.viewer-realigning .layered-chamber-system,
+.viewer-realigning .optical-plane-system,
+.viewer-realigning .ncn-environment-system {
+  transform:
+    translate3d(var(--ncn-align-x, 0), var(--ncn-align-y, 0), 0)
+    rotate(var(--ncn-align-rotation, 0deg))
+    scale(var(--ncn-align-scale, 1));
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.viewer-realigning .app {
+  pointer-events: none;
+}
+
+.viewer-realigning .optical-plane-system {
+  filter: brightness(var(--ncn-align-brightness, 1));
+}
+
+html[data-viewer-state="realigning"] .ncn-floor-mist {
+  opacity: .28;
+}
+
+html[data-viewer-state="interacting"] .ncn-floor-mist {
+  opacity: .72;
+}
+
+.rail-actions .layered-chamber-toggle,
+.rail-actions .heuristic-rangefinder-toggle,
+.rail-actions .optical-toggle {
+  display: none;
+}
+
+.diagnostics-on .rail-actions .layered-chamber-toggle,
+.diagnostics-on .rail-actions .heuristic-rangefinder-toggle,
+.diagnostics-on .rail-actions .optical-toggle {
+  display: inline-flex;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ncn-floor-mist,
+  .ncn-chamber-block {
+    display: none !important;
+  }
+
+  .viewer-realigning .layered-chamber-system,
+  .viewer-realigning .optical-plane-system,
+  .viewer-realigning .ncn-environment-system {
+    transform: none !important;
+  }
+}

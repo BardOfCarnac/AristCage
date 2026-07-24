@@ -1,8 +1,9 @@
 /*==================================================
   TERMINAL APPLICATION SWITCHER
 
-  Applications share the terminal shell, chamber camera and rendering runtime,
-  but each application owns its own document model and renderer.
+  Applications share the neutral terminal chamber and runtime, while each owns
+  its document model, renderer and environmental profile. Animated switches hide
+  the outgoing mount, realign the empty chamber, then activate the incoming app.
 ==================================================*/
 
 window.NCNApplications = (() => {
@@ -23,10 +24,10 @@ window.NCNApplications = (() => {
     })
   });
 
-  const redwireRoot = document.querySelector('.app-shell');
+  const redwireRoot = document.querySelector('#redwire-root');
   const dripfeedRoot = document.querySelector('#dripfeed-root');
   let dripfeedApp = null;
-  let restoreRedwireOptics = false;
+  let switching = false;
 
   function profile(name) {
     return profiles[name] || profiles.redwire;
@@ -60,18 +61,13 @@ window.NCNApplications = (() => {
     return dripfeedApp;
   }
 
-  function setMountVisibility(name) {
+  function setMountVisibility(name = null) {
     if (redwireRoot) redwireRoot.hidden = name !== 'redwire';
     if (dripfeedRoot) dripfeedRoot.hidden = name !== 'dripfeed';
   }
 
   function prepareToLeave(name) {
-    if (name === 'redwire') {
-      restoreRedwireOptics = Boolean(window.OpticalProjection?.isEnabled?.());
-      if (restoreRedwireOptics) window.OpticalProjection.disable({ persist: false });
-      return;
-    }
-    dripfeedApp?.deactivate?.();
+    if (name === 'dripfeed') dripfeedApp?.deactivate?.();
   }
 
   function mountApplication(name) {
@@ -86,36 +82,57 @@ window.NCNApplications = (() => {
     render();
     updateProjection();
     activatePresence(true);
+  }
 
-    if (restoreRedwireOptics && !window.OpticalProjection?.isEnabled?.()) {
-      window.OpticalProjection?.enable?.({ persist: false });
-    } else {
-      window.OpticalProjection?.refresh?.();
-    }
+  function resolveApplication(name, animate) {
+    const root = name === 'dripfeed' ? dripfeedRoot : redwireRoot;
+    root?.classList.remove('application-resolving');
+    if (!animate) return;
+    requestAnimationFrame(() => root?.classList.add('application-resolving'));
+    window.setTimeout(() => root?.classList.remove('application-resolving'), 320);
   }
 
   async function switchTo(name, options = {}) {
     const next = profile(name).name;
     const current = NCN_STATE.activeApp || 'redwire';
-    if (next === current && options.force !== true) return false;
+    if (switching || (next === current && options.force !== true)) return false;
+    switching = true;
 
-    prepareToLeave(current);
-    NCN_STATE.activeApp = next;
-    updateChrome(next);
-    mountApplication(next);
+    try {
+      const environment = window.NCNEnvironment;
+      prepareToLeave(current);
+      setMountVisibility(null);
 
-    const nextRoot = next === 'dripfeed' ? dripfeedRoot : redwireRoot;
-    nextRoot?.classList.remove('application-resolving');
-    if (options.animate !== false) {
-      requestAnimationFrame(() => nextRoot?.classList.add('application-resolving'));
-      window.setTimeout(() => nextRoot?.classList.remove('application-resolving'), 320);
+      if (environment?.prepareApplication) {
+        await environment.prepareApplication(next, {
+          previous: current,
+          animate: options.animate !== false,
+          magnitude: 1.08
+        });
+      }
+
+      NCN_STATE.activeApp = next;
+      updateChrome(next);
+      mountApplication(next);
+
+      if (environment?.activateApplication) {
+        environment.activateApplication(next, { previous: current });
+      }
+
+      resolveApplication(next, options.animate !== false);
+      window.sessionStorage.setItem(SESSION_KEY, next);
+      window.dispatchEvent(new CustomEvent('ncn:application-change', {
+        detail: {
+          name: next,
+          previous: current,
+          reason: options.reason || 'switch',
+          environmentHandled: Boolean(environment?.activateApplication)
+        }
+      }));
+      return true;
+    } finally {
+      switching = false;
     }
-
-    window.sessionStorage.setItem(SESSION_KEY, next);
-    window.dispatchEvent(new CustomEvent('ncn:application-change', {
-      detail: { name: next, reason: options.reason || 'switch' }
-    }));
-    return true;
   }
 
   function initialApplication() {
@@ -134,14 +151,15 @@ window.NCNApplications = (() => {
     updateChrome('redwire');
   }
 
-  return {
+  return Object.freeze({
     switchTo,
     current: () => NCN_STATE.activeApp,
+    isSwitching: () => switching,
     profiles: () => Object.values(profiles).map(item => ({ ...item })),
     getDepthPlaneDefinitions: () => (
       NCN_STATE.activeApp === 'dripfeed'
         ? dripfeedApp?.getDepthPlaneDefinitions?.() || window.Dripfeed?.depth?.PLANE_DEFINITIONS || []
         : window.OpticalProjection?.getPlaneDefinitions?.() || []
     )
-  };
+  });
 })();
