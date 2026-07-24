@@ -22,10 +22,12 @@ Dripfeed and RedWire are separate applications running inside the same NCN termi
 
 - classified publication model
 - mixed-size tile-wall renderer
-- live, saved, seen and expired views
+- category filter rail and classified search
 - expanded classified reader
 - three-stage classified submission flow
 - Unsplash picker and attribution
-- Dripfeed live, rear and reader plane roles
+- Dripfeed live-wall and reader plane roles
+
+Dripfeed does not use terminal-local SAVED or SEEN states. Expiry remains a publication property and may be shown directly on a classified tile.
 
 Dripfeed records must never be adapted into `NCN_ENTRIES` or passed through RedWire's `entryMarkup()` renderer. The terminal application switch changes mounted application roots, not datasets inside one renderer.
