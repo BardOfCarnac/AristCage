@@ -1,8 +1,9 @@
 /*==================================================
   PERMANENT OPTICAL ARTICLE RENDERER
 
-  Four semantic chamber ports replace the old ten-plane demonstrator. Source
-  cards remain as invisible layout, interaction and accessibility geometry.
+  Four semantic chamber ports replace the old ten-plane demonstrator.
+  Source cards retain layout and accessibility; projected hit targets follow
+  the visible geometry.
 ==================================================*/
 
 .optical-plane-system {
@@ -13,7 +14,11 @@
   pointer-events: none;
   contain: layout paint;
   opacity: var(--viewer-power, 1);
-  transform: translate(var(--viewer-registration-x, 0px), var(--viewer-registration-y, 0px));
+  transform:
+    translate(
+      var(--viewer-registration-x, 0px),
+      var(--viewer-registration-y, 0px)
+    );
   transform-origin: 50% 50%;
 }
 
@@ -23,6 +28,8 @@
   margin-left: calc(var(--optical-card-overhang) * -.5);
   margin-bottom: 18px;
   opacity: 0;
+  cursor: pointer;
+  user-select: none;
 }
 
 .optical-mode #feed > .entry:not(.panel) > .projection-plate {
@@ -70,7 +77,11 @@
   transform: scale(var(--optical-item-scale, 1));
   transform-origin: 50% 50%;
   backface-visibility: hidden;
-  will-change: opacity, transform;
+}
+
+.optical-semantic-item.entering,
+.optical-semantic-item.leaving {
+  will-change: opacity, transform, filter;
 }
 
 .optical-semantic-item > * {
@@ -133,35 +144,93 @@
   letter-spacing: .17em;
 }
 
-/* Canonical source lifecycle mirrored onto each optical group. */
+/* Canonical source lifecycle delivered by ProjectionRenderer. */
 .optical-semantic-item.gone {
   opacity: 0;
 }
 
-.optical-semantic-item.entering,
-.optical-semantic-item.energy-up {
-  animation: optical-canonical-resolve 300ms cubic-bezier(.16, .78, .2, 1) both;
+.optical-semantic-item.entering {
+  animation:
+    optical-canonical-resolve
+    300ms
+    cubic-bezier(.16, .78, .2, 1)
+    both;
 }
 
 .optical-semantic-item.present {
   opacity: 1;
 }
 
-.optical-semantic-item.leaving,
-.optical-semantic-item.energy-down {
-  animation: optical-canonical-dismiss 190ms cubic-bezier(.55, 0, .8, .32) both;
+.optical-semantic-item.leaving {
+  animation:
+    optical-canonical-dismiss
+    190ms
+    cubic-bezier(.55, 0, .8, .32)
+    both;
 }
 
 @keyframes optical-canonical-resolve {
-  0% { opacity: 0; filter: brightness(.3) saturate(.55); }
-  58% { opacity: .8; filter: brightness(calc(1 + var(--optical-resolve-glow, .5))) saturate(1.08); }
-  100% { opacity: 1; filter: none; }
+  0% {
+    opacity: 0;
+    filter: brightness(.3) saturate(.55);
+  }
+
+  58% {
+    opacity: .8;
+    filter:
+      brightness(calc(1 + var(--optical-resolve-glow, .5)))
+      saturate(1.08);
+  }
+
+  100% {
+    opacity: 1;
+    filter: none;
+  }
 }
 
 @keyframes optical-canonical-dismiss {
-  0% { opacity: 1; filter: none; }
-  55% { opacity: .42; filter: brightness(.72) saturate(.75); }
-  100% { opacity: 0; filter: brightness(.25) saturate(.45); }
+  0% {
+    opacity: 1;
+    filter: none;
+  }
+
+  55% {
+    opacity: .42;
+    filter: brightness(.72) saturate(.75);
+  }
+
+  100% {
+    opacity: 0;
+    filter: brightness(.25) saturate(.45);
+  }
+}
+
+/* One projected hit surface per article follows the visible union. */
+.optical-hit-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.optical-hit-target {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  background: transparent;
+  touch-action: manipulation;
+}
+
+.optical-semantic-item.optical-hover[data-optical-role="structure"] {
+  filter: brightness(1.08);
+}
+
+.optical-semantic-item.optical-keyboard-focus[data-optical-role="structure"] {
+  outline: 2px solid rgba(255, 196, 150, .9);
+  outline-offset: 5px;
+  box-shadow:
+    0 0 0 1px rgba(255, 62, 40, .55),
+    0 0 18px rgba(255, 62, 40, .42);
 }
 
 html.viewer-fault-active .optical-plane-system {
