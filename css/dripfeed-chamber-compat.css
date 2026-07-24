@@ -159,6 +159,64 @@ html[data-ncn-app="dripfeed"] .rail-title > span {
   }
 }
 
+/* Some mobile browsers expose a wide layout viewport even in portrait. Touch
+   capability is therefore a safer signal than width alone for the reader and
+   transmission form. */
+@media (hover: none) and (pointer: coarse) {
+  #dripfeed-root .reader-overlay,
+  #dripfeed-root .submit-overlay {
+    padding: 0;
+  }
+
+  #dripfeed-root .reader-card {
+    width: calc(100% - 20px);
+    max-width: 620px;
+    max-height: 92dvh;
+    grid-template-columns: 1fr;
+  }
+
+  #dripfeed-root .reader-image {
+    min-height: 180px;
+    max-height: 28dvh;
+  }
+
+  #dripfeed-root .reader-copy {
+    min-height: 360px;
+    padding: 16px;
+  }
+
+  #dripfeed-root .submit-card {
+    width: calc(100% - 10px);
+    max-width: 720px;
+    max-height: 97dvh;
+  }
+
+  #dripfeed-root .form-columns,
+  #dripfeed-root .review-card {
+    grid-template-columns: 1fr;
+  }
+
+  #dripfeed-root .field.full {
+    grid-column: auto;
+  }
+
+  #dripfeed-root .photo-results {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #dripfeed-root .unsplash-bar {
+    grid-template-columns: 1fr auto;
+  }
+
+  #dripfeed-root .unsplash-bar select {
+    grid-column: 1 / -1;
+  }
+
+  #dripfeed-root .review-image {
+    min-height: 190px;
+  }
+}
+
 @media (max-width: 390px) {
   html[data-ncn-app="dripfeed"] .dripfeed-wordmark {
     font-size: clamp(2rem, 10.2vw, 2.75rem);
