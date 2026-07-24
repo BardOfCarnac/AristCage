@@ -14,6 +14,13 @@ const NCN_CONFIG = {
   },
   projection: {
     travel: 58
+  },
+  dripfeed: {
+    // Set these to the deployed Supabase Edge Function URLs when the live
+    // Unsplash application is connected. Empty values keep the local demo
+    // image search available without exposing an API key in the browser.
+    unsplashSearchEndpoint: "",
+    unsplashTrackEndpoint: ""
   }
 };
 
