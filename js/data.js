@@ -1,6 +1,7 @@
-const NCN_ENTRIES = [
+const NCN_REDWIRE_ENTRIES = [
   {
     id: "av-clinic",
+    app: "redwire",
     type: "story",
     priority: 4,
     priorityLabel: "Warning",
@@ -10,11 +11,12 @@ const NCN_ENTRIES = [
     timeScope: "Now",
     headline: "Unmarked AV spotted circling old clinic block",
     meta: "23:41 // Watson // Street Feed",
-    tags: "AV // Clinic // Unverified",
+    tags: "Crime // Sprawl // Eyewitness",
     body: "Locals report repeated low-altitude passes over a shuttered ripperdoc unit. Power is back on inside, but no official permits have been logged."
   },
   {
     id: "arasaka-convoy",
+    app: "redwire",
     type: "story",
     priority: 3,
     priorityLabel: "Alert",
@@ -24,11 +26,12 @@ const NCN_ENTRIES = [
     timeScope: "Now",
     headline: "Arasaka convoy delayed",
     meta: "00:12 // Corpo Plaza // Traffic Desk",
-    tags: "Corp // Traffic // Escort",
+    tags: "Infra // City Core // Press",
     body: "A corporate convoy halted traffic for fourteen minutes before diverting through private security lanes."
   },
   {
     id: "power-surge",
+    app: "redwire",
     type: "story",
     priority: 2,
     priorityLabel: "Advisory",
@@ -38,11 +41,12 @@ const NCN_ENTRIES = [
     timeScope: "Now",
     headline: "Power surge reported across the south grid",
     meta: "22:09 // Santo Domingo // Civic Notice",
-    tags: "Grid // Fire // Local",
+    tags: "Infra // Industrial // Civic",
     body: "Residents reported a blue-white flash across the south grid before emergency shutters dropped."
   },
   {
     id: "metro-tunnels",
+    app: "redwire",
     type: "story",
     priority: 4,
     priorityLabel: "Emergency",
@@ -52,11 +56,12 @@ const NCN_ENTRIES = [
     timeScope: "Last Day",
     headline: "Three boosters found in sealed metro tunnels",
     meta: "22:11 // Urban Sprawl // Scanner Traffic",
-    tags: "Crime // Metro // Investigation",
+    tags: "Crime // Sprawl // Scanner",
     body: "Scanner traffic reports three unidentified boosters discovered beneath a sealed transit spur."
   },
   {
     id: "budget-clinics",
+    app: "redwire",
     type: "story",
     priority: 2,
     priorityLabel: "Bulletin",
@@ -66,10 +71,15 @@ const NCN_ENTRIES = [
     timeScope: "All Time",
     headline: "Kiroshi closes three budget clinics",
     meta: "22:14 // Private Enclave // Corporate",
-    tags: "Business // Health // Kiroshi",
+    tags: "Business // Enclave // Corporate",
     body: "Kiroshi Optical has shuttered three low-cost eye clinics, citing unsustainable operating conditions."
   }
 ];
+
+// This array is deliberately stable. The terminal application switcher replaces
+// its contents so every existing renderer, inspector and depth observer keeps the
+// same reference while the selected application changes.
+const NCN_ENTRIES = NCN_REDWIRE_ENTRIES.map(entry => ({ ...entry }));
 
 /*
   Higher depth means nearer to the viewer and therefore more parallax.
