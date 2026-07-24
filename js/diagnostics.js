@@ -91,6 +91,18 @@ function opticalLayerListMarkup(camera = cameraSnapshot()) {
   return layers.map(layer => opticalLayerMarkup(layer, camera)).join("");
 }
 
+function updateApplicationDiagnostics() {
+  if (!diagnosticsPanel) return;
+  const current = window.NCNApplications?.current?.() || NCN_STATE.activeApp || "redwire";
+  diagnosticsPanel.querySelectorAll("[data-debug-app]").forEach(button => {
+    const active = button.dataset.debugApp === current;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  const readout = diagnosticsPanel.querySelector("[data-debug-current-app]");
+  if (readout) readout.textContent = current.toUpperCase();
+}
+
 function ensureDiagnosticsInterface() {
   if (diagnosticsPanel) return;
 
@@ -100,6 +112,14 @@ function ensureDiagnosticsInterface() {
   panel.setAttribute("aria-label", "Projection diagnostics");
   panel.innerHTML = `
     <div class="diagnostics-title"><span>Projection Diagnostics</span><span>DEV</span></div>
+    <section class="diagnostics-section diagnostics-application-section">
+      <div class="diagnostics-heading">Terminal application · temporary launcher bypass</div>
+      <div class="diagnostics-app-switch" role="group" aria-label="Terminal application">
+        <button type="button" data-debug-app="redwire">RedWire</button>
+        <button type="button" data-debug-app="dripfeed">Dripfeed</button>
+      </div>
+      <div class="diagnostics-app-readout">Mounted: <strong data-debug-current-app>REDWIRE</strong></div>
+    </section>
     <section class="diagnostics-section">
       <div class="diagnostics-heading">Energy spectrum 0–10</div>
       <div class="diagnostics-spectrum">${energySpectrumMarkup()}</div>
@@ -144,6 +164,13 @@ function ensureDiagnosticsInterface() {
   toggle.className = "diagnostics-toggle";
   toggle.addEventListener("click", toggleDiagnostics);
 
+  panel.querySelectorAll("[data-debug-app]").forEach(button => {
+    button.addEventListener("click", () => {
+      void window.NCNApplications?.switchTo?.(button.dataset.debugApp);
+    });
+  });
+
+  window.addEventListener("ncn:application-change", updateApplicationDiagnostics);
   document.body.append(panel, toggle);
   diagnosticsPanel = panel;
   diagnosticsToggle = toggle;
@@ -155,6 +182,7 @@ function ensureDiagnosticsInterface() {
   diagnosticsCameraFocal = panel.querySelector("[data-debug-camera-focal]");
   diagnosticsCameraAperture = panel.querySelector("[data-debug-camera-aperture]");
   diagnosticsOpticalLayers = panel.querySelector("[data-debug-optical-layers]");
+  updateApplicationDiagnostics();
 }
 
 function findDiagnosticEntry() {
@@ -208,6 +236,7 @@ function updateDiagnosticsLiveValues() {
   diagnosticsLiveOffset.textContent = offset.toFixed(3);
   diagnosticsLiveScroll.textContent = Math.round(window.scrollY).toString();
   updateCameraDiagnostics();
+  updateApplicationDiagnostics();
 }
 
 function bindDiagnosticsLiveListeners() {
