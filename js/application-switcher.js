@@ -1,9 +1,8 @@
 /*==================================================
   TERMINAL APPLICATION SWITCHER
 
-  RedWire and Dripfeed are independent applications mounted into the same
-  chamber, feed host, inspector and optical projection infrastructure. The
-  temporary switch is intentionally exposed only through diagnostics.js.
+  Applications share the terminal shell, chamber camera and rendering runtime,
+  but each application owns its own document model and renderer.
 ==================================================*/
 
 window.NCNApplications = (() => {
@@ -14,8 +13,6 @@ window.NCNApplications = (() => {
       mark: "NCN",
       title: "Night City News",
       version: "14.07.2045 / v1.0",
-      filterLabel: "Filter",
-      submitLabel: "Submit",
       documentTitle: "Night City News"
     }),
     dripfeed: Object.freeze({
@@ -23,20 +20,17 @@ window.NCNApplications = (() => {
       mark: "DF",
       title: "Dripfeed Classifieds",
       version: "14.07.2045 / DF 0.8 / APP 02",
-      filterLabel: "Browse",
-      submitLabel: "+ Transmit",
       documentTitle: "Dripfeed // Night City News Terminal"
     })
   });
 
+  const redwireRoot = document.querySelector(".app-shell");
+  const dripfeedRoot = document.querySelector("#dripfeed-root");
+  let dripfeedApp = null;
+  let restoreRedwireOptics = false;
+
   function profile(name) {
     return profiles[name] || profiles.redwire;
-  }
-
-  function entriesFor(name) {
-    return name === "dripfeed"
-      ? window.DripfeedApp.entries()
-      : NCN_REDWIRE_ENTRIES.map(entry => ({ ...entry }));
   }
 
   function updateChrome(name) {
@@ -44,8 +38,6 @@ window.NCNApplications = (() => {
     const mark = document.querySelector(".rail-mark");
     const title = document.querySelector(".rail-title strong");
     const version = document.querySelector(".rail-title span");
-    const filterButton = document.querySelector('[data-panel="filter"]');
-    const submitButton = document.querySelector('[data-panel="submit"]');
 
     document.documentElement.dataset.ncnApp = current.name;
     document.body.dataset.ncnApp = current.name;
@@ -53,49 +45,74 @@ window.NCNApplications = (() => {
     if (mark) mark.textContent = current.mark;
     if (title) title.textContent = current.title;
     if (version) version.textContent = current.version;
-    if (filterButton) filterButton.textContent = current.filterLabel;
-    if (submitButton) submitButton.textContent = current.submitLabel;
   }
 
-  function applicationProjectionObjects() {
-    const inspectorEntry = document.querySelector("#desktop-inspector .entry");
-    return [
-      ...getFeedProjectionObjects(),
-      ...(inspectorEntry ? getVisibleProjectionObjects(inspectorEntry) : [])
-    ];
+  function ensureDripfeed() {
+    if (dripfeedApp) return dripfeedApp;
+    if (!dripfeedRoot || !window.Dripfeed?.mount) return null;
+    dripfeedApp = window.Dripfeed.mount(dripfeedRoot);
+    return dripfeedApp;
   }
 
-  function commitApplication(name) {
-    const next = profile(name).name;
-    activateApplicationState(next);
-    NCN_ENTRIES.splice(0, NCN_ENTRIES.length, ...entriesFor(next));
-    updateChrome(next);
+  function setMountVisibility(name) {
+    if (redwireRoot) redwireRoot.hidden = name !== "redwire";
+    if (dripfeedRoot) dripfeedRoot.hidden = name !== "dripfeed";
+  }
+
+  function prepareToLeave(name) {
+    if (name === "redwire") {
+      restoreRedwireOptics = Boolean(window.OpticalProjection?.isEnabled?.());
+      if (restoreRedwireOptics) {
+        window.OpticalProjection.disable({ persist: false });
+      }
+      return;
+    }
+
+    dripfeedApp?.deactivate?.();
+  }
+
+  function mountApplication(name) {
+    if (name === "dripfeed") {
+      const app = ensureDripfeed();
+      setMountVisibility("dripfeed");
+      app?.activate?.();
+      return;
+    }
+
+    setMountVisibility("redwire");
     render();
-    syncPanelButtons();
     updateProjection();
-    window.OpticalProjection?.refresh?.();
-    window.sessionStorage.setItem(SESSION_KEY, next);
-    window.dispatchEvent(new CustomEvent("ncn:application-change", {
-      detail: { name: next, reason: "switch" }
-    }));
+    activatePresence(true);
+
+    if (restoreRedwireOptics && !window.OpticalProjection?.isEnabled?.()) {
+      window.OpticalProjection?.enable?.({ persist: false });
+    } else {
+      window.OpticalProjection?.refresh?.();
+    }
   }
 
   async function switchTo(name, options = {}) {
     const next = profile(name).name;
-    if (next === NCN_STATE.activeApp && options.force !== true) return false;
+    const current = NCN_STATE.activeApp || "redwire";
+    if (next === current && options.force !== true) return false;
 
-    if (options.animate === false || !feed?.children.length) {
-      commitApplication(next);
-      activatePresence(true);
-      return true;
+    prepareToLeave(current);
+    NCN_STATE.activeApp = next;
+    updateChrome(next);
+    mountApplication(next);
+
+    const nextRoot = next === "dripfeed" ? dripfeedRoot : redwireRoot;
+    nextRoot?.classList.remove("application-resolving");
+    if (options.animate !== false) {
+      requestAnimationFrame(() => nextRoot?.classList.add("application-resolving"));
+      window.setTimeout(() => nextRoot?.classList.remove("application-resolving"), 320);
     }
 
-    return runProjectionTransaction({
-      name: `application:${NCN_STATE.activeApp}->${next}`,
-      dismiss: applicationProjectionObjects,
-      commit: () => commitApplication(next),
-      resolve: applicationProjectionObjects
-    });
+    window.sessionStorage.setItem(SESSION_KEY, next);
+    window.dispatchEvent(new CustomEvent("ncn:application-change", {
+      detail: { name: next, reason: options.reason || "switch" }
+    }));
+    return true;
   }
 
   function initialApplication() {
@@ -106,12 +123,22 @@ window.NCNApplications = (() => {
   }
 
   const initial = initialApplication();
-  if (initial !== "redwire") switchTo(initial, { animate: false, force: true });
-  else updateChrome("redwire");
+  if (initial === "dripfeed") {
+    void switchTo("dripfeed", { animate: false, force: true, reason: "initial" });
+  } else {
+    NCN_STATE.activeApp = "redwire";
+    setMountVisibility("redwire");
+    updateChrome("redwire");
+  }
 
   return {
     switchTo,
     current: () => NCN_STATE.activeApp,
-    profiles: () => Object.values(profiles).map(item => ({ ...item }))
+    profiles: () => Object.values(profiles).map(item => ({ ...item })),
+    getDepthPlaneDefinitions: () => (
+      NCN_STATE.activeApp === "dripfeed"
+        ? dripfeedApp?.getDepthPlaneDefinitions?.() || window.Dripfeed?.depth?.PLANE_DEFINITIONS || []
+        : window.OpticalProjection?.getPlaneDefinitions?.() || []
+    )
   };
 })();
