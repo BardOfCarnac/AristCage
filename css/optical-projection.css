@@ -1,50 +1,27 @@
 /*==================================================
-  OPTIONAL OPTICAL PROJECTION
+  PERMANENT OPTICAL ARTICLE RENDERER
 
-  Semantic article objects occupy independent chamber planes. Remove
-  this file, the matching script and the rail toggle to restore the
-  standard viewer unchanged.
+  Four semantic chamber ports replace the old ten-plane demonstrator. Source
+  cards remain as invisible layout, interaction and accessibility geometry.
 ==================================================*/
 
-.optical-mode .viewer {
-  position: relative;
-  z-index: 20;
-  isolation: isolate;
-}
-
 .optical-plane-system {
-  display: none;
-}
-
-.optical-mode .optical-plane-system {
-  display: block;
   position: fixed;
   inset: 0;
   z-index: 15;
   overflow: visible;
   pointer-events: none;
   contain: layout paint;
+  opacity: var(--viewer-power, 1);
+  transform: translate(var(--viewer-registration-x, 0px), var(--viewer-registration-y, 0px));
+  transform-origin: 50% 50%;
 }
-
-.optical-mode .rail-occlusion {
-  background: transparent !important;
-}
-
-.optical-mode #layered-chamber-fg {
-  opacity: 0;
-}
-
-/*==================================================
-  SOURCE GEOMETRY
-
-  The invisible source cards retain the real spacing and click targets.
-==================================================*/
 
 .optical-mode #feed > .entry:not(.panel) {
   --optical-card-overhang: clamp(16px, 5vw, 30px);
   width: calc(100% + var(--optical-card-overhang));
-  margin-left: calc(var(--optical-card-overhang) * -0.5);
-  margin-bottom: 16px;
+  margin-left: calc(var(--optical-card-overhang) * -.5);
+  margin-bottom: 18px;
   opacity: 0;
 }
 
@@ -76,14 +53,7 @@
   line-height: 1.56;
 }
 
-/*==================================================
-  DEPTH PORTS
-
-  JavaScript positions and clips every plane to camera.aperturePointsAt(z).
-  The wrapper itself is never scaled: the chamber port remains exact.
-==================================================*/
-
-.optical-mode .optical-plane {
+.optical-plane {
   position: fixed;
   z-index: var(--optical-plane-order, 0);
   overflow: hidden;
@@ -92,45 +62,31 @@
   contain: layout paint;
 }
 
-/* The semantic box keeps its original measured dimensions. Scaling is applied
-   to the entire object, so typography, borders and glow scale together. */
-.optical-mode .optical-semantic-item {
+.optical-semantic-item {
   position: absolute;
   margin: 0;
   pointer-events: none;
   opacity: 1;
-  filter: none;
   transform: scale(var(--optical-item-scale, 1));
   transform-origin: 50% 50%;
   backface-visibility: hidden;
+  will-change: opacity, transform;
 }
 
-.optical-mode .optical-semantic-item > * {
+.optical-semantic-item > * {
   box-sizing: border-box;
 }
 
-.optical-mode .optical-semantic-item .part,
-.optical-mode .optical-semantic-item .priority,
-.optical-mode .optical-semantic-item .body {
+.optical-semantic-item .part,
+.optical-semantic-item .priority,
+.optical-semantic-item .body {
   opacity: 1 !important;
   animation: none !important;
   transition: none !important;
-}
-
-.optical-mode .optical-semantic-item[data-optical-role="plate"] .optical-plate-surface,
-.optical-mode .optical-semantic-item[data-optical-role="frame"] .frame,
-.optical-mode .optical-semantic-item[data-optical-role="corners"] .corners,
-.optical-mode .optical-semantic-item[data-optical-role="priority"] .priority {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
   transform: none !important;
 }
 
-/* A nearly opaque centre keeps the card readable. Transparency is confined
-   to the outer edge, avoiding a large blurred inset shadow over every panel. */
-.optical-mode .optical-semantic-item[data-optical-role="plate"] .optical-plate-surface {
+.optical-plate-surface {
   background: radial-gradient(
     140% 115% at 50% 50%,
     rgba(0, 0, 0, .94) 0%,
@@ -138,129 +94,82 @@
     rgba(0, 0, 0, .82) 84%,
     rgba(0, 0, 0, .28) 100%
   );
-  box-shadow: none;
 }
 
-.optical-mode .optical-semantic-item[data-optical-role="frame"] .frame {
+.optical-frame-copy {
   border-color: rgba(255, 70, 40, .28);
   box-shadow: 0 0 10px rgba(255, 70, 40, .14);
 }
 
-.optical-mode .optical-semantic-item[data-optical-role="priority"] .priority {
-  min-width: 6px;
+.optical-priority-copy {
+  min-width: 7px;
 }
 
-.optical-mode .optical-semantic-item[data-optical-role="headline"] .headline,
-.optical-mode .optical-semantic-item[data-optical-role="tags"] .tags,
-.optical-mode .optical-semantic-item[data-optical-role="meta"] .meta,
-.optical-mode .optical-semantic-item[data-optical-role="body"] .body {
-  width: 100%;
-  margin: 0;
-  transform: none !important;
-}
-
-.optical-mode .optical-semantic-item[data-optical-role="headline"] .headline {
-  font-size: clamp(1.82rem, 8.4vw, 3.3rem);
-  line-height: .9;
-}
-
-.optical-mode .optical-semantic-item[data-optical-role="tags"] .tags {
-  font-size: .7rem;
-  letter-spacing: .17em;
-}
-
-.optical-mode .optical-semantic-item[data-optical-role="body"] .body {
+.optical-body-copy {
   padding: 0;
   font-size: 1rem;
   line-height: 1.56;
 }
 
-.optical-mode .optical-semantic-item .mobile-inspector-detail-grid {
+.optical-detail-copy {
   display: grid !important;
-  width: 100%;
-  height: 100%;
   margin: 0;
 }
 
-.optical-mode .optical-detail-labels .detail-value,
-.optical-mode .optical-detail-values .detail-label {
-  visibility: hidden !important;
+.optical-headline-copy,
+.optical-meta-copy,
+.optical-tags-copy,
+.optical-body-copy {
+  margin: 0;
 }
 
-.optical-mode .optical-detail-values {
-  border-top-color: transparent !important;
+.optical-headline-copy {
+  font-size: clamp(1.82rem, 8.4vw, 3.3rem);
+  line-height: .9;
 }
 
-/*==================================================
-  OPTICAL PRESENCE
-==================================================*/
+.optical-tags-copy {
+  font-size: .7rem;
+  letter-spacing: .17em;
+}
 
-.optical-mode .optical-semantic-item.optical-absent {
+/* Canonical source lifecycle mirrored onto each optical group. */
+.optical-semantic-item.gone {
   opacity: 0;
-  filter: brightness(.3) saturate(.55);
 }
 
-.optical-mode .optical-semantic-item.optical-resolving {
-  animation: optical-semantic-resolve
-    var(--optical-resolve-duration, 280ms)
-    cubic-bezier(.16, .78, .2, 1)
-    var(--optical-resolve-delay, 0ms)
-    both;
+.optical-semantic-item.entering,
+.optical-semantic-item.energy-up {
+  animation: optical-canonical-resolve 300ms cubic-bezier(.16, .78, .2, 1) both;
 }
 
-.optical-mode .optical-semantic-item.optical-present {
+.optical-semantic-item.present {
   opacity: 1;
-  filter: none;
 }
 
-.optical-mode .optical-semantic-item.optical-dismissing {
-  animation: optical-semantic-dismiss 190ms cubic-bezier(.55, 0, .8, .32) both;
+.optical-semantic-item.leaving,
+.optical-semantic-item.energy-down {
+  animation: optical-canonical-dismiss 190ms cubic-bezier(.55, 0, .8, .32) both;
 }
 
-.optical-mode .optical-semantic-item.optical-body-resolving {
-  animation: optical-body-resolve 360ms cubic-bezier(.16, .78, .2, 1) both;
+@keyframes optical-canonical-resolve {
+  0% { opacity: 0; filter: brightness(.3) saturate(.55); }
+  58% { opacity: .8; filter: brightness(calc(1 + var(--optical-resolve-glow, .5))) saturate(1.08); }
+  100% { opacity: 1; filter: none; }
 }
 
-.optical-mode .optical-semantic-item.optical-body-dismissing {
-  animation: optical-body-dismiss 180ms cubic-bezier(.55, 0, .8, .32) both;
-}
-
-@keyframes optical-semantic-resolve {
-  0% {
-    opacity: 0;
-    filter: brightness(.28) saturate(.5);
-  }
-  58% {
-    opacity: .78;
-    filter: brightness(calc(1 + var(--optical-resolve-glow, .5))) saturate(1.1);
-  }
-  100% {
-    opacity: 1;
-    filter: none;
-  }
-}
-
-@keyframes optical-semantic-dismiss {
+@keyframes optical-canonical-dismiss {
   0% { opacity: 1; filter: none; }
   55% { opacity: .42; filter: brightness(.72) saturate(.75); }
   100% { opacity: 0; filter: brightness(.25) saturate(.45); }
 }
 
-@keyframes optical-body-resolve {
-  0% { opacity: 0; filter: brightness(.38) saturate(.65); }
-  58% { opacity: .78; filter: brightness(1.24) saturate(1.08); }
-  100% { opacity: 1; filter: none; }
+html.viewer-fault-active .optical-plane-system {
+  filter: brightness(calc(.86 + var(--viewer-power, 1) * .14));
 }
 
-@keyframes optical-body-dismiss {
-  0% { opacity: 1; filter: none; }
-  100% { opacity: 0; filter: brightness(.35) saturate(.55); }
-}
-
-.optical-toggle[aria-pressed="true"] {
-  color: var(--white);
-  border-color: rgba(255, 180, 110, .7);
-  text-shadow: 0 0 9px rgba(255, 100, 45, .65);
+html.viewer-fault-active .optical-headline-copy {
+  text-shadow: 0 0 10px rgba(255, 84, 44, .34);
 }
 
 @media (max-width: 420px) {
@@ -270,11 +179,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .optical-mode .optical-semantic-item,
-  .optical-mode .optical-semantic-item * {
+  .optical-semantic-item,
+  .optical-semantic-item * {
     animation: none !important;
     transition: none !important;
-    opacity: 1 !important;
     filter: none !important;
   }
 }
