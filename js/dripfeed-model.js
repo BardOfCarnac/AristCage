@@ -1,5 +1,7 @@
 (function (DF) {
-  const terminalConfig = window.NCN_CONFIG?.dripfeed || {};
+  const terminalConfig = typeof NCN_CONFIG !== 'undefined'
+    ? NCN_CONFIG.dripfeed || {}
+    : {};
   DF.config = Object.assign({
     worldNow: '2045-07-14T21:17:00-07:00',
     unsplashSearchEndpoint: terminalConfig.unsplashSearchEndpoint || '',
