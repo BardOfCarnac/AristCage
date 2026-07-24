@@ -144,9 +144,13 @@ html[data-ncn-app="dripfeed"].layered-chamber-mode .layered-chamber-system {
   }
 }
 
-/* Touch devices always use the compact overlay composition, even when a
-   browser reports an unusually wide layout viewport. */
+/* Touch devices always use the compact composition, even when a browser
+   reports an unusually wide layout viewport. */
 @media (hover: none) and (pointer: coarse) {
+  #dripfeed-root {
+    --cols: 3;
+  }
+
   #dripfeed-root .reader-overlay,
   #dripfeed-root .submit-overlay {
     padding: 0;
@@ -198,5 +202,11 @@ html[data-ncn-app="dripfeed"].layered-chamber-mode .layered-chamber-system {
 
   #dripfeed-root .review-image {
     min-height: 190px;
+  }
+}
+
+@media (max-width: 350px) and (hover: none) and (pointer: coarse) {
+  #dripfeed-root {
+    --cols: 2;
   }
 }
