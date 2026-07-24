@@ -37,6 +37,7 @@
       this.opened = false;
       this.sourceElement = null;
       this.flightStage = null;
+      this.sequence = 0;
       this.motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)') || null;
       this.onKeyDown = event => {
         if (event.key === 'Escape' && this.opened && !this.busy) this.close();
@@ -100,6 +101,7 @@
 
     async open(post, sourceElement) {
       if (this.busy || this.opened) return false;
+      const sequence = ++this.sequence;
       const overlay = this.overlay;
       const target = this.target;
       if (!overlay || !target) return false;
@@ -116,6 +118,7 @@
 
       await nextFrame();
       await nextFrame();
+      if (sequence !== this.sequence) return false;
 
       if (!readerCard || !this.sourceElement || this.reducedMotion()) {
         overlay.classList.remove('reader-transitioning', 'reader-opening');
@@ -202,6 +205,7 @@
         sourceAnimation.finished,
         targetAnimation.finished
       ]);
+      if (sequence !== this.sequence) return false;
 
       this.clearFlight();
       overlay.classList.remove('reader-transitioning', 'reader-opening');
@@ -216,6 +220,7 @@
       const overlay = this.overlay;
       if (!overlay) return false;
       if ((!this.opened && !this.busy) || (this.busy && !immediate)) return false;
+      const sequence = ++this.sequence;
 
       const readerCard = this.target?.querySelector('.reader-card');
       const sourceElement = this.sourceElement;
@@ -307,6 +312,7 @@
         targetAnimation.finished,
         sourceAnimation.finished
       ]);
+      if (sequence !== this.sequence) return false;
 
       this.clearFlight();
       this.revealSource();
