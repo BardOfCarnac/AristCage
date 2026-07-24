@@ -1,0 +1,5 @@
+[functions.unsplash-search]
+verify_jwt = false
+
+[functions.unsplash-track-download]
+verify_jwt = false

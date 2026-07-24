@@ -120,7 +120,7 @@ document.addEventListener("click", event => {
     return;
   }
 
-  if (event.target.closest("form, button, input, select, textarea, label, summary, details")) {
+  if (event.target.closest("form, button, input, select, textarea, label, summary, details, a")) {
     return;
   }
 
