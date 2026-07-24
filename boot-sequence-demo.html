@@ -8,7 +8,6 @@
   :root {
     color-scheme: dark;
     --black: #010000;
-    --deep: #160004;
     --red: #9d0714;
     --bright: #f02a27;
     --hot: #ff6b42;
@@ -163,7 +162,7 @@
 
   .surface-copy {
     position: absolute;
-    left: 6%; right: 6%; top: 6%;
+    left: 6%; right: 6%; top: 5%;
     display: grid;
     gap: clamp(3px, .55vh, 7px);
     color: rgba(255,82,57,.76);
@@ -172,8 +171,8 @@
     text-shadow: 0 0 6px rgba(255,28,29,.35);
     opacity: 0;
   }
-  .back .surface-copy { left: 5%; right: 5%; top: 5%; font-size: clamp(7px, 1vw, 14px); }
-  .left .surface-copy, .right .surface-copy { top: 4%; font-size: clamp(5px, .67vw, 10px); }
+  .back .surface-copy { left: 5%; right: 5%; top: 4%; font-size: clamp(7px, 1vw, 14px); }
+  .left .surface-copy, .right .surface-copy { top: 3%; font-size: clamp(5px, .67vw, 10px); }
   .surface-copy .strong { color: rgba(255,205,170,.92); }
   .surface-copy .dim { color: rgba(173,30,35,.56); }
   .surface-copy .fail { color: rgba(255,58,44,.94); }
@@ -212,6 +211,49 @@
     39%, 100% { opacity: 0; }
   }
 
+  .wall-title-piece,
+  .wall-title-sub {
+    position: absolute;
+    z-index: 4;
+    pointer-events: none;
+    opacity: 0;
+    backface-visibility: hidden;
+  }
+
+  .wall-title-piece {
+    top: 20%;
+    font-family: Arial Black, Impact, sans-serif;
+    font-size: clamp(58px, 12vw, 158px);
+    line-height: .72;
+    letter-spacing: -.08em;
+    color: var(--cream);
+    text-shadow: 0 0 4px #fff, 0 0 18px rgba(255,84,46,.72), 0 0 36px rgba(255,15,23,.45);
+    transform: translateZ(1px);
+  }
+  .left .wall-title-piece { right: -2%; width: 110%; text-align: right; }
+  .back .wall-title-piece { left: 50%; width: 32%; text-align: center; transform: translateX(-50%) translateZ(1px); }
+  .right .wall-title-piece { left: -2%; width: 110%; text-align: left; }
+
+  .wall-title-sub {
+    top: 36%;
+    color: rgba(255,92,58,.88);
+    font-size: clamp(7px, 1.05vw, 15px);
+    letter-spacing: .22em;
+    white-space: nowrap;
+    transform: translateZ(1px);
+  }
+  .left .wall-title-sub { right: 5%; }
+  .back .wall-title-sub { left: 50%; transform: translateX(-50%) translateZ(1px); }
+  .right .wall-title-sub { left: 5%; }
+
+  .run .wall-title-piece,
+  .run .wall-title-sub { animation: wallTitleAppear var(--duration) steps(1,end) forwards; }
+  @keyframes wallTitleAppear {
+    0%, 31% { opacity: 0; }
+    34% { opacity: .92; }
+    39%, 100% { opacity: 1; }
+  }
+
   .title-rig {
     position: absolute;
     inset: 0;
@@ -219,77 +261,33 @@
     transform-style: preserve-3d;
     pointer-events: none;
   }
-  .title-piece {
+
+  .projection-piece {
     position: absolute;
-    top: 22%;
-    width: 18vw;
+    margin: 0;
+    transform-style: preserve-3d;
+    transition:
+      left .9s cubic-bezier(.18,.8,.18,1),
+      top .9s cubic-bezier(.18,.8,.18,1),
+      width .9s cubic-bezier(.18,.8,.18,1),
+      transform .9s cubic-bezier(.18,.8,.18,1);
+    will-change: left, top, transform;
+  }
+  .projection-piece.detached {
+    left: var(--final-x) !important;
+    top: var(--final-y) !important;
+    transform: translate(-50%, -50%) translateZ(var(--final-z)) rotateY(0deg) scaleX(1) !important;
+  }
+  .projection-piece.detached.title-letter {
+    width: 18vw !important;
     min-width: 84px;
     max-width: 210px;
-    text-align: center;
-    font-family: Arial Black, Impact, sans-serif;
-    font-size: clamp(50px, 11vw, 148px);
-    line-height: .72;
-    letter-spacing: -.08em;
-    color: var(--cream);
-    text-shadow: 0 0 4px #fff, 0 0 18px rgba(255,84,46,.72), 0 0 36px rgba(255,15,23,.45);
-    opacity: 0;
-    transform-style: preserve-3d;
+    text-align: center !important;
   }
-  .title-piece.left-letter {
-    left: 8.5%;
-    transform-origin: right center;
-    transform: rotateY(66deg) translateZ(-16px) scaleX(.74);
-  }
-  .title-piece.centre-letter {
-    left: 50%;
-    transform: translateX(-50%) translateZ(-92px) scaleX(.82);
-  }
-  .title-piece.right-letter {
-    right: 8.5%;
-    transform-origin: left center;
-    transform: rotateY(-66deg) translateZ(-16px) scaleX(.74);
-  }
-
-  .title-sub {
-    position: absolute;
-    left: 50%; top: 36%;
-    transform: translateX(-50%) translateZ(-92px) perspective(500px) rotateX(2deg) scaleX(.76);
-    width: min(60vw, 520px);
-    text-align: center;
-    color: rgba(255,92,58,.88);
-    font-size: clamp(8px, 1.4vw, 17px);
-    letter-spacing: .34em;
-    opacity: 0;
-  }
-
-  .run .left-letter { animation: titleLeft var(--duration) cubic-bezier(.18,.8,.18,1) forwards; }
-  .run .centre-letter { animation: titleCentre var(--duration) cubic-bezier(.18,.8,.18,1) forwards; }
-  .run .right-letter { animation: titleRight var(--duration) cubic-bezier(.18,.8,.18,1) forwards; }
-  .run .title-sub { animation: titleSubtitle var(--duration) cubic-bezier(.18,.8,.18,1) forwards; }
-
-  @keyframes titleLeft {
-    0%, 31% { opacity: 0; left: 8.5%; top: 22%; transform: rotateY(66deg) translateZ(-16px) scaleX(.74); }
-    34% { opacity: .92; }
-    39% { opacity: 1; left: 8.5%; top: 22%; transform: rotateY(66deg) translateZ(-16px) scaleX(.74); }
-    49%, 100% { opacity: 1; left: calc(50% - clamp(74px, 9vw, 126px)); top: 25%; transform: translateX(-50%) translateZ(122px) rotateY(0) scaleX(1); }
-  }
-  @keyframes titleCentre {
-    0%, 31% { opacity: 0; left: 50%; top: 22%; transform: translateX(-50%) translateZ(-92px) scaleX(.82); }
-    34% { opacity: .92; }
-    39% { opacity: 1; left: 50%; top: 22%; transform: translateX(-50%) translateZ(-92px) scaleX(.82); }
-    49%, 100% { opacity: 1; left: 50%; top: 25%; transform: translateX(-50%) translateZ(122px) scaleX(1); }
-  }
-  @keyframes titleRight {
-    0%, 31% { opacity: 0; right: 8.5%; top: 22%; transform: rotateY(-66deg) translateZ(-16px) scaleX(.74); }
-    34% { opacity: .92; }
-    39% { opacity: 1; right: 8.5%; top: 22%; transform: rotateY(-66deg) translateZ(-16px) scaleX(.74); }
-    49%, 100% { opacity: 1; right: calc(50% - clamp(74px, 9vw, 126px)); top: 25%; transform: translateX(50%) translateZ(122px) rotateY(0) scaleX(1); }
-  }
-  @keyframes titleSubtitle {
-    0%, 32% { opacity: 0; top: 36%; transform: translateX(-50%) translateZ(-92px) scaleX(.76); }
-    35% { opacity: .86; }
-    39% { opacity: 1; top: 36%; transform: translateX(-50%) translateZ(-92px) scaleX(.76); }
-    49%, 100% { opacity: 1; top: 39%; transform: translateX(-50%) translateZ(118px) scaleX(1); }
+  .projection-sub.detached {
+    width: auto !important;
+    text-align: center !important;
+    transform: translate(-50%, -50%) translateZ(118px) rotateY(0deg) scaleX(1) !important;
   }
 
   .activation-lock {
@@ -432,15 +430,14 @@
     .chamber { inset: 4vh 2vw; }
     .back { left: 20%; right: 20%; }
     .surface-copy { letter-spacing: .02em; }
-    .title-piece { font-size: clamp(50px, 18vw, 96px); width: 22vw; }
-    .title-piece.left-letter { left: 7%; }
-    .title-piece.right-letter { right: 7%; }
+    .wall-title-piece { font-size: clamp(54px, 19vw, 100px); }
     .menu { margin-top: 21vh; }
     .statusline { flex-direction: column; align-items: center; text-align: center; }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .viewer *, .viewer::after { animation-duration: .001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+    .projection-piece { transition-duration: .001ms !important; }
   }
 </style>
 </head>
@@ -454,7 +451,10 @@
         <div class="line">DISTRICT DIRECTORY ..... LOADING</div>
         <div class="line">SUBROUTE INDEX ......... VERIFYING</div>
       </div>
+      <span class="wall-title-piece title-letter" data-slot="0" data-final-z="122px" data-angle="0" data-scale=".82">C</span>
+      <span class="wall-title-sub title-sub-fragment" data-slot="0" data-angle="0" data-scale=".8">CITY</span>
     </div>
+
     <div class="plane left">
       <div class="surface-copy">
         <div class="line strong">TERMINAL CRV-04-771</div>
@@ -463,7 +463,10 @@
         <div class="line dim">COURIER IDENTIFICATION / STANDBY</div>
         <div class="line strong">DISPATCH QUEUE / SEALED</div>
       </div>
+      <span class="wall-title-piece title-letter" data-slot="-1" data-final-z="122px" data-angle="66" data-scale=".74">N</span>
+      <span class="wall-title-sub title-sub-fragment" data-slot="-1" data-angle="66" data-scale=".72">NIGHT</span>
     </div>
+
     <div class="plane right">
       <div class="surface-copy">
         <div class="line strong">LOCAL SUBROUTE 07-C-14</div>
@@ -471,7 +474,10 @@
         <div class="line">LOCAL EXCHANGE / AVAILABLE</div>
         <div class="line fail">UPLINE EXCHANGE / NO RESPONSE</div>
       </div>
+      <span class="wall-title-piece title-letter" data-slot="1" data-final-z="122px" data-angle="-66" data-scale=".74">N</span>
+      <span class="wall-title-sub title-sub-fragment" data-slot="1" data-angle="-66" data-scale=".72">NEWS</span>
     </div>
+
     <div class="plane floor"></div>
     <div class="plane ceiling"></div>
   </div>
@@ -484,12 +490,7 @@
     PUBLIC RELAY ACCESS / ENABLED
   </div>
 
-  <div class="title-rig" aria-hidden="true">
-    <span class="title-piece left-letter">N</span>
-    <span class="title-piece centre-letter">C</span>
-    <span class="title-piece right-letter">N</span>
-    <div class="title-sub">NIGHT CITY NEWS</div>
-  </div>
+  <div class="title-rig" id="title-rig" aria-hidden="true"></div>
 
   <div class="activation-lock" aria-hidden="true">
     <strong>REDWIRE SERVICE LAYER</strong>
@@ -513,15 +514,18 @@
   <div class="edge-flash"></div>
   <div class="selection-pulse" id="selection-pulse"></div>
 </div>
+
 <script>
 (() => {
   const viewer = document.getElementById('viewer');
+  const titleRig = document.getElementById('title-rig');
   const options = [...document.querySelectorAll('.option')];
   const descriptor = document.getElementById('descriptor');
   const replay = document.getElementById('replay');
   const pulse = document.getElementById('selection-pulse');
   const startScreen = document.querySelector('.start-screen');
   let selected = 0;
+  let detached = false;
 
   function select(index, focus = false) {
     selected = (index + options.length) % options.length;
@@ -540,13 +544,52 @@
     descriptor.textContent = `${options[selected].textContent.trim().toUpperCase()} / SERVICE HANDOFF READY`;
   }
 
-  function restart() {
-    startScreen.style.pointerEvents = 'none';
-    viewer.classList.remove('run');
-    void viewer.offsetWidth;
-    viewer.classList.add('run');
-    select(0);
-    setTimeout(() => { startScreen.style.pointerEvents = 'auto'; }, 7600);
+  function detachTitle() {
+    if (detached) return;
+    detached = true;
+
+    const pieces = [
+      ...document.querySelectorAll('.title-letter'),
+      ...document.querySelectorAll('.title-sub-fragment')
+    ];
+
+    const states = pieces.map(piece => {
+      const rect = piece.getBoundingClientRect();
+      return { piece, rect };
+    });
+
+    states.forEach(({ piece, rect }) => {
+      const isSubtitle = piece.classList.contains('title-sub-fragment');
+      const angle = Number(piece.dataset.angle || 0);
+      const scale = Number(piece.dataset.scale || 1);
+
+      titleRig.appendChild(piece);
+      piece.classList.add('projection-piece');
+      if (isSubtitle) piece.classList.add('projection-sub');
+
+      piece.style.left = `${rect.left + rect.width / 2}px`;
+      piece.style.top = `${rect.top + rect.height / 2}px`;
+      piece.style.width = `${Math.max(rect.width, 1)}px`;
+      piece.style.height = `${Math.max(rect.height, 1)}px`;
+      piece.style.opacity = '1';
+
+      const slot = Number(piece.dataset.slot || 0);
+      const letterSpacing = Math.min(126, Math.max(74, innerWidth * .09));
+      const subtitleSpacing = Math.min(100, Math.max(55, innerWidth * .075));
+      const finalSpacing = isSubtitle ? subtitleSpacing : letterSpacing;
+      const finalY = innerHeight * (isSubtitle ? .39 : .25);
+
+      piece.style.setProperty('--final-x', `${innerWidth / 2 + slot * finalSpacing}px`);
+      piece.style.setProperty('--final-y', `${finalY}px`);
+      piece.style.setProperty('--final-z', piece.dataset.finalZ || '118px');
+      piece.style.transform = `translate(-50%, -50%) rotateY(${angle}deg) scaleX(${scale})`;
+    });
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        pieces.forEach(piece => piece.classList.add('detached'));
+      });
+    });
   }
 
   options.forEach((option, index) => {
@@ -559,11 +602,13 @@
     if (event.key === 'ArrowDown') { event.preventDefault(); select(selected + 1, true); }
     if (event.key === 'ArrowUp') { event.preventDefault(); select(selected - 1, true); }
     if (event.key === 'Enter') activate();
-    if (event.key.toLowerCase() === 'r') restart();
+    if (event.key.toLowerCase() === 'r') location.reload();
   });
 
-  replay.addEventListener('click', restart);
+  replay.addEventListener('click', () => location.reload());
   select(0);
+
+  setTimeout(detachTitle, 3520);
   setTimeout(() => { startScreen.style.pointerEvents = 'auto'; }, 7600);
 })();
 </script>
