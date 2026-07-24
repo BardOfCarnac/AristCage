@@ -1,11 +1,19 @@
-/* Optional chamber subsystem. Removing this file and layered-chamber.js restores the original viewer. */
-.layered-chamber-system {
+/* Permanent chamber compositor: rear canvas < optical DOM < front canvas. */
+:root {
+  --viewer-power: 1;
+  --viewer-registration-x: 0px;
+  --viewer-registration-y: 0px;
+}
+
+.layered-chamber-layer {
   position: fixed;
   inset: 0;
-  z-index: 10;
   pointer-events: none;
   overflow: hidden;
 }
+
+.layered-chamber-rear { z-index: 10; }
+.layered-chamber-front { z-index: 18; }
 
 .layered-chamber-canvas {
   position: absolute;
@@ -15,39 +23,29 @@
   pointer-events: none;
 }
 
-#layered-chamber-bg { z-index: 0; }
-#layered-chamber-fg {
-  z-index: 1;
-  filter: blur(.35px);
+html.viewer-spatial-runtime body {
+  background: #020102;
 }
 
-html.layered-chamber-mode body { background: #020102; }
-html.layered-chamber-mode .viewer { position: relative; z-index: 20; }
-html.layered-chamber-mode .rail { z-index: 50; }
-
-.layered-chamber-toggle[aria-pressed="true"] {
-  color: #fff;
-  border-color: #e43b45;
-  box-shadow: 0 0 12px rgba(228, 59, 69, .35);
+html.viewer-spatial-runtime .viewer {
+  position: relative;
+  z-index: 20;
 }
 
-/* Lab mode preserves the current geometry demonstrator. Background mode leaves the app intact. */
-html.layered-chamber-lab-mode .app,
-html.layered-chamber-lab-mode .rail-occlusion {
-  visibility: hidden;
-  pointer-events: none;
+html.viewer-spatial-runtime .rail {
+  z-index: 50;
 }
 
-html.layered-chamber-lab-mode .rail {
-  background: linear-gradient(to bottom, rgba(2, 1, 2, .94), rgba(2, 1, 2, .54));
+html.viewer-spatial-runtime .rail-occlusion {
+  background: transparent !important;
 }
 
-html.layered-chamber-lab-mode .rail-actions button:not(.layered-chamber-toggle),
-html.layered-chamber-lab-mode .rail-mark,
-html.layered-chamber-lab-mode .rail-title {
-  opacity: .28;
+html.viewer-fault-active .layered-chamber-front {
+  opacity: calc(.82 + (1 - var(--viewer-power)) * .18);
 }
 
-@media (max-width: 720px) {
-  .layered-chamber-toggle { font-size: 11px; }
+@media (prefers-reduced-motion: reduce) {
+  .layered-chamber-front {
+    opacity: .72;
+  }
 }
