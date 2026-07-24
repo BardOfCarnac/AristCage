@@ -2,12 +2,13 @@
   const terminalConfig = typeof NCN_CONFIG !== 'undefined'
     ? NCN_CONFIG.dripfeed || {}
     : {};
+
   DF.config = Object.assign({
     worldNow: '2045-07-14T21:17:00-07:00',
     unsplashSearchEndpoint: terminalConfig.unsplashSearchEndpoint || '',
     unsplashTrackEndpoint: terminalConfig.unsplashTrackEndpoint || '',
     terminalId: '08-441',
-    appVersion: '0.8.0',
+    appVersion: '0.8.1',
     storageKey: 'ncn-dripfeed-v08'
   }, window.DRIPFEED_CONFIG || {});
 })(window.Dripfeed = window.Dripfeed || {});
@@ -21,16 +22,22 @@
     rides:     { code: 'MOV', label: 'Rides',     mark: '»' },
     community: { code: 'COM', label: 'Community', mark: '○' }
   };
+
   const LISTING_TYPES = {
     offer:  { label: 'Offering', short: 'OFFER' },
     wanted: { label: 'Wanted', short: 'WANTED' },
     event:  { label: 'Notice', short: 'NOTICE' }
   };
+
   const PUBLICATION_STATES = ['live', 'expired', 'removed'];
 
   function demoImage(label, a, b) {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient><pattern id="p" width="90" height="90" patternUnits="userSpaceOnUse"><path d="M0 90L90 0M-25 25L25-25M65 115L115 65" stroke="rgba(255,255,255,.12)" stroke-width="2"/></pattern></defs><rect width="100%" height="100%" fill="url(#g)"/><rect width="100%" height="100%" fill="url(#p)"/><text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" fill="white" opacity=".9" font-family="monospace" font-size="54">${label}</text></svg>`;
-    return { provider: 'demo', url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg), alt: label };
+    return {
+      provider: 'demo',
+      url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
+      alt: label
+    };
   }
 
   const seedPosts = [
@@ -46,7 +53,7 @@
   function normalisePost(raw) {
     const now = DF.config.worldNow;
     return {
-      id: String(raw.id || `DF-${Math.floor(800 + Math.random()*900)}`),
+      id: String(raw.id || `DF-${Math.floor(800 + Math.random() * 900)}`),
       listingType: LISTING_TYPES[raw.listingType] ? raw.listingType : 'offer',
       category: CATEGORIES[raw.category] ? raw.category : 'items',
       title: String(raw.title || '').trim(),
@@ -56,7 +63,7 @@
       valueLabel: String(raw.valueLabel || 'NEGOTIABLE').trim(),
       contactMethod: String(raw.contactMethod || 'REPLY VIA TERMINAL').trim(),
       createdAt: raw.createdAt || now,
-      expiresAt: raw.expiresAt || new Date(new Date(now).getTime()+3*86400000).toISOString(),
+      expiresAt: raw.expiresAt || new Date(new Date(now).getTime() + 3 * 86400000).toISOString(),
       publicationState: PUBLICATION_STATES.includes(raw.publicationState) ? raw.publicationState : 'live',
       image: raw.image || null,
       custom: Boolean(raw.custom)
@@ -65,18 +72,18 @@
 
   function relativeTime(iso) {
     const delta = Math.max(0, new Date(DF.config.worldNow) - new Date(iso));
-    const mins = Math.floor(delta/60000);
-    if (mins < 60) return `${Math.max(1,mins)}M`;
-    const hours = Math.floor(mins/60);
+    const mins = Math.floor(delta / 60000);
+    if (mins < 60) return `${Math.max(1, mins)}M`;
+    const hours = Math.floor(mins / 60);
     if (hours < 24) return `${hours}H`;
-    return `${Math.floor(hours/24)}D`;
+    return `${Math.floor(hours / 24)}D`;
   }
 
   function expiryLabel(iso) {
     const delta = new Date(iso) - new Date(DF.config.worldNow);
     if (delta <= 0) return 'EXPIRED';
-    const hours = Math.ceil(delta/3600000);
-    return hours < 24 ? `${hours}H LEFT` : `${Math.ceil(hours/24)}D LEFT`;
+    const hours = Math.ceil(delta / 3600000);
+    return hours < 24 ? `${hours}H LEFT` : `${Math.ceil(hours / 24)}D LEFT`;
   }
 
   function effectiveState(post) {
@@ -87,30 +94,46 @@
   class Store {
     constructor() {
       this.posts = seedPosts.map(normalisePost);
-      this.terminal = { seenIds:new Set(), savedIds:new Set() };
       this.load();
     }
+
     load() {
       try {
         const saved = JSON.parse(localStorage.getItem(DF.config.storageKey) || '{}');
         const custom = Array.isArray(saved.posts) ? saved.posts.map(normalisePost) : [];
         this.posts = [...custom, ...this.posts];
-        this.terminal.seenIds = new Set(saved.seenIds || []);
-        this.terminal.savedIds = new Set(saved.savedIds || []);
-      } catch (error) { console.warn('Dripfeed state could not be restored', error); }
+      } catch (error) {
+        console.warn('Dripfeed state could not be restored', error);
+      }
     }
+
     persist() {
       localStorage.setItem(DF.config.storageKey, JSON.stringify({
-        posts:this.posts.filter(post=>post.custom),
-        seenIds:[...this.terminal.seenIds],
-        savedIds:[...this.terminal.savedIds]
+        posts: this.posts.filter(post => post.custom)
       }));
     }
-    add(post) { this.posts.unshift(normalisePost({...post, custom:true})); this.persist(); }
-    markSeen(id, seen=true) { seen ? this.terminal.seenIds.add(id) : this.terminal.seenIds.delete(id); this.persist(); }
-    toggleSaved(id) { this.terminal.savedIds.has(id) ? this.terminal.savedIds.delete(id) : this.terminal.savedIds.add(id); this.persist(); }
-    clearLocal() { localStorage.removeItem(DF.config.storageKey); this.posts=seedPosts.map(normalisePost); this.terminal={seenIds:new Set(),savedIds:new Set()}; }
+
+    add(post) {
+      this.posts.unshift(normalisePost({ ...post, custom: true }));
+      this.persist();
+    }
+
+    clearLocal() {
+      localStorage.removeItem(DF.config.storageKey);
+      this.posts = seedPosts.map(normalisePost);
+    }
   }
 
-  DF.model = { CATEGORIES, LISTING_TYPES, PUBLICATION_STATES, seedPosts, normalisePost, relativeTime, expiryLabel, effectiveState, Store, demoImage };
+  DF.model = {
+    CATEGORIES,
+    LISTING_TYPES,
+    PUBLICATION_STATES,
+    seedPosts,
+    normalisePost,
+    relativeTime,
+    expiryLabel,
+    effectiveState,
+    Store,
+    demoImage
+  };
 })(window.Dripfeed = window.Dripfeed || {});
