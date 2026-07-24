@@ -1,35 +1,45 @@
 /*==================================================
-  PERMANENT OPTICAL ARTICLE RENDERER
+  PERMANENT OPTICAL PROJECTION
 
-  Four semantic chamber ports replace the old ten-plane demonstrator.
-  Source cards retain layout and accessibility; projected hit targets follow
-  the visible geometry.
+  The original Optical display is preserved: semantic article objects occupy
+  their established chamber planes, scales and resolve profile. Source cards
+  remain the layout and accessibility authority.
 ==================================================*/
 
+.optical-mode .viewer {
+  position: relative;
+  z-index: 20;
+  isolation: isolate;
+}
+
 .optical-plane-system {
+  display: none;
+}
+
+.optical-mode .optical-plane-system {
+  display: block;
   position: fixed;
   inset: 0;
   z-index: 15;
   overflow: visible;
   pointer-events: none;
   contain: layout paint;
-  opacity: var(--viewer-power, 1);
-  transform:
-    translate(
-      var(--viewer-registration-x, 0px),
-      var(--viewer-registration-y, 0px)
-    );
-  transform-origin: 50% 50%;
 }
+
+.optical-mode .rail-occlusion {
+  background: transparent !important;
+}
+
+/*==================================================
+  SOURCE GEOMETRY
+==================================================*/
 
 .optical-mode #feed > .entry:not(.panel) {
   --optical-card-overhang: clamp(16px, 5vw, 30px);
   width: calc(100% + var(--optical-card-overhang));
-  margin-left: calc(var(--optical-card-overhang) * -.5);
-  margin-bottom: 18px;
+  margin-left: calc(var(--optical-card-overhang) * -0.5);
+  margin-bottom: 16px;
   opacity: 0;
-  cursor: pointer;
-  user-select: none;
 }
 
 .optical-mode #feed > .entry:not(.panel) > .projection-plate {
@@ -60,7 +70,11 @@
   line-height: 1.56;
 }
 
-.optical-plane {
+/*==================================================
+  DEPTH PORTS
+==================================================*/
+
+.optical-mode .optical-plane {
   position: fixed;
   z-index: var(--optical-plane-order, 0);
   overflow: hidden;
@@ -69,35 +83,41 @@
   contain: layout paint;
 }
 
-.optical-semantic-item {
+.optical-mode .optical-semantic-item {
   position: absolute;
   margin: 0;
   pointer-events: none;
   opacity: 1;
+  filter: none;
   transform: scale(var(--optical-item-scale, 1));
   transform-origin: 50% 50%;
   backface-visibility: hidden;
 }
 
-.optical-semantic-item.entering,
-.optical-semantic-item.leaving {
-  will-change: opacity, transform, filter;
-}
-
-.optical-semantic-item > * {
+.optical-mode .optical-semantic-item > * {
   box-sizing: border-box;
 }
 
-.optical-semantic-item .part,
-.optical-semantic-item .priority,
-.optical-semantic-item .body {
+.optical-mode .optical-semantic-item .part,
+.optical-mode .optical-semantic-item .priority,
+.optical-mode .optical-semantic-item .body {
   opacity: 1 !important;
   animation: none !important;
   transition: none !important;
+}
+
+.optical-mode .optical-semantic-item[data-optical-role="plate"] .optical-plate-surface,
+.optical-mode .optical-semantic-item[data-optical-role="frame"] .frame,
+.optical-mode .optical-semantic-item[data-optical-role="corners"] .corners,
+.optical-mode .optical-semantic-item[data-optical-role="priority"] .priority {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   transform: none !important;
 }
 
-.optical-plate-surface {
+.optical-mode .optical-semantic-item[data-optical-role="plate"] .optical-plate-surface {
   background: radial-gradient(
     140% 115% at 50% 50%,
     rgba(0, 0, 0, .94) 0%,
@@ -105,140 +125,123 @@
     rgba(0, 0, 0, .82) 84%,
     rgba(0, 0, 0, .28) 100%
   );
+  box-shadow: none;
 }
 
-.optical-frame-copy {
+.optical-mode .optical-semantic-item[data-optical-role="frame"] .frame {
   border-color: rgba(255, 70, 40, .28);
   box-shadow: 0 0 10px rgba(255, 70, 40, .14);
 }
 
-.optical-priority-copy {
-  min-width: 7px;
+.optical-mode .optical-semantic-item[data-optical-role="priority"] .priority {
+  min-width: 6px;
 }
 
-.optical-body-copy {
+.optical-mode .optical-semantic-item[data-optical-role="headline"] .headline,
+.optical-mode .optical-semantic-item[data-optical-role="tags"] .tags,
+.optical-mode .optical-semantic-item[data-optical-role="meta"] .meta,
+.optical-mode .optical-semantic-item[data-optical-role="body"] .body {
+  width: 100%;
+  margin: 0;
+  transform: none !important;
+}
+
+.optical-mode .optical-semantic-item[data-optical-role="headline"] .headline {
+  font-size: clamp(1.82rem, 8.4vw, 3.3rem);
+  line-height: .9;
+}
+
+.optical-mode .optical-semantic-item[data-optical-role="tags"] .tags {
+  font-size: .7rem;
+  letter-spacing: .17em;
+}
+
+.optical-mode .optical-semantic-item[data-optical-role="body"] .body {
   padding: 0;
   font-size: 1rem;
   line-height: 1.56;
 }
 
-.optical-detail-copy {
+.optical-mode .optical-semantic-item .mobile-inspector-detail-grid {
   display: grid !important;
+  width: 100%;
+  height: 100%;
   margin: 0;
 }
 
-.optical-headline-copy,
-.optical-meta-copy,
-.optical-tags-copy,
-.optical-body-copy {
-  margin: 0;
+.optical-mode .optical-detail-labels .detail-value,
+.optical-mode .optical-detail-values .detail-label {
+  visibility: hidden !important;
 }
 
-.optical-headline-copy {
-  font-size: clamp(1.82rem, 8.4vw, 3.3rem);
-  line-height: .9;
+.optical-mode .optical-detail-values {
+  border-top-color: transparent !important;
 }
 
-.optical-tags-copy {
-  font-size: .7rem;
-  letter-spacing: .17em;
-}
+/*==================================================
+  OPTICAL PRESENCE
+==================================================*/
 
-/* Canonical source lifecycle delivered by ProjectionRenderer. */
-.optical-semantic-item.gone {
+.optical-mode .optical-semantic-item.optical-absent {
   opacity: 0;
+  filter: brightness(.3) saturate(.55);
 }
 
-.optical-semantic-item.entering {
-  animation:
-    optical-canonical-resolve
-    300ms
+.optical-mode .optical-semantic-item.optical-resolving {
+  animation: optical-semantic-resolve
+    var(--optical-resolve-duration, 280ms)
     cubic-bezier(.16, .78, .2, 1)
+    var(--optical-resolve-delay, 0ms)
     both;
 }
 
-.optical-semantic-item.present {
+.optical-mode .optical-semantic-item.optical-present {
   opacity: 1;
+  filter: none;
 }
 
-.optical-semantic-item.leaving {
-  animation:
-    optical-canonical-dismiss
-    190ms
-    cubic-bezier(.55, 0, .8, .32)
-    both;
+.optical-mode .optical-semantic-item.optical-dismissing {
+  animation: optical-semantic-dismiss 190ms cubic-bezier(.55, 0, .8, .32) both;
 }
 
-@keyframes optical-canonical-resolve {
+.optical-mode .optical-semantic-item.optical-body-resolving {
+  animation: optical-body-resolve 360ms cubic-bezier(.16, .78, .2, 1) both;
+}
+
+.optical-mode .optical-semantic-item.optical-body-dismissing {
+  animation: optical-body-dismiss 180ms cubic-bezier(.55, 0, .8, .32) both;
+}
+
+@keyframes optical-semantic-resolve {
   0% {
     opacity: 0;
-    filter: brightness(.3) saturate(.55);
+    filter: brightness(.28) saturate(.5);
   }
-
   58% {
-    opacity: .8;
-    filter:
-      brightness(calc(1 + var(--optical-resolve-glow, .5)))
-      saturate(1.08);
+    opacity: .78;
+    filter: brightness(calc(1 + var(--optical-resolve-glow, .5))) saturate(1.1);
   }
-
   100% {
     opacity: 1;
     filter: none;
   }
 }
 
-@keyframes optical-canonical-dismiss {
-  0% {
-    opacity: 1;
-    filter: none;
-  }
-
-  55% {
-    opacity: .42;
-    filter: brightness(.72) saturate(.75);
-  }
-
-  100% {
-    opacity: 0;
-    filter: brightness(.25) saturate(.45);
-  }
+@keyframes optical-semantic-dismiss {
+  0% { opacity: 1; filter: none; }
+  55% { opacity: .42; filter: brightness(.72) saturate(.75); }
+  100% { opacity: 0; filter: brightness(.25) saturate(.45); }
 }
 
-/* One projected hit surface per article follows the visible union. */
-.optical-hit-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  pointer-events: none;
+@keyframes optical-body-resolve {
+  0% { opacity: 0; filter: brightness(.38) saturate(.65); }
+  58% { opacity: .78; filter: brightness(1.24) saturate(1.08); }
+  100% { opacity: 1; filter: none; }
 }
 
-.optical-hit-target {
-  position: absolute;
-  pointer-events: auto;
-  cursor: pointer;
-  background: transparent;
-  touch-action: manipulation;
-}
-
-.optical-semantic-item.optical-hover[data-optical-role="structure"] {
-  filter: brightness(1.08);
-}
-
-.optical-semantic-item.optical-keyboard-focus[data-optical-role="structure"] {
-  outline: 2px solid rgba(255, 196, 150, .9);
-  outline-offset: 5px;
-  box-shadow:
-    0 0 0 1px rgba(255, 62, 40, .55),
-    0 0 18px rgba(255, 62, 40, .42);
-}
-
-html.viewer-fault-active .optical-plane-system {
-  filter: brightness(calc(.86 + var(--viewer-power, 1) * .14));
-}
-
-html.viewer-fault-active .optical-headline-copy {
-  text-shadow: 0 0 10px rgba(255, 84, 44, .34);
+@keyframes optical-body-dismiss {
+  0% { opacity: 1; filter: none; }
+  100% { opacity: 0; filter: brightness(.35) saturate(.55); }
 }
 
 @media (max-width: 420px) {
@@ -248,10 +251,11 @@ html.viewer-fault-active .optical-headline-copy {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .optical-semantic-item,
-  .optical-semantic-item * {
+  .optical-mode .optical-semantic-item,
+  .optical-mode .optical-semantic-item * {
     animation: none !important;
     transition: none !important;
+    opacity: 1 !important;
     filter: none !important;
   }
 }
