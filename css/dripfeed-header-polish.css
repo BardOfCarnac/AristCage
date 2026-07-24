@@ -121,6 +121,26 @@ html[data-ncn-app="dripfeed"] .rail-title::after {
   display: none !important;
 }
 
+/* The application has no backing screen. Only the tiles occupy the chamber. */
+#dripfeed-root,
+#dripfeed-root .dripfeed-app,
+#dripfeed-root .demo-stage,
+#dripfeed-root .listing-wall {
+  background: transparent !important;
+}
+
+#dripfeed-root .demo-stage {
+  border-inline: 0 !important;
+  isolation: auto;
+  contain: layout;
+}
+
+#dripfeed-root .demo-stage::before,
+#dripfeed-root .demo-stage::after {
+  content: none !important;
+  display: none !important;
+}
+
 #dripfeed-root .dripfeed-filter-rail {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
