@@ -9,7 +9,6 @@
       this.app = app;
       this.bound = false;
       this.resizeObserver = null;
-      this.visualViewport = window.visualViewport || null;
       this.onResize = () => this.refreshGeometry();
       this.onCameraChange = event => this.refreshGeometry(event.detail);
       this.onEnvironmentPhase = event => {
@@ -19,9 +18,6 @@
       };
     }
 
-    /* Dripfeed belongs to the neutral terminal chamber. Do not consume the
-       LayeredChamber camera first: Optics deliberately patches that API with
-       softened article-port mapping for RedWire. */
     cameraSnapshot() {
       return window.NCNChamberCamera?.snapshot?.()
         || window.LayeredChamber?.getCameraSnapshot?.()
@@ -38,26 +34,23 @@
       window.addEventListener('orientationchange', this.onResize, { passive: true });
       window.addEventListener('ncn:chamber-camera-change', this.onCameraChange);
       window.addEventListener('ncn:application-environment-phase', this.onEnvironmentPhase);
-      this.visualViewport?.addEventListener('resize', this.onResize, { passive: true });
 
       if ('ResizeObserver' in window && stage) {
         this.resizeObserver = new ResizeObserver(() => this.syncGeometry());
         this.resizeObserver.observe(stage);
       }
 
+      this.clearLayoutOverrides();
       this.refreshGeometry();
     }
 
-    columnCount(apertureWidth) {
-      const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches;
-      if (coarsePointer) return apertureWidth < 350 ? 2 : 3;
-      if (apertureWidth < 430) return 2;
-      if (apertureWidth < 760) return 3;
-      if (apertureWidth < 1120) return 4;
-      return 5;
+    clearLayoutOverrides() {
+      const root = this.app.root;
+      ['--drip-aperture-width', '--drip-aperture-left', '--drip-aperture-top', '--cols']
+        .forEach(property => root.style.removeProperty(property));
     }
 
-    applyCamera(camera = this.cameraSnapshot()) {
+    applyDepth(camera = this.cameraSnapshot()) {
       const root = this.app.root;
       const stage = root.querySelector('[data-depth-host]');
       if (!stage || !camera) {
@@ -67,20 +60,12 @@
 
       const live = PLANE_DEFINITIONS.find(plane => plane.role === 'live');
       const reader = PLANE_DEFINITIONS.find(plane => plane.role === 'reader');
-      const aperture = camera.apertureAt(live.z, camera.halfWidth);
-      const viewportWidth = this.visualViewport?.width || camera.width || window.innerWidth;
-      const horizontalGutter = viewportWidth < 520 ? 8 : 14;
-      const usableWidth = Math.max(
-        280,
-        Math.min(aperture.width, viewportWidth - horizontalGutter * 2)
-      );
       const liveScale = camera.scaleAt(live.z);
       const readerScale = camera.scaleAt(reader.z) / liveScale;
 
-      root.style.setProperty('--drip-aperture-width', `${usableWidth.toFixed(2)}px`);
-      root.style.setProperty('--drip-aperture-left', `${Math.max(horizontalGutter, aperture.left).toFixed(2)}px`);
-      root.style.setProperty('--drip-aperture-top', `${Math.max(0, aperture.top).toFixed(2)}px`);
-      root.style.setProperty('--cols', String(this.columnCount(usableWidth)));
+      /* The live wall is the application's design plane, so it remains at its
+         normal responsive size. The camera only supplies the relative reader
+         depth used while a card is open. */
       stage.style.setProperty('--drip-live-scale', '1');
       stage.style.setProperty('--drip-live-reading-scale', Math.max(.91, 2 - readerScale).toFixed(5));
       stage.dataset.sharedCamera = 'true';
@@ -88,7 +73,8 @@
     }
 
     refreshGeometry(camera) {
-      this.applyCamera(camera);
+      this.clearLayoutOverrides();
+      this.applyDepth(camera);
       requestAnimationFrame(() => this.syncGeometry());
       window.LayeredChamber?.refresh?.();
     }
@@ -131,8 +117,8 @@
       window.removeEventListener('orientationchange', this.onResize);
       window.removeEventListener('ncn:chamber-camera-change', this.onCameraChange);
       window.removeEventListener('ncn:application-environment-phase', this.onEnvironmentPhase);
-      this.visualViewport?.removeEventListener('resize', this.onResize);
       this.resizeObserver?.disconnect();
+      this.clearLayoutOverrides();
       this.bound = false;
     }
 
