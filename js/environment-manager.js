@@ -42,15 +42,34 @@ window.NCNEnvironment = (() => {
     });
   }
 
+  function announceChamberGeometry() {
+    const camera = window.NCNChamberCamera?.snapshot?.();
+    if (!camera) return;
+    window.dispatchEvent(new CustomEvent("ncn:chamber-camera-change", {
+      detail: camera
+    }));
+  }
+
   function ensureNeutralChamber() {
     window.NCNEnvironmentHost?.ensure?.();
     const chamber = window.LayeredChamber;
-    if (chamber?.MODES && chamber.getMode?.() !== chamber.MODES.BACKGROUND) {
+    if (!chamber) return false;
+
+    if (chamber.MODES && chamber.getMode?.() !== chamber.MODES.BACKGROUND) {
       chamber.setMode(chamber.MODES.BACKGROUND, {
         persist: false,
         restartAnimation: chamber.getMode?.() === chamber.MODES.OFF
       });
+    } else {
+      chamber.mount?.();
+      chamber.refresh?.();
     }
+
+    requestAnimationFrame(() => {
+      chamber.refresh?.();
+      announceChamberGeometry();
+    });
+    return true;
   }
 
   function disablePresentation() {
@@ -100,6 +119,8 @@ window.NCNEnvironment = (() => {
       force: true
     });
     window.OpticalProjection?.refresh?.();
+    window.LayeredChamber?.refresh?.();
+    requestAnimationFrame(announceChamberGeometry);
     window.dispatchEvent(new CustomEvent("ncn:application-environment-phase", {
       detail: { phase: "active", previous: options.previous || null, next: next.name }
     }));
