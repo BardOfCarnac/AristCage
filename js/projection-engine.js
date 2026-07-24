@@ -1,9 +1,34 @@
 /*==================================================
-  PROJECTION ENGINE V3
+  PROJECTION ENGINE V4
 
-  Projection owns visibility only. It knows nothing about
-  articles, panels, filters, or layout geometry.
+  Projection owns canonical visibility. The active visual renderer receives
+  the same semantic lifecycle directly; it does not infer it from the DOM.
 ==================================================*/
+
+const ProjectionRenderer = (() => {
+  let renderer = null;
+
+  function register(candidate) {
+    renderer = candidate || null;
+    renderer?.refreshLifecycle?.();
+    return () => {
+      if (renderer === candidate) renderer = null;
+    };
+  }
+
+  function notify(object, state) {
+    if (!object || !renderer?.transitionObject) return;
+    renderer.transitionObject(object, state);
+  }
+
+  function refresh() {
+    renderer?.refreshLifecycle?.();
+  }
+
+  return { register, notify, refresh };
+})();
+
+window.NCNProjectionRenderer = ProjectionRenderer;
 
 const Projection = (() => {
   const lifecycleClasses = [
@@ -33,16 +58,19 @@ const Projection = (() => {
     object.classList.remove(...lifecycleClasses);
   }
 
-  function show(object) {
+  function setState(object, state, classes) {
     if (!object) return;
     clean(object);
-    object.classList.add("present");
+    object.classList.add(...classes);
+    ProjectionRenderer.notify(object, state);
+  }
+
+  function show(object) {
+    setState(object, "present", ["present"]);
   }
 
   function hide(object) {
-    if (!object) return;
-    clean(object);
-    object.classList.add("gone");
+    setState(object, "gone", ["gone"]);
   }
 
   function animationFallbackMs(object) {
@@ -101,12 +129,12 @@ const Projection = (() => {
   async function transitionObjectToGone(object) {
     if (!object) return;
 
-    clean(object);
-    object.classList.add("leaving", "energy-down");
+    setState(object, "leaving", ["leaving", "energy-down"]);
     await waitForAnimation(object);
 
     object.classList.remove("leaving", "energy-down");
     object.classList.add("gone");
+    ProjectionRenderer.notify(object, "gone");
   }
 
   async function transitionObjectToPresent(object, delay = 0) {
@@ -116,13 +144,13 @@ const Projection = (() => {
       await new Promise(resolvePromise => window.setTimeout(resolvePromise, delay));
     }
 
-    clean(object);
-    object.classList.add("entering");
+    setState(object, "entering", ["entering"]);
 
     await new Promise(resolvePromise => {
       requestAnimationFrame(() => {
         object.classList.remove("entering");
         object.classList.add("energy-up");
+        ProjectionRenderer.notify(object, "entering");
         resolvePromise();
       });
     });
@@ -130,6 +158,7 @@ const Projection = (() => {
     await waitForAnimation(object);
     object.classList.remove("energy-up");
     object.classList.add("present");
+    ProjectionRenderer.notify(object, "present");
   }
 
   async function glowDown(objects) {
@@ -158,7 +187,6 @@ const Projection = (() => {
     uniqueObjects(objects).forEach(hide);
   }
 
-  /* Compatibility wrappers for initial-load code. */
   function resolve(objects) {
     void glowUp(objects);
   }

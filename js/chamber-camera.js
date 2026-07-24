@@ -1,131 +1,79 @@
 /*==================================================
   SHARED CHAMBER CAMERA
 
-  Public camera bridge for the chamber, semantic optics and diagnostics.
-  The current constants mirror LayeredChamber's settled geometry; all
-  consumers read their viewport projection from this one API.
+  Thin public bridge over the permanent chamber runtime. Geometry is owned
+  by LayeredChamber; no consumer carries a second copy of its constants.
 ==================================================*/
-
 (() => {
-  const CONFIG = Object.freeze({
-    near: 2.5,
-    cell: 0.5,
-    focalRatio: 0.84,
-    wallShiftCells: 2
-  });
+  'use strict';
 
-  function snapCells(value) {
-    return Math.max(
-      CONFIG.cell,
-      Math.round(value / CONFIG.cell) * CONFIG.cell
-    );
-  }
-
-  function dimensions() {
-    return {
-      width: window.innerWidth,
-      height: window.innerHeight
+  function fallbackSnapshot() {
+    const config = window.LayeredChamber?.getGeometryConfig?.() || {
+      near: 2.5,
+      cell: 0.5,
+      focal: 0.84,
+      wallShiftCells: 2,
+      halfWidth: 3,
+      halfHeight: 2.5
     };
-  }
-
-  function freezePoint(point) {
-    return Object.freeze({ x: point.x, y: point.y });
-  }
-
-  function rectangle(left, top, width, height) {
-    return Object.freeze({
-      left,
-      top,
-      right: left + width,
-      bottom: top + height,
-      width,
-      height
-    });
-  }
-
-  function rectangleForPoints(points) {
-    const xs = points.map(point => point.x);
-    const ys = points.map(point => point.y);
-    const left = Math.min(...xs);
-    const top = Math.min(...ys);
-    const right = Math.max(...xs);
-    const bottom = Math.max(...ys);
-    return rectangle(left, top, right - left, bottom - top);
-  }
-
-  function snapshot() {
-    const { width, height } = dimensions();
-    const focalLength = Math.min(width, height) * CONFIG.focalRatio;
+    const width = innerWidth;
+    const height = innerHeight;
+    const focalLength = Math.min(width, height) * config.focal;
     const centreX = width * 0.5;
     const centreY = height * 0.5;
-    const halfWidth = snapCells(
-      (width * 0.5) * CONFIG.near / focalLength
-    );
-    const halfHeight = snapCells(
-      (height * 0.5) * CONFIG.near / focalLength
-    );
-    const finalHalfWidth = halfWidth
-      + CONFIG.wallShiftCells * CONFIG.cell;
-
-    function project(x, y, z) {
-      const safeZ = Math.max(0.0001, Number(z) || CONFIG.near);
-      return Object.freeze({
+    const snap = value => Math.max(config.cell, Math.round(value / config.cell) * config.cell);
+    const halfWidth = snap((width * 0.5) * config.near / focalLength);
+    const halfHeight = snap((height * 0.5) * config.near / focalLength);
+    const finalHalfWidth = halfWidth + config.wallShiftCells * config.cell;
+    const project = (x, y, z) => {
+      const safeZ = Math.max(0.0001, Number(z) || config.near);
+      return {
         x: centreX + Number(x || 0) * focalLength / safeZ,
         y: centreY - Number(y || 0) * focalLength / safeZ,
-        scale: CONFIG.near / safeZ
-      });
-    }
-
-    function aperturePointsAt(z, requestedHalfWidth = finalHalfWidth) {
-      return Object.freeze([
-        freezePoint(project(-requestedHalfWidth, halfHeight, z)),
-        freezePoint(project(requestedHalfWidth, halfHeight, z)),
-        freezePoint(project(requestedHalfWidth, -halfHeight, z)),
-        freezePoint(project(-requestedHalfWidth, -halfHeight, z))
-      ]);
-    }
-
-    function apertureAt(z, requestedHalfWidth = finalHalfWidth) {
-      return rectangleForPoints(aperturePointsAt(z, requestedHalfWidth));
-    }
-
-    const camera = {
+        scale: config.near / safeZ
+      };
+    };
+    const aperturePointsAt = (z, requestedHalfWidth = finalHalfWidth) => [
+      project(-requestedHalfWidth, halfHeight, z),
+      project(requestedHalfWidth, halfHeight, z),
+      project(requestedHalfWidth, -halfHeight, z),
+      project(-requestedHalfWidth, -halfHeight, z)
+    ];
+    const apertureAt = (z, requestedHalfWidth) => {
+      const points = aperturePointsAt(z, requestedHalfWidth);
+      const xs = points.map(point => point.x);
+      const ys = points.map(point => point.y);
+      const left = Math.min(...xs);
+      const top = Math.min(...ys);
+      const right = Math.max(...xs);
+      const bottom = Math.max(...ys);
+      return { left, top, right, bottom, width: right - left, height: bottom - top };
+    };
+    return {
       width,
       height,
       centreX,
       centreY,
-      near: CONFIG.near,
-      cell: CONFIG.cell,
-      focalRatio: CONFIG.focalRatio,
+      near: config.near,
+      cell: config.cell,
+      focalRatio: config.focal,
       focalLength,
       halfWidth,
       halfHeight,
-      wallShiftCells: CONFIG.wallShiftCells,
+      wallShiftCells: config.wallShiftCells,
       finalHalfWidth,
       project,
-      scaleAt: z => CONFIG.near / Math.max(0.0001, Number(z) || CONFIG.near),
+      scaleAt: z => config.near / Math.max(0.0001, Number(z) || config.near),
       apertureAt,
       aperturePointsAt
     };
-
-    camera.nearAperturePoints = aperturePointsAt(CONFIG.near);
-    camera.nearAperture = rectangleForPoints(camera.nearAperturePoints);
-    return Object.freeze(camera);
   }
 
-  function attachToChamber() {
-    const chamber = window.LayeredChamber;
-    if (!chamber) return false;
-
-    chamber.getCameraSnapshot = snapshot;
-    chamber.projectPoint = (x, y, z) => snapshot().project(x, y, z);
-    chamber.getApertureAt = (z, halfWidth) => snapshot().apertureAt(z, halfWidth);
-    chamber.getAperturePointsAt = (z, halfWidth) => snapshot().aperturePointsAt(z, halfWidth);
-    return true;
+  function snapshot() {
+    return window.LayeredChamber?.getCameraSnapshot?.() || fallbackSnapshot();
   }
 
   const API = Object.freeze({
-    CONFIG,
     snapshot,
     project: (x, y, z) => snapshot().project(x, y, z),
     apertureAt: (z, halfWidth) => snapshot().apertureAt(z, halfWidth),
@@ -133,21 +81,13 @@
   });
 
   window.NCNChamberCamera = API;
-  attachToChamber();
 
   let resizeFrame = 0;
-
-  function announceCameraChange() {
+  addEventListener('resize', () => {
     if (resizeFrame) return;
-
     resizeFrame = requestAnimationFrame(() => {
       resizeFrame = 0;
-      const camera = snapshot();
-      window.dispatchEvent(new CustomEvent("ncn:chamber-camera-change", {
-        detail: camera
-      }));
+      dispatchEvent(new CustomEvent('ncn:chamber-camera-change', { detail: snapshot() }));
     });
-  }
-
-  window.addEventListener("resize", announceCameraChange, { passive: true });
+  }, { passive: true });
 })();

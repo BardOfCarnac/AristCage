@@ -1,238 +1,76 @@
 /*==================================================
-  OPTIONAL OPTICAL PROJECTION
+  PERMANENT OPTICAL ARTICLE RENDERER
 
-  Semantic article parts are rendered independently on chamber depth
-  planes. The normal DOM remains the layout, interaction and
-  accessibility source. Remove this file, its stylesheet and the rail
-  toggle to restore the standard viewer unchanged.
+  The established Optical display is treated as a protected visual contract:
+  ten semantic objects retain their original depths, scales, resolve timing,
+  glow and three-port mapping. The permanent runtime adds only lifecycle
+  delivery, batched geometry, viewport pooling and aligned interaction.
 ==================================================*/
-
 window.OpticalProjection = (() => {
-  const STORAGE_KEY = "ncn-optical-projection";
-  const ROOT_CLASS = "optical-mode";
+  'use strict';
+
   const CLIP_BLEED = 2;
-  const DISMISS_DURATION = 190;
-  const BODY_DISMISS_DURATION = 180;
-  const LAYOUT_TRACK_DURATION = 520;
+  const VIEWPORT_MARGIN = 0.85;
+  const MAX_POOL_SIZE = 12;
 
-  const SOURCE_LIFECYCLE_CLASSES = Object.freeze([
-    "entering",
-    "present",
-    "leaving",
-    "gone",
-    "energy-up",
-    "energy-down"
+  const SOURCE_LIFECYCLE = Object.freeze([
+    'entering', 'present', 'leaving', 'gone', 'energy-up', 'energy-down'
   ]);
 
-  const OPTICAL_LIFECYCLE_CLASSES = Object.freeze([
-    "optical-absent",
-    "optical-resolving",
-    "optical-present",
-    "optical-dismissing"
+  const OPTICAL_LIFECYCLE = Object.freeze([
+    'optical-absent', 'optical-resolving', 'optical-present', 'optical-dismissing'
   ]);
 
-  /* Far to near. Depth controls the shared article anchor and the chamber
-     port. sizeScale controls the actual semantic object, including text,
-     borders and glow; it is never cancelled by inverse compensation. */
   const SEMANTIC_PLANES = Object.freeze([
-    Object.freeze({ role: "plate",         z: 5.50, sizeScale: 0.68, delay: 0,   duration: 250, glow: 0.25 }),
-    Object.freeze({ role: "frame",         z: 5.30, sizeScale: 0.72, delay: 20,  duration: 290, glow: 0.48 }),
-    Object.freeze({ role: "corners",       z: 5.00, sizeScale: 0.74, delay: 42,  duration: 270, glow: 0.58 }),
-    Object.freeze({ role: "priority",      z: 4.70, sizeScale: 0.78, delay: 62,  duration: 260, glow: 0.78 }),
-    Object.freeze({ role: "detail-labels", z: 4.30, sizeScale: 0.82, delay: 115, duration: 250, glow: 0.42 }),
-    Object.freeze({ role: "detail-values", z: 4.10, sizeScale: 0.84, delay: 132, duration: 260, glow: 0.52 }),
-    Object.freeze({ role: "body",          z: 3.70, sizeScale: 0.87, delay: 102, duration: 280, glow: 0.56 }),
-    Object.freeze({ role: "meta",          z: 3.30, sizeScale: 0.91, delay: 88,  duration: 240, glow: 0.46 }),
-    Object.freeze({ role: "tags",          z: 2.90, sizeScale: 0.97, delay: 110, duration: 250, glow: 0.62 }),
-    Object.freeze({ role: "headline",      z: 2.50, sizeScale: 1.08, delay: 145, duration: 310, glow: 1.00 })
+    Object.freeze({ role: 'plate',         z: 5.50, sizeScale: 0.68, delay: 0,   duration: 250, glow: 0.25 }),
+    Object.freeze({ role: 'frame',         z: 5.30, sizeScale: 0.72, delay: 20,  duration: 290, glow: 0.48 }),
+    Object.freeze({ role: 'corners',       z: 5.00, sizeScale: 0.74, delay: 42,  duration: 270, glow: 0.58 }),
+    Object.freeze({ role: 'priority',      z: 4.70, sizeScale: 0.78, delay: 62,  duration: 260, glow: 0.78 }),
+    Object.freeze({ role: 'detail-labels', z: 4.30, sizeScale: 0.82, delay: 115, duration: 250, glow: 0.42 }),
+    Object.freeze({ role: 'detail-values', z: 4.10, sizeScale: 0.84, delay: 132, duration: 260, glow: 0.52 }),
+    Object.freeze({ role: 'body',          z: 3.70, sizeScale: 0.87, delay: 102, duration: 280, glow: 0.56 }),
+    Object.freeze({ role: 'meta',          z: 3.30, sizeScale: 0.91, delay: 88,  duration: 240, glow: 0.46 }),
+    Object.freeze({ role: 'tags',          z: 2.90, sizeScale: 0.97, delay: 110, duration: 250, glow: 0.62 }),
+    Object.freeze({ role: 'headline',      z: 2.50, sizeScale: 1.08, delay: 145, duration: 310, glow: 1.00 })
   ]);
 
-  const BODY_ROLES = new Set(["body", "detail-labels", "detail-values"]);
+  const BODY_ROLES = Object.freeze(['body', 'detail-labels', 'detail-values']);
+
+  const ROLE_SOURCE_SELECTOR = Object.freeze({
+    plate: '.frame',
+    frame: '.frame',
+    corners: '.corners',
+    priority: '.priority',
+    'detail-labels': '.body',
+    'detail-values': '.body',
+    body: '.body',
+    meta: '.meta',
+    tags: '.tags',
+    headline: '.headline'
+  });
 
   let feed = null;
-  let toggle = null;
   let planeSystem = null;
+  let hitLayer = null;
   let enabled = false;
+  let initialized = false;
   let geometryFrame = 0;
   let structureTimer = 0;
   let observer = null;
   let resizeObserver = null;
-  let layoutTrackingUntil = 0;
+  let intersectionObserver = null;
+  let unregisterRenderer = null;
 
-  const planes = new Map();
-  const records = new Map();
+  const planeRecords = new Map();
+  const articleRecords = new Map();
+  const recordPool = [];
+  const observedEntries = new Set();
+  const nearEntries = new Set();
 
   function cameraSnapshot() {
     return window.LayeredChamber?.getCameraSnapshot?.()
       || window.NCNChamberCamera?.snapshot?.()
       || null;
-  }
-
-  function sourceEntries() {
-    if (!feed) return [];
-    return [...feed.querySelectorAll(":scope > .entry:not(.panel)")];
-  }
-
-  function sourceId(entry, index = 0) {
-    return entry.dataset.entryId || `optical-entry-${index}`;
-  }
-
-  function clearTimer(record, name) {
-    if (!record?.[name]) return;
-    window.clearTimeout(record[name]);
-    record[name] = 0;
-  }
-
-  function ensurePlaneSystem() {
-    if (planeSystem?.isConnected) return planeSystem;
-
-    planeSystem = document.createElement("div");
-    planeSystem.className = "optical-plane-system";
-    planeSystem.setAttribute("aria-hidden", "true");
-    document.body.append(planeSystem);
-
-    SEMANTIC_PLANES.forEach((definition, index) => {
-      const plane = document.createElement("div");
-      plane.className = "optical-plane";
-      plane.dataset.opticalRole = definition.role;
-      plane.dataset.chamberDepth = definition.z.toFixed(2);
-      plane.style.setProperty("--optical-plane-order", String(index));
-      plane.style.setProperty("--optical-resolve-delay", `${definition.delay}ms`);
-      plane.style.setProperty("--optical-resolve-duration", `${definition.duration}ms`);
-      plane.style.setProperty("--optical-resolve-glow", definition.glow.toFixed(2));
-      planeSystem.append(plane);
-      planes.set(definition.role, {
-        definition,
-        element: plane,
-        bounds: null,
-        depthScale: 1
-      });
-    });
-
-    return planeSystem;
-  }
-
-  function stabiliseProjectionObject(node) {
-    node.classList.remove(...SOURCE_LIFECYCLE_CLASSES);
-    node.classList.add("present");
-    node.removeAttribute("id");
-    node.removeAttribute("style");
-    node.setAttribute("aria-hidden", "true");
-    node.querySelectorAll?.("[id]").forEach(child => child.removeAttribute("id"));
-  }
-
-  function directBodyText(body) {
-    if (!body) return "";
-    return [...body.childNodes]
-      .filter(node => node.nodeType === Node.TEXT_NODE)
-      .map(node => node.textContent)
-      .join("")
-      .trim();
-  }
-
-  function directBodyTextRect(body) {
-    if (!body) return null;
-    const nodes = [...body.childNodes]
-      .filter(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
-    if (!nodes.length) return null;
-
-    const range = document.createRange();
-    range.setStartBefore(nodes[0]);
-    range.setEndAfter(nodes[nodes.length - 1]);
-    const rect = range.getBoundingClientRect();
-    range.detach?.();
-    return rect.width || rect.height ? rect : null;
-  }
-
-  function articleRect(entry) {
-    return entry.querySelector(".projection-plate")?.getBoundingClientRect()
-      || entry.getBoundingClientRect();
-  }
-
-  function semanticSource(entry, role) {
-    const plate = entry.querySelector(".projection-plate");
-    const body = entry.querySelector(".body");
-    const detailGrid = entry.querySelector(".mobile-inspector-detail-grid");
-    const plateRect = articleRect(entry);
-
-    switch (role) {
-      case "plate":
-        return plate ? {
-          rect: plateRect,
-          build: () => {
-            const surface = document.createElement("div");
-            surface.className = "optical-plate-surface";
-            return surface;
-          }
-        } : null;
-
-      case "frame":
-      case "corners": {
-        const node = entry.querySelector(`.${role}`);
-        if (!node) return null;
-        return {
-          rect: plateRect,
-          build: () => {
-            const clone = node.cloneNode(true);
-            stabiliseProjectionObject(clone);
-            return clone;
-          }
-        };
-      }
-
-      case "priority":
-      case "meta":
-      case "tags":
-      case "headline": {
-        const node = entry.querySelector(`.${role}`);
-        if (!node) return null;
-        return {
-          rect: node.getBoundingClientRect(),
-          build: () => {
-            const clone = node.cloneNode(true);
-            stabiliseProjectionObject(clone);
-            return clone;
-          }
-        };
-      }
-
-      case "body": {
-        const text = directBodyText(body);
-        const rect = directBodyTextRect(body);
-        if (!text || !rect) return null;
-        return {
-          rect,
-          build: () => {
-            const clone = document.createElement("div");
-            clone.className = "body optical-body-copy present";
-            clone.textContent = text;
-            clone.setAttribute("aria-hidden", "true");
-            return clone;
-          }
-        };
-      }
-
-      case "detail-labels":
-      case "detail-values":
-        if (!detailGrid) return null;
-        return {
-          rect: detailGrid.getBoundingClientRect(),
-          build: () => {
-            const clone = detailGrid.cloneNode(true);
-            clone.classList.add(
-              role === "detail-labels"
-                ? "optical-detail-labels"
-                : "optical-detail-values"
-            );
-            clone.setAttribute("aria-hidden", "true");
-            clone.querySelectorAll("[id]").forEach(child => child.removeAttribute("id"));
-            return clone;
-          }
-        };
-
-      default:
-        return null;
-    }
   }
 
   function validRect(rect) {
@@ -245,354 +83,519 @@ window.OpticalProjection = (() => {
     );
   }
 
-  function setOpticalLifecycle(node, state) {
-    node.classList.remove(...OPTICAL_LIFECYCLE_CLASSES);
-    node.classList.add(`optical-${state}`);
+  function copyRect(rect) {
+    if (!validRect(rect)) return null;
+    return {
+      left: rect.left,
+      top: rect.top,
+      right: rect.right ?? rect.left + rect.width,
+      bottom: rect.bottom ?? rect.top + rect.height,
+      width: rect.width,
+      height: rect.height
+    };
   }
 
-  function createSemanticItem(entry, definition, state = "present") {
-    const semantic = semanticSource(entry, definition.role);
-    if (!semantic || !validRect(semantic.rect)) return null;
+  function articleRect(entry) {
+    return entry.querySelector('.projection-plate')?.getBoundingClientRect()
+      || entry.getBoundingClientRect();
+  }
 
-    const item = document.createElement("div");
-    item.className = "optical-semantic-item";
-    item.dataset.opticalRole = definition.role;
-    item.dataset.opticalEntryId = entry.dataset.entryId || "";
-    item.setAttribute("aria-hidden", "true");
-    item.style.setProperty("--optical-item-scale", definition.sizeScale.toFixed(4));
-    item.append(semantic.build());
-    setOpticalLifecycle(item, state);
+  function sourceId(entry) {
+    return entry?.dataset.entryId || '';
+  }
 
-    return { element: item, sourceRect: semantic.rect };
+  function stableClassName(node) {
+    if (!node) return '';
+    return [...node.classList]
+      .filter(name => !SOURCE_LIFECYCLE.includes(name))
+      .sort()
+      .join(' ');
+  }
+
+  function directBodyText(body) {
+    if (!body) return '';
+    return [...body.childNodes]
+      .filter(node => node.nodeType === Node.TEXT_NODE)
+      .map(node => node.textContent)
+      .join('')
+      .trim();
+  }
+
+  function directBodyTextRect(body) {
+    if (!body) return null;
+    const nodes = [...body.childNodes]
+      .filter(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+    if (!nodes.length) return null;
+
+    const range = document.createRange();
+    range.setStartBefore(nodes[0]);
+    range.setEndAfter(nodes[nodes.length - 1]);
+    const rect = copyRect(range.getBoundingClientRect());
+    range.detach?.();
+    return rect;
   }
 
   function sourceSignature(entry) {
-    const priority = entry.querySelector(".priority")?.className || "";
-    const headline = entry.querySelector(".headline")?.textContent || "";
-    const meta = entry.querySelector(".meta")?.textContent || "";
-    const tags = entry.querySelector(".tags")?.textContent || "";
-    const body = entry.querySelector(".body")?.textContent || "";
-    return [priority, headline, meta, tags, body].join("\u241f");
+    return [
+      stableClassName(entry.querySelector('.priority')),
+      entry.querySelector('.headline')?.textContent || '',
+      entry.querySelector('.meta')?.textContent || '',
+      entry.querySelector('.tags')?.textContent || '',
+      entry.querySelector('.body')?.textContent || ''
+    ].join('\u241f');
   }
 
-  function projectedPortPoints(camera, definition) {
-    if (camera.aperturePointsAt) {
-      return camera.aperturePointsAt(definition.z);
+  function rectWithinMargin(rect) {
+    if (!rect) return false;
+    const margin = innerHeight * VIEWPORT_MARGIN;
+    return rect.bottom >= -margin && rect.top <= innerHeight + margin;
+  }
+
+  function shouldRender(entry) {
+    if (!entry?.isConnected || entry.classList.contains('panel')) return false;
+    if (getComputedStyle(entry).display === 'none') return false;
+    return rectWithinMargin(copyRect(entry.getBoundingClientRect()));
+  }
+
+  function ensurePlaneSystem() {
+    if (planeSystem?.isConnected) return planeSystem;
+
+    planeSystem = document.createElement('div');
+    planeSystem.className = 'optical-plane-system';
+    planeSystem.setAttribute('aria-hidden', 'true');
+    document.body.append(planeSystem);
+
+    SEMANTIC_PLANES.forEach((definition, index) => {
+      const element = document.createElement('div');
+      element.className = 'optical-plane';
+      element.dataset.opticalRole = definition.role;
+      element.dataset.chamberDepth = definition.z.toFixed(2);
+      element.style.setProperty('--optical-plane-order', String(index));
+      element.style.setProperty('--optical-resolve-delay', `${definition.delay}ms`);
+      element.style.setProperty('--optical-resolve-duration', `${definition.duration}ms`);
+      element.style.setProperty('--optical-resolve-glow', definition.glow.toFixed(2));
+      planeSystem.append(element);
+      planeRecords.set(definition.role, {
+        definition,
+        element,
+        bounds: null,
+        depthScale: 1
+      });
+    });
+
+    hitLayer = document.createElement('div');
+    hitLayer.className = 'optical-hit-layer';
+    planeSystem.append(hitLayer);
+    return planeSystem;
+  }
+
+  function cleanClone(node) {
+    node.classList.remove(...SOURCE_LIFECYCLE);
+    node.removeAttribute('id');
+    node.removeAttribute('style');
+    node.setAttribute('aria-hidden', 'true');
+    node.querySelectorAll?.('[id]').forEach(child => child.removeAttribute('id'));
+    node.querySelectorAll?.('[style]').forEach(child => child.removeAttribute('style'));
+    node.querySelectorAll?.(`.${SOURCE_LIFECYCLE.join(',.')}`)
+      .forEach(child => child.classList.remove(...SOURCE_LIFECYCLE));
+    return node;
+  }
+
+  function createRecordShell() {
+    ensurePlaneSystem();
+    const record = {
+      id: '',
+      source: null,
+      signature: '',
+      items: new Map(),
+      hitTarget: document.createElement('div'),
+      pooled: false
+    };
+
+    SEMANTIC_PLANES.forEach(definition => {
+      const element = document.createElement('div');
+      element.className = 'optical-semantic-item optical-absent';
+      element.dataset.opticalRole = definition.role;
+      element.style.display = 'none';
+      planeRecords.get(definition.role)?.element.append(element);
+      record.items.set(definition.role, {
+        definition,
+        element,
+        lifecycle: 'absent',
+        screenBounds: null
+      });
+    });
+
+    record.hitTarget.className = 'optical-hit-target';
+    record.hitTarget.setAttribute('aria-hidden', 'true');
+    record.hitTarget.style.display = 'none';
+    hitLayer.append(record.hitTarget);
+
+    record.hitTarget.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      record.source?.click();
+    });
+    record.hitTarget.addEventListener('pointerenter', () => setHover(record, true));
+    record.hitTarget.addEventListener('pointerleave', () => setHover(record, false));
+    return record;
+  }
+
+  function acquireRecord(entry) {
+    const id = sourceId(entry);
+    if (!id) return null;
+
+    let record = articleRecords.get(id);
+    if (record) {
+      record.source = entry;
+      return record;
     }
 
-    const aperture = camera.apertureAt(definition.z);
-    return [
-      { x: aperture.left, y: aperture.top },
-      { x: aperture.right, y: aperture.top },
-      { x: aperture.right, y: aperture.bottom },
-      { x: aperture.left, y: aperture.bottom }
-    ];
+    record = recordPool.pop() || createRecordShell();
+    record.id = id;
+    record.source = entry;
+    record.signature = '';
+    record.pooled = false;
+
+    record.items.forEach(item => {
+      item.element.dataset.opticalEntryId = id;
+      item.element.style.display = 'block';
+      item.screenBounds = null;
+    });
+
+    record.hitTarget.dataset.opticalEntryId = id;
+    record.hitTarget.style.display = 'block';
+    articleRecords.set(id, record);
+    syncRecordLifecycle(record);
+    syncFocus(record);
+    return record;
+  }
+
+  function releaseRecord(record) {
+    if (!record || record.pooled) return;
+    articleRecords.delete(record.id);
+    record.id = '';
+    record.source = null;
+    record.signature = '';
+    record.pooled = true;
+
+    record.items.forEach(item => {
+      item.element.replaceChildren();
+      item.element.classList.remove(
+        ...OPTICAL_LIFECYCLE,
+        'optical-keyboard-focus',
+        'optical-hover'
+      );
+      item.element.classList.add('optical-absent');
+      item.element.style.display = 'none';
+      item.lifecycle = 'absent';
+      item.screenBounds = null;
+    });
+
+    record.hitTarget.style.display = 'none';
+    record.hitTarget.removeAttribute('data-optical-entry-id');
+
+    if (recordPool.length < MAX_POOL_SIZE) recordPool.push(record);
+    else {
+      record.items.forEach(item => item.element.remove());
+      record.hitTarget.remove();
+    }
+  }
+
+  function measureNode(node) {
+    return node ? copyRect(node.getBoundingClientRect()) : null;
+  }
+
+  function measureEntry(entry) {
+    const anchor = copyRect(articleRect(entry));
+    if (!anchor) return null;
+
+    const frame = entry.querySelector('.frame');
+    const corners = entry.querySelector('.corners');
+    const priority = entry.querySelector('.priority');
+    const body = entry.querySelector('.body');
+    const details = entry.querySelector('.mobile-inspector-detail-grid');
+    const meta = entry.querySelector('.meta');
+    const tags = entry.querySelector('.tags');
+    const headline = entry.querySelector('.headline');
+
+    const semantic = {
+      plate: { rect: anchor, node: null, kind: 'plate' },
+      frame: { rect: anchor, node: frame, kind: 'clone' },
+      corners: { rect: anchor, node: corners, kind: 'clone' },
+      priority: { rect: measureNode(priority), node: priority, kind: 'clone' },
+      'detail-labels': { rect: measureNode(details), node: details, kind: 'detail-labels' },
+      'detail-values': { rect: measureNode(details), node: details, kind: 'detail-values' },
+      body: { rect: directBodyTextRect(body), node: body, kind: 'body', text: directBodyText(body) },
+      meta: { rect: measureNode(meta), node: meta, kind: 'clone' },
+      tags: { rect: measureNode(tags), node: tags, kind: 'clone' },
+      headline: { rect: measureNode(headline), node: headline, kind: 'clone' }
+    };
+
+    return {
+      entry,
+      anchor,
+      signature: sourceSignature(entry),
+      semantic
+    };
+  }
+
+  function buildSemanticNode(definition, measurement) {
+    const semantic = measurement.semantic[definition.role];
+    if (!semantic) return null;
+
+    if (semantic.kind === 'plate') {
+      const surface = document.createElement('div');
+      surface.className = 'optical-plate-surface';
+      return surface;
+    }
+
+    if (semantic.kind === 'body') {
+      if (!semantic.text) return null;
+      const body = document.createElement('div');
+      body.className = 'body optical-body-copy present';
+      body.textContent = semantic.text;
+      body.setAttribute('aria-hidden', 'true');
+      return body;
+    }
+
+    if (!semantic.node) return null;
+    const clone = cleanClone(semantic.node.cloneNode(true));
+    if (semantic.kind === 'detail-labels') clone.classList.add('optical-detail-labels');
+    if (semantic.kind === 'detail-values') clone.classList.add('optical-detail-values');
+    return clone;
+  }
+
+  function rebuildRecordContent(record, measurement) {
+    SEMANTIC_PLANES.forEach(definition => {
+      const item = record.items.get(definition.role);
+      if (!item) return;
+      item.element.replaceChildren();
+      const child = buildSemanticNode(definition, measurement);
+      if (child) item.element.append(child);
+    });
+    record.signature = measurement.signature;
   }
 
   function planeBounds(camera, definition) {
-    const points = projectedPortPoints(camera, definition);
-    const expandedPoints = points.map(point => ({
+    const points = camera.aperturePointsAt(definition.z).map(point => ({
       x: point.x + (point.x < camera.centreX ? -CLIP_BLEED : CLIP_BLEED),
       y: point.y + (point.y < camera.centreY ? -CLIP_BLEED : CLIP_BLEED)
     }));
-    const xs = expandedPoints.map(point => point.x);
-    const ys = expandedPoints.map(point => point.y);
+    const xs = points.map(point => point.x);
+    const ys = points.map(point => point.y);
     const left = Math.min(...xs);
     const top = Math.min(...ys);
     const right = Math.max(...xs);
     const bottom = Math.max(...ys);
-
-    return {
-      left,
-      top,
-      width: right - left,
-      height: bottom - top,
-      points: expandedPoints
-    };
+    return { left, top, width: right - left, height: bottom - top, points };
   }
 
   function applyPlaneCamera(camera) {
     ensurePlaneSystem();
-
     SEMANTIC_PLANES.forEach(definition => {
-      const planeRecord = planes.get(definition.role);
-      if (!planeRecord) return;
-
+      const record = planeRecords.get(definition.role);
+      if (!record) return;
       const bounds = planeBounds(camera, definition);
-      const polygon = bounds.points.map(point => (
-        `${(point.x - bounds.left).toFixed(2)}px ${(point.y - bounds.top).toFixed(2)}px`
-      )).join(", ");
-
-      planeRecord.bounds = bounds;
-      planeRecord.depthScale = camera.scaleAt(definition.z);
-
-      const plane = planeRecord.element;
-      plane.style.left = `${bounds.left}px`;
-      plane.style.top = `${bounds.top}px`;
-      plane.style.width = `${bounds.width}px`;
-      plane.style.height = `${bounds.height}px`;
-      plane.style.clipPath = `polygon(${polygon})`;
-      plane.style.setProperty("--optical-depth-scale", planeRecord.depthScale.toFixed(6));
+      const polygon = bounds.points
+        .map(point => `${(point.x - bounds.left).toFixed(2)}px ${(point.y - bounds.top).toFixed(2)}px`)
+        .join(', ');
+      record.bounds = bounds;
+      record.depthScale = camera.scaleAt(definition.z);
+      record.element.style.left = `${bounds.left}px`;
+      record.element.style.top = `${bounds.top}px`;
+      record.element.style.width = `${bounds.width}px`;
+      record.element.style.height = `${bounds.height}px`;
+      record.element.style.clipPath = `polygon(${polygon})`;
+      record.element.style.setProperty('--optical-depth-scale', record.depthScale.toFixed(6));
     });
   }
 
-  /* A common article anchor is projected at each role's Z. Local offsets are
-     then retained inside that article. This yields real depth parallax without
-     tearing the headline, rail and frame into unrelated screen coordinates. */
-  function semanticGeometry(entry, rect, definition, planeRecord, camera) {
-    const anchorRect = articleRect(entry);
+  function semanticGeometry(anchorRect, semanticRect, definition, plane, camera) {
     const sourceAnchorX = anchorRect.left + anchorRect.width * 0.5;
     const sourceAnchorY = anchorRect.top + anchorRect.height * 0.5;
-    const localCentreX = rect.left + rect.width * 0.5 - sourceAnchorX;
-    const localCentreY = rect.top + rect.height * 0.5 - sourceAnchorY;
-    const depthScale = planeRecord.depthScale;
-    const itemScale = definition.sizeScale;
-
+    const localCentreX = semanticRect.left + semanticRect.width * 0.5 - sourceAnchorX;
+    const localCentreY = semanticRect.top + semanticRect.height * 0.5 - sourceAnchorY;
     const projectedAnchorX = camera.centreX
-      + (sourceAnchorX - camera.centreX) * depthScale;
+      + (sourceAnchorX - camera.centreX) * plane.depthScale;
     const projectedAnchorY = camera.centreY
-      + (sourceAnchorY - camera.centreY) * depthScale;
-    const roleCentreX = projectedAnchorX + localCentreX * itemScale;
-    const roleCentreY = projectedAnchorY + localCentreY * itemScale;
+      + (sourceAnchorY - camera.centreY) * plane.depthScale;
+    const roleCentreX = projectedAnchorX + localCentreX * definition.sizeScale;
+    const roleCentreY = projectedAnchorY + localCentreY * definition.sizeScale;
 
     return {
-      left: roleCentreX - rect.width * 0.5 - planeRecord.bounds.left,
-      top: roleCentreY - rect.height * 0.5 - planeRecord.bounds.top,
-      width: rect.width,
-      height: rect.height,
-      scale: itemScale
+      left: roleCentreX - semanticRect.width * 0.5 - plane.bounds.left,
+      top: roleCentreY - semanticRect.height * 0.5 - plane.bounds.top,
+      width: semanticRect.width,
+      height: semanticRect.height,
+      centreX: roleCentreX,
+      centreY: roleCentreY,
+      scale: definition.sizeScale
     };
   }
 
-  function applyGeometry(itemRecord, geometry) {
-    const item = itemRecord.element;
-    item.style.left = `${geometry.left}px`;
-    item.style.top = `${geometry.top}px`;
-    item.style.width = `${geometry.width}px`;
-    item.style.height = `${geometry.height}px`;
-    item.style.setProperty("--optical-item-scale", geometry.scale.toFixed(4));
-  }
+  function applyItemGeometry(record, measurement, definition, camera) {
+    const plane = planeRecords.get(definition.role);
+    const item = record.items.get(definition.role);
+    const semantic = measurement.semantic[definition.role];
+    if (!plane?.bounds || !item) return;
 
-  function updateItemGeometry(record, definition, camera) {
-    const role = definition.role;
-    const planeRecord = planes.get(role);
-    if (!planeRecord?.bounds) return;
-
-    const semantic = semanticSource(record.source, role);
-    const existing = record.items.get(role);
-
-    if (!semantic || !validRect(semantic.rect)) {
-      existing?.element.remove();
-      record.items.delete(role);
+    if (!semantic?.rect || !item.element.childElementCount) {
+      item.element.style.display = 'none';
+      item.screenBounds = null;
       return;
     }
 
-    let itemRecord = existing;
-    if (!itemRecord) {
-      itemRecord = createSemanticItem(record.source, definition, "present");
-      if (!itemRecord) return;
-      planeRecord.element.append(itemRecord.element);
-      record.items.set(role, itemRecord);
-
-      if (BODY_ROLES.has(role)) {
-        itemRecord.element.classList.add("optical-body-resolving");
-        window.setTimeout(() => {
-          itemRecord.element.classList.remove("optical-body-resolving");
-        }, 420);
-      }
-    } else {
-      itemRecord.sourceRect = semantic.rect;
-    }
-
-    applyGeometry(
-      itemRecord,
-      semanticGeometry(record.source, semantic.rect, definition, planeRecord, camera)
+    const geometry = semanticGeometry(
+      measurement.anchor,
+      semantic.rect,
+      definition,
+      plane,
+      camera
     );
-  }
 
-  function updateRecordGeometry(record, camera) {
-    if (!record?.source?.isConnected || record.removed) return;
-    SEMANTIC_PLANES.forEach(definition => {
-      updateItemGeometry(record, definition, camera);
-    });
-  }
+    item.element.style.display = 'block';
+    item.element.style.left = `${geometry.left}px`;
+    item.element.style.top = `${geometry.top}px`;
+    item.element.style.width = `${geometry.width}px`;
+    item.element.style.height = `${geometry.height}px`;
+    item.element.style.setProperty('--optical-item-scale', geometry.scale.toFixed(4));
 
-  function startResolve(record) {
-    clearTimer(record, "lifecycleTimer");
-
-    requestAnimationFrame(() => {
-      record.items.forEach(item => setOpticalLifecycle(item.element, "resolving"));
-      const longest = Math.max(...SEMANTIC_PLANES.map(plane => plane.delay + plane.duration));
-      record.lifecycleTimer = window.setTimeout(() => {
-        record.lifecycleTimer = 0;
-        record.items.forEach(item => setOpticalLifecycle(item.element, "present"));
-      }, longest + 40);
-    });
-  }
-
-  function createRecord(source, index, camera, animate = true) {
-    const id = sourceId(source, index);
-    const record = {
-      id,
-      source,
-      signature: sourceSignature(source),
-      expanded: source.classList.contains("expanded"),
-      items: new Map(),
-      lifecycleTimer: 0,
-      removalTimer: 0,
-      collapseTimer: 0,
-      removed: false
+    const scaledWidth = geometry.width * geometry.scale;
+    const scaledHeight = geometry.height * geometry.scale;
+    item.screenBounds = {
+      left: geometry.centreX - scaledWidth * 0.5,
+      top: geometry.centreY - scaledHeight * 0.5,
+      right: geometry.centreX + scaledWidth * 0.5,
+      bottom: geometry.centreY + scaledHeight * 0.5
     };
-
-    SEMANTIC_PLANES.forEach(definition => {
-      const created = createSemanticItem(
-        source,
-        definition,
-        animate ? "absent" : "present"
-      );
-      if (!created) return;
-      planes.get(definition.role)?.element.append(created.element);
-      record.items.set(definition.role, created);
-    });
-
-    records.set(id, record);
-    updateRecordGeometry(record, camera);
-    if (animate) startResolve(record);
-    return record;
   }
 
-  function rebuildRecord(record, camera) {
-    record.items.forEach(item => item.element.remove());
-    record.items.clear();
-    record.signature = sourceSignature(record.source);
-    record.expanded = record.source.classList.contains("expanded");
-
-    SEMANTIC_PLANES.forEach(definition => {
-      const created = createSemanticItem(record.source, definition, "present");
-      if (!created) return;
-      planes.get(definition.role)?.element.append(created.element);
-      record.items.set(definition.role, created);
-    });
-
-    updateRecordGeometry(record, camera);
-  }
-
-  function dismissRecord(record) {
-    if (!record || record.removed) return;
-    record.removed = true;
-    record.items.forEach(item => setOpticalLifecycle(item.element, "dismissing"));
-
-    record.removalTimer = window.setTimeout(() => {
-      record.removalTimer = 0;
-      record.items.forEach(item => item.element.remove());
-      records.delete(record.id);
-    }, DISMISS_DURATION + 30);
-  }
-
-  function dismissBody(record) {
-    BODY_ROLES.forEach(role => {
-      const item = record.items.get(role);
-      if (!item) return;
-      item.element.classList.add("optical-body-dismissing");
-    });
-
-    clearTimer(record, "collapseTimer");
-    record.collapseTimer = window.setTimeout(() => {
-      record.collapseTimer = 0;
-      BODY_ROLES.forEach(role => {
-        record.items.get(role)?.element.remove();
-        record.items.delete(role);
-      });
-    }, BODY_DISMISS_DURATION);
-  }
-
-  function handleExpansion(record, expanded) {
-    if (!record || record.removed || record.expanded === expanded) return;
-    record.expanded = expanded;
-    beginLayoutTracking();
-
-    if (!expanded) {
-      dismissBody(record);
+  function applyHitGeometry(record) {
+    const bounds = [...record.items.values()]
+      .map(item => item.screenBounds)
+      .filter(Boolean);
+    if (!bounds.length) {
+      record.hitTarget.style.display = 'none';
       return;
     }
 
-    window.setTimeout(() => {
-      if (!enabled || !record.source?.isConnected) return;
-      const camera = cameraSnapshot();
-      if (!camera) return;
-      applyPlaneCamera(camera);
-      SEMANTIC_PLANES
-        .filter(definition => BODY_ROLES.has(definition.role))
-        .forEach(definition => updateItemGeometry(record, definition, camera));
-    }, 70);
+    const padding = 5;
+    const left = Math.min(...bounds.map(value => value.left)) - padding;
+    const top = Math.min(...bounds.map(value => value.top)) - padding;
+    const right = Math.max(...bounds.map(value => value.right)) + padding;
+    const bottom = Math.max(...bounds.map(value => value.bottom)) + padding;
+
+    record.hitTarget.style.display = 'block';
+    record.hitTarget.style.left = `${left}px`;
+    record.hitTarget.style.top = `${top}px`;
+    record.hitTarget.style.width = `${right - left}px`;
+    record.hitTarget.style.height = `${bottom - top}px`;
   }
 
-  function beginLayoutTracking(duration = LAYOUT_TRACK_DURATION) {
-    layoutTrackingUntil = Math.max(
-      layoutTrackingUntil,
-      performance.now() + duration
-    );
-    planeSystem?.classList.add("optical-layout-active");
-    requestGeometrySync();
-  }
-
-  function syncStructure({ animateNew = true } = {}) {
-    if (!enabled || !feed) return;
-
-    const camera = cameraSnapshot();
-    if (!camera) return;
-    applyPlaneCamera(camera);
-
-    const sources = sourceEntries();
-    const presentIds = new Set();
-
-    sources.forEach((source, index) => {
-      const id = sourceId(source, index);
-      presentIds.add(id);
-      let record = records.get(id);
-
-      if (!record) {
-        createRecord(source, index, camera, animateNew);
-        return;
-      }
-
-      if (record.removed) {
-        clearTimer(record, "removalTimer");
-        record.removed = false;
-      }
-
-      const sourceChanged = record.source !== source;
-      const signature = sourceSignature(source);
-      record.source = source;
-
-      if (sourceChanged || signature !== record.signature) {
-        rebuildRecord(record, camera);
-      }
-
-      const expanded = source.classList.contains("expanded");
-      if (expanded !== record.expanded) handleExpansion(record, expanded);
-      updateRecordGeometry(record, camera);
+  function applyMeasurement(record, measurement, camera) {
+    if (measurement.signature !== record.signature) rebuildRecordContent(record, measurement);
+    SEMANTIC_PLANES.forEach(definition => {
+      applyItemGeometry(record, measurement, definition, camera);
     });
+    applyHitGeometry(record);
+    syncRecordLifecycle(record);
+    syncFocus(record);
+  }
 
-    records.forEach((record, id) => {
-      if (!presentIds.has(id)) dismissRecord(record);
+  function nodeLifecycle(node) {
+    if (!node) return 'absent';
+    if (node.classList.contains('leaving') || node.classList.contains('energy-down')) return 'dismissing';
+    if (node.classList.contains('entering') || node.classList.contains('energy-up')) return 'resolving';
+    if (node.classList.contains('gone')) return 'absent';
+    return 'present';
+  }
+
+  function roleLifecycle(entry, role) {
+    const selector = ROLE_SOURCE_SELECTOR[role];
+    return nodeLifecycle(selector ? entry.querySelector(selector) : null);
+  }
+
+  function setItemLifecycle(item, state) {
+    if (!item || item.lifecycle === state) return;
+    item.lifecycle = state;
+    item.element.classList.remove(...OPTICAL_LIFECYCLE);
+    item.element.classList.add(`optical-${state}`);
+  }
+
+  function syncRoleLifecycle(record, role) {
+    if (!record?.source) return;
+    setItemLifecycle(record.items.get(role), roleLifecycle(record.source, role));
+  }
+
+  function syncRecordLifecycle(record) {
+    SEMANTIC_PLANES.forEach(definition => syncRoleLifecycle(record, definition.role));
+  }
+
+  function rolesForObject(object) {
+    if (object.matches?.('.frame')) return ['plate', 'frame'];
+    if (object.matches?.('.corners')) return ['corners'];
+    if (object.matches?.('.priority')) return ['priority'];
+    if (object.matches?.('.body')) return BODY_ROLES;
+    if (object.matches?.('.meta')) return ['meta'];
+    if (object.matches?.('.tags')) return ['tags'];
+    if (object.matches?.('.headline')) return ['headline'];
+    return [];
+  }
+
+  function transitionObject(object) {
+    const roles = rolesForObject(object);
+    const entry = object?.closest?.('.entry:not(.panel)');
+    if (!roles.length || !entry) return;
+
+    let record = articleRecords.get(sourceId(entry));
+    if (!record && shouldRender(entry)) {
+      nearEntries.add(entry);
+      record = acquireRecord(entry);
+      requestGeometrySync();
+    }
+    if (record) roles.forEach(role => syncRoleLifecycle(record, role));
+  }
+
+  function refreshLifecycle() {
+    articleRecords.forEach(syncRecordLifecycle);
+  }
+
+  function setHover(record, active) {
+    record?.items.forEach(item => item.element.classList.toggle('optical-hover', active));
+  }
+
+  function syncFocus(record) {
+    const active = Boolean(record?.source?.matches?.(':focus-visible, :focus-within'));
+    record?.items.forEach(item => {
+      item.element.classList.toggle('optical-keyboard-focus', active);
     });
   }
 
   function updateGeometry() {
     geometryFrame = 0;
     if (!enabled) return;
-
     const camera = cameraSnapshot();
-    if (!camera) return;
-    applyPlaneCamera(camera);
-    records.forEach(record => updateRecordGeometry(record, camera));
+    if (!camera || !camera.width || !camera.height) return;
 
-    if (performance.now() < layoutTrackingUntil) {
-      geometryFrame = requestAnimationFrame(updateGeometry);
-    } else {
-      planeSystem?.classList.remove("optical-layout-active");
-    }
+    const measured = [];
+    articleRecords.forEach(record => {
+      if (!record.source?.isConnected) {
+        releaseRecord(record);
+        return;
+      }
+      const measurement = measureEntry(record.source);
+      if (!measurement || !rectWithinMargin(measurement.anchor)) {
+        releaseRecord(record);
+        return;
+      }
+      measured.push({ record, measurement });
+    });
+
+    applyPlaneCamera(camera);
+    measured.forEach(({ record, measurement }) => {
+      applyMeasurement(record, measurement, camera);
+    });
   }
 
   function requestGeometrySync() {
@@ -600,156 +603,204 @@ window.OpticalProjection = (() => {
     geometryFrame = requestAnimationFrame(updateGeometry);
   }
 
-  function requestStructureSync(delay = 70, options = {}) {
-    if (!enabled) return;
-    window.clearTimeout(structureTimer);
-    structureTimer = window.setTimeout(() => {
-      structureTimer = 0;
-      requestAnimationFrame(() => syncStructure(options));
-    }, delay);
+  function activateEntry(entry) {
+    if (!entry?.isConnected || entry.classList.contains('panel')) return;
+    nearEntries.add(entry);
+    acquireRecord(entry);
+    requestGeometrySync();
   }
 
-  function directEntryForMutation(mutation) {
-    const target = mutation.target;
-    if (!(target instanceof Element)) return null;
-    if (!target.classList.contains("entry") || target.classList.contains("panel")) return null;
-    if (target.parentElement !== feed) return null;
-    return target;
+  function deactivateEntry(entry) {
+    nearEntries.delete(entry);
+    const record = articleRecords.get(sourceId(entry));
+    if (record) releaseRecord(record);
   }
 
-  function handleFeedMutations(mutations) {
-    let structureChanged = false;
+  function syncEntryAccessibility(entry) {
+    if (!entry || entry.classList.contains('panel')) return;
+    entry.setAttribute('role', 'button');
+    entry.tabIndex = 0;
+    entry.setAttribute(
+      'aria-expanded',
+      entry.classList.contains('expanded') ? 'true' : 'false'
+    );
+  }
 
-    mutations.forEach(mutation => {
-      if (mutation.type === "childList" || mutation.type === "characterData") {
-        structureChanged = true;
-        return;
-      }
+  function observeEntry(entry) {
+    if (observedEntries.has(entry) || entry.classList.contains('panel')) return;
+    syncEntryAccessibility(entry);
+    observedEntries.add(entry);
+    intersectionObserver?.observe(entry);
+    if (!intersectionObserver && shouldRender(entry)) activateEntry(entry);
+  }
 
-      if (mutation.type !== "attributes" || mutation.attributeName !== "class") return;
-      const entry = directEntryForMutation(mutation);
-      if (!entry) return;
+  function syncObservedEntries() {
+    if (!feed) return;
+    const current = new Set(feed.querySelectorAll(':scope > .entry:not(.panel)'));
+    current.forEach(observeEntry);
 
-      const record = records.get(sourceId(entry));
-      if (!record) {
-        structureChanged = true;
-        return;
-      }
-
-      const oldClasses = new Set(String(mutation.oldValue || "").split(/\s+/));
-      const wasExpanded = oldClasses.has("expanded");
-      const expanded = entry.classList.contains("expanded");
-      if (wasExpanded !== expanded) handleExpansion(record, expanded);
+    observedEntries.forEach(entry => {
+      if (current.has(entry) && entry.isConnected) return;
+      intersectionObserver?.unobserve(entry);
+      observedEntries.delete(entry);
+      deactivateEntry(entry);
     });
 
-    if (structureChanged) requestStructureSync(75);
+    if (intersectionObserver) {
+      current.forEach(entry => {
+        if (nearEntries.has(entry)) acquireRecord(entry);
+      });
+    }
   }
 
-  function setToggleState() {
-    if (!toggle) return;
-    toggle.setAttribute("aria-pressed", enabled ? "true" : "false");
-    toggle.textContent = enabled ? "Optics On" : "Optics Off";
+  function syncStructure() {
+    structureTimer = 0;
+    if (!enabled || !feed) return;
+    syncObservedEntries();
+    requestGeometrySync();
   }
 
-  function enable(options = {}) {
+  function requestStructureSync(delay = 60) {
+    if (!enabled) return;
+    clearTimeout(structureTimer);
+    structureTimer = setTimeout(syncStructure, delay);
+  }
+
+  function onMutations(mutations) {
+    let structureChanged = false;
+    for (const mutation of mutations) {
+      if (mutation.type === 'childList' || mutation.type === 'characterData') structureChanged = true;
+      if (mutation.type === 'attributes') {
+        const entry = mutation.target.closest?.('.entry:not(.panel)');
+        const record = entry ? articleRecords.get(sourceId(entry)) : null;
+        if (entry && mutation.attributeName === 'class') {
+          syncEntryAccessibility(entry);
+          if (record) syncRecordLifecycle(record);
+        }
+      }
+    }
+    if (structureChanged) requestStructureSync();
+    requestGeometrySync();
+  }
+
+  function onFocusChange(event) {
+    const entry = event.target.closest?.('.entry:not(.panel)');
+    if (!entry) return;
+    const record = articleRecords.get(sourceId(entry));
+    if (record) requestAnimationFrame(() => syncFocus(record));
+  }
+
+  function onKeyDown(event) {
+    const entry = event.target.closest?.('.entry:not(.panel)');
+    if (!entry || event.target !== entry) return;
+    if (!['Enter', ' '].includes(event.key)) return;
+    event.preventDefault();
+    entry.click();
+  }
+
+  function enable() {
     if (enabled) return;
     enabled = true;
-    document.documentElement.classList.add(ROOT_CLASS);
+    document.documentElement.classList.add('optical-mode');
     ensurePlaneSystem();
-    setToggleState();
-    if (options.persist !== false) localStorage.setItem(STORAGE_KEY, "on");
-    syncStructure({ animateNew: true });
-    beginLayoutTracking(360);
+    syncStructure();
   }
 
-  function disable(options = {}) {
-    enabled = false;
-    document.documentElement.classList.remove(ROOT_CLASS);
+  function refresh() {
+    requestStructureSync(0);
+  }
 
-    if (geometryFrame) cancelAnimationFrame(geometryFrame);
-    geometryFrame = 0;
-    window.clearTimeout(structureTimer);
-    structureTimer = 0;
-    layoutTrackingUntil = 0;
-
-    records.forEach(record => {
-      clearTimer(record, "lifecycleTimer");
-      clearTimer(record, "removalTimer");
-      clearTimer(record, "collapseTimer");
+  function connectRendererBridge() {
+    if (unregisterRenderer || !window.NCNProjectionRenderer?.register) return;
+    unregisterRenderer = window.NCNProjectionRenderer.register({
+      transitionObject,
+      refreshLifecycle
     });
-    records.clear();
-    planes.clear();
-
-    planeSystem?.remove();
-    planeSystem = null;
-
-    setToggleState();
-    if (options.persist !== false) localStorage.setItem(STORAGE_KEY, "off");
-  }
-
-  function toggleMode() {
-    if (enabled) disable();
-    else enable();
   }
 
   function init(options = {}) {
-    feed = options.feed || document.querySelector("#feed");
-    toggle = options.toggle || document.querySelector("#optical-projection-toggle");
+    if (initialized) return true;
+    feed = options.feed || document.querySelector('#feed');
     if (!feed) return false;
+    initialized = true;
 
-    toggle?.addEventListener("click", toggleMode);
-    window.addEventListener("scroll", requestGeometrySync, { passive: true });
-    window.addEventListener("resize", requestGeometrySync, { passive: true });
-    window.addEventListener("ncn:chamber-camera-change", requestGeometrySync);
+    intersectionObserver = 'IntersectionObserver' in window
+      ? new IntersectionObserver(entries => {
+          entries.forEach(result => {
+            if (result.isIntersecting) activateEntry(result.target);
+            else deactivateEntry(result.target);
+          });
+        }, { root: null, rootMargin: '85% 0px 85% 0px', threshold: 0 })
+      : null;
 
-    observer = new MutationObserver(handleFeedMutations);
+    observer = new MutationObserver(onMutations);
     observer.observe(feed, {
       childList: true,
       subtree: true,
       characterData: true,
       attributes: true,
-      attributeOldValue: true,
-      attributeFilter: ["class"]
+      attributeFilter: ['class', 'style', 'hidden']
     });
 
-    if ("ResizeObserver" in window) {
-      resizeObserver = new ResizeObserver(() => {
-        beginLayoutTracking(220);
-      });
+    if ('ResizeObserver' in window) {
+      resizeObserver = new ResizeObserver(requestGeometrySync);
       resizeObserver.observe(feed);
     }
 
-    if (localStorage.getItem(STORAGE_KEY) === "on") enable({ persist: false });
-    else disable({ persist: false });
+    addEventListener('scroll', requestGeometrySync, { passive: true });
+    addEventListener('resize', requestGeometrySync, { passive: true });
+    addEventListener('ncn:chamber-camera-change', requestGeometrySync);
+    feed.addEventListener('focusin', onFocusChange);
+    feed.addEventListener('focusout', onFocusChange);
+    feed.addEventListener('keydown', onKeyDown);
 
+    document.fonts?.ready?.then(() => requestGeometrySync());
+    connectRendererBridge();
+    enable();
     return true;
   }
 
-  function refresh() {
-    requestStructureSync(0, { animateNew: false });
-  }
-
   function destroy() {
-    disable({ persist: false });
-    toggle?.removeEventListener("click", toggleMode);
-    window.removeEventListener("scroll", requestGeometrySync);
-    window.removeEventListener("resize", requestGeometrySync);
-    window.removeEventListener("ncn:chamber-camera-change", requestGeometrySync);
+    enabled = false;
+    initialized = false;
+    cancelAnimationFrame(geometryFrame);
+    clearTimeout(structureTimer);
+    geometryFrame = 0;
+    structureTimer = 0;
     observer?.disconnect();
     resizeObserver?.disconnect();
-
+    intersectionObserver?.disconnect();
+    removeEventListener('scroll', requestGeometrySync);
+    removeEventListener('resize', requestGeometrySync);
+    removeEventListener('ncn:chamber-camera-change', requestGeometrySync);
+    feed?.removeEventListener('focusin', onFocusChange);
+    feed?.removeEventListener('focusout', onFocusChange);
+    feed?.removeEventListener('keydown', onKeyDown);
+    articleRecords.forEach(releaseRecord);
+    articleRecords.clear();
+    recordPool.splice(0).forEach(record => {
+      record.items.forEach(item => item.element.remove());
+      record.hitTarget.remove();
+    });
+    observedEntries.clear();
+    nearEntries.clear();
+    planeRecords.clear();
+    planeSystem?.remove();
+    planeSystem = null;
+    hitLayer = null;
+    unregisterRenderer?.();
+    unregisterRenderer = null;
     feed = null;
-    toggle = null;
-    observer = null;
-    resizeObserver = null;
   }
 
   function boot() {
     init();
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot, { once: true });
+  connectRendererBridge();
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
   } else {
     boot();
   }
@@ -757,11 +808,16 @@ window.OpticalProjection = (() => {
   return {
     init,
     enable,
-    disable,
     refresh,
+    refreshGeometry: requestGeometrySync,
+    refreshLifecycle,
+    transitionObject,
     destroy,
+    connectRendererBridge,
     getCameraSnapshot: cameraSnapshot,
     getPlaneDefinitions: () => SEMANTIC_PLANES.map(plane => ({ ...plane })),
+    getActiveRecordCount: () => articleRecords.size,
+    getPoolSize: () => recordPool.length,
     isEnabled: () => enabled
   };
 })();

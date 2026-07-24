@@ -1,9 +1,9 @@
 /*==================================================
-  OPTIONAL OPTICAL PROJECTION
+  PERMANENT OPTICAL PROJECTION
 
-  Semantic article objects occupy independent chamber planes. Remove
-  this file, the matching script and the rail toggle to restore the
-  standard viewer unchanged.
+  The original Optical display is preserved: semantic article objects occupy
+  their established chamber planes, scales and resolve profile. Source cards
+  remain the layout and accessibility authority.
 ==================================================*/
 
 .optical-mode .viewer {
@@ -30,14 +30,8 @@
   background: transparent !important;
 }
 
-.optical-mode #layered-chamber-fg {
-  opacity: 0;
-}
-
 /*==================================================
   SOURCE GEOMETRY
-
-  The invisible source cards retain the real spacing and click targets.
 ==================================================*/
 
 .optical-mode #feed > .entry:not(.panel) {
@@ -78,9 +72,6 @@
 
 /*==================================================
   DEPTH PORTS
-
-  JavaScript positions and clips every plane to camera.aperturePointsAt(z).
-  The wrapper itself is never scaled: the chamber port remains exact.
 ==================================================*/
 
 .optical-mode .optical-plane {
@@ -92,8 +83,6 @@
   contain: layout paint;
 }
 
-/* The semantic box keeps its original measured dimensions. Scaling is applied
-   to the entire object, so typography, borders and glow scale together. */
 .optical-mode .optical-semantic-item {
   position: absolute;
   margin: 0;
@@ -128,8 +117,6 @@
   transform: none !important;
 }
 
-/* A nearly opaque centre keeps the card readable. Transparency is confined
-   to the outer edge, avoiding a large blurred inset shadow over every panel. */
 .optical-mode .optical-semantic-item[data-optical-role="plate"] .optical-plate-surface {
   background: radial-gradient(
     140% 115% at 50% 50%,
@@ -255,12 +242,6 @@
 @keyframes optical-body-dismiss {
   0% { opacity: 1; filter: none; }
   100% { opacity: 0; filter: brightness(.35) saturate(.55); }
-}
-
-.optical-toggle[aria-pressed="true"] {
-  color: var(--white);
-  border-color: rgba(255, 180, 110, .7);
-  text-shadow: 0 0 9px rgba(255, 100, 45, .65);
 }
 
 @media (max-width: 420px) {
