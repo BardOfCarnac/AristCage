@@ -21,7 +21,6 @@
   <link rel="stylesheet" href="css/selector-focus.css" />
   <link rel="stylesheet" href="css/responsive.css" />
   <link rel="stylesheet" href="css/desktop.css" />
-  <link rel="stylesheet" href="css/diagnostics.css" />
   <link rel="stylesheet" href="css/ui-cohesion.css" />
   <link rel="stylesheet" href="css/ui-polish.css" />
   <link rel="stylesheet" href="css/refactor-52.css" />
@@ -29,14 +28,11 @@
   <link rel="stylesheet" href="css/dropdown-unification.css" />
   <link rel="stylesheet" href="css/panel-stability-mobile-details.css" />
   <link rel="stylesheet" href="css/story-metadata-polish.css" />
-  <link rel="stylesheet" href="css/effects.css" />
   <link rel="stylesheet" href="css/instrumentation.css" />
   <link rel="stylesheet" href="css/selector-panel-corrections.css" />
   <link rel="stylesheet" href="css/final-interaction-polish.css" />
-  <link rel="stylesheet" href="css/layered-chamber.css" />
-  <link rel="stylesheet" href="css/heuristic-rangefinder.css?v=front-carrier-15" data-optional-module="heuristic-rangefinder" />
-  <link rel="stylesheet" href="css/optical-projection.css?v=dark-edge-plate-1" data-optional-module="optical-projection" />
-  <link rel="stylesheet" href="css/optical-three-plane-profile.css?v=priority-clear-1" data-optional-module="optical-projection" />
+  <link rel="stylesheet" href="css/layered-chamber.css?v=spatial-runtime-1" />
+  <link rel="stylesheet" href="css/optical-projection.css?v=permanent-optics-1" />
 </head>
 
 <body>
@@ -50,9 +46,6 @@
       <nav class="rail-actions" aria-label="Feed controls">
         <button type="button" data-panel="filter" aria-pressed="false">Filter</button>
         <button type="button" data-panel="submit" aria-pressed="false">Submit</button>
-        <button type="button" class="layered-chamber-toggle" id="layered-chamber-toggle" aria-pressed="false" title="Toggle layered chamber projection">Chamber Off</button>
-        <button type="button" class="heuristic-rangefinder-toggle" id="heuristic-rangefinder-toggle" aria-pressed="false" title="Toggle heuristic image rangefinder">Range Off</button>
-        <button type="button" class="optical-toggle" id="optical-projection-toggle" aria-pressed="false" title="Toggle the additional optical projection mode">Optics Off</button>
       </nav>
     </header>
 
@@ -73,7 +66,7 @@
   <script src="js/render.js"></script>
   <script src="js/controls.js"></script>
   <script src="js/selector-panel-corrections.js"></script>
-  <script src="js/projection.js"></script>
+  <script src="js/projection.js?v=optical-bridge-1"></script>
   <script src="js/projection-engine.js"></script>
   <script src="js/layout.js"></script>
   <script src="js/actions.js"></script>
@@ -84,42 +77,9 @@
   <script src="js/presence.js"></script>
   <script src="js/app.js"></script>
   <script src="js/priority-palette.js"></script>
-  <script src="js/effects.js"></script>
   <script src="js/desktop.js"></script>
-  <script src="js/layered-chamber.js?v=native-breath-1"></script>
-  <script src="js/chamber-camera.js?v=semantic-panes-3"></script>
-  <script src="js/optical-port-map.js?v=soft-perspective-1"></script>
-  <script src="js/heuristic-rangefinder.js?v=front-carrier-15" data-optional-module="heuristic-rangefinder"></script>
-  <script src="js/optical-projection.js?v=semantic-three-ports-2" data-optional-module="optical-projection"></script>
-  <script src="js/diagnostics.js?v=shared-camera-1"></script>
-  <script>
-    (() => {
-      const parameters = new URLSearchParams(location.search);
-      if (parameters.get('terminalfx') !== '1') return;
-
-      const railActions = document.querySelector('.rail-actions');
-      const chamberButton = document.querySelector('#layered-chamber-toggle');
-      if (!railActions || !chamberButton) return;
-
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'terminal-environment-toggle';
-      button.id = 'terminal-environment-toggle';
-      button.setAttribute('aria-pressed', 'false');
-      button.title = 'Toggle the optional terminal weather and fault lab mode';
-      button.textContent = 'Terminal FX Off';
-      chamberButton.insertAdjacentElement('afterend', button);
-
-      const stylesheet = document.createElement('link');
-      stylesheet.rel = 'stylesheet';
-      stylesheet.href = 'css/terminal-environment-mode.css?v=terminal-mode-2';
-      document.head.append(stylesheet);
-
-      const script = document.createElement('script');
-      script.src = 'js/terminal-environment-mode.js?v=terminal-mode-2';
-      script.dataset.debug = parameters.get('terminalfxdebug') === '1' ? 'true' : 'false';
-      document.body.append(script);
-    })();
-  </script>
+  <script src="js/layered-chamber.js?v=spatial-runtime-1"></script>
+  <script src="js/chamber-camera.js?v=single-source-camera-1"></script>
+  <script src="js/optical-projection.js?v=permanent-optics-1"></script>
 </body>
 </html>
