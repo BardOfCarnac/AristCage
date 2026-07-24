@@ -74,10 +74,23 @@ function syncPanelButtons() {
   });
 }
 
+function announcePanelState(reason = "panel-toggle") {
+  const name = NCN_STATE.activePanel;
+  window.dispatchEvent(new CustomEvent("ncn:panel-change", {
+    detail: {
+      name,
+      open: name === "filter" || name === "submit",
+      app: NCN_STATE.activeApp,
+      reason
+    }
+  }));
+}
+
 function setRequestedPanel(name) {
   NCN_STATE.activePanel = NCN_STATE.activePanel === name ? null : name;
   clearExpandedEntry();
   syncPanelButtons();
+  announcePanelState();
 }
 
 async function transitionPanel(name) {
