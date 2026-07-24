@@ -1,14 +1,294 @@
-/* Loaded after the legacy overlay sheet so shared-rail Dripfeed rules win. */
-html[data-ncn-app="dripfeed"] .rail-title > span::after {
-  content: none !important;
+/*==================================================
+  DRIPFEED SHARED MASTHEAD + FILTER RAIL
+
+  Loaded after the standalone overlay styles so these application-in-terminal
+  rules take precedence without disturbing the established tile wall.
+==================================================*/
+
+html[data-ncn-app="dripfeed"] .app {
+  width: 100%;
+  max-width: none;
+}
+
+html[data-ncn-app="dripfeed"] .app-shell {
+  display: none !important;
+}
+
+html[data-ncn-app="dripfeed"] .rail {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: clamp(12px, 3vw, 24px);
+  align-items: center;
+  padding: 10px clamp(14px, 4vw, 32px) 12px;
+  background:
+    linear-gradient(90deg, rgba(240, 68, 57, .08), transparent 55%),
+    rgba(4, 3, 3, .97);
 }
 
 html[data-ncn-app="dripfeed"] .rail-actions {
   display: none !important;
 }
 
-#dripfeed-root .view-tabs,
+html[data-ncn-app="dripfeed"] .rail-mark {
+  align-self: end;
+  padding-bottom: .38rem;
+  color: #f04439;
+  font-size: clamp(1.45rem, 4vw, 2.2rem);
+  letter-spacing: .08em;
+}
+
+html[data-ncn-app="dripfeed"] .rail-title {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, auto) 1fr;
+  column-gap: clamp(14px, 3vw, 28px);
+  align-items: end;
+}
+
+html[data-ncn-app="dripfeed"] .rail-title strong {
+  display: block;
+  min-width: 0;
+  color: #f04439;
+  font-size: 1rem;
+  line-height: .8;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+html[data-ncn-app="dripfeed"] .dripfeed-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  white-space: nowrap;
+  filter: drop-shadow(0 0 12px rgba(240, 68, 57, .18));
+}
+
+html[data-ncn-app="dripfeed"] .drip-word {
+  display: inline-block;
+  color: #f04439;
+  font-family: "Arial Rounded MT Bold", "Trebuchet MS", "Arial Black", sans-serif;
+  font-size: clamp(2.65rem, 9.2vw, 5.7rem);
+  font-weight: 900;
+  line-height: .72;
+  letter-spacing: -.13em;
+  text-transform: lowercase;
+  transform: scaleX(1.05) scaleY(1.11);
+  transform-origin: left bottom;
+}
+
+html[data-ncn-app="dripfeed"] .feed-word {
+  display: inline-block;
+  margin-left: -.03em;
+  color: #971a19;
+  font-family: Impact, "Arial Black", "Helvetica Neue", sans-serif;
+  font-size: clamp(2.5rem, 8.7vw, 5.45rem);
+  font-weight: 900;
+  line-height: .72;
+  letter-spacing: -.055em;
+  text-transform: uppercase;
+  transform: scaleY(1.04);
+  transform-origin: left bottom;
+}
+
+html[data-ncn-app="dripfeed"] .rail-title > span {
+  align-self: end;
+  max-width: 38ch;
+  margin: 0 0 .18rem;
+  color: #ff914d;
+  font-size: clamp(.55rem, 1.8vw, .76rem);
+  line-height: 1.5;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+
+html[data-ncn-app="dripfeed"] .rail-title > span::after {
+  content: none !important;
+}
+
+html[data-ncn-app="dripfeed"] .rail-title::after {
+  content: "BUY · SELL · BECOME NOTICEABLE";
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  color: rgba(244, 234, 226, .62);
+  font-family: var(--font-main);
+  font-size: clamp(.56rem, 1.7vw, .72rem);
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
 #dripfeed-root .terminal-header,
+#dripfeed-root .view-tabs,
 #dripfeed-root .rear-wall {
   display: none !important;
+}
+
+#dripfeed-root .dripfeed-filter-rail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+  margin-top: 0;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--line2);
+  background: rgba(5, 4, 4, .84);
+}
+
+#dripfeed-root .dripfeed-filter-rail .filter-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 5px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(240, 68, 57, .35) transparent;
+}
+
+#dripfeed-root .dripfeed-filter-rail .filter-chip {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: .64rem;
+  letter-spacing: .07em;
+}
+
+#dripfeed-root .filter-transmit {
+  min-width: 132px;
+  white-space: nowrap;
+}
+
+#dripfeed-root .dripfeed-utility-rail {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 4px 10px;
+  border-bottom: 1px solid rgba(240, 68, 57, .12);
+}
+
+#dripfeed-root .dripfeed-utility-rail .system-line {
+  padding: 0;
+  border: 0;
+}
+
+#dripfeed-root .dripfeed-utility-rail .search-box {
+  min-width: 0;
+}
+
+#dripfeed-root .dripfeed-utility-rail .display-note {
+  white-space: nowrap;
+}
+
+#dripfeed-root .reset-local {
+  min-height: 40px;
+  font-size: .59rem;
+}
+
+#dripfeed-root .demo-stage.shared-depth .live-wall {
+  transform: translate3d(0, var(--drip-live-y, 0), 0) scale(var(--drip-live-scale, 1));
+}
+
+#dripfeed-root .demo-stage.shared-depth.reading .live-wall {
+  opacity: .25;
+  filter: brightness(.43) blur(1.1px);
+  transform: translate3d(0, var(--drip-live-y, 0), 0) scale(var(--drip-live-reading-scale, .94));
+}
+
+@media (max-width: 1050px) {
+  #dripfeed-root .dripfeed-utility-rail {
+    grid-template-columns: 1fr auto;
+  }
+
+  #dripfeed-root .dripfeed-utility-rail .system-line {
+    grid-column: 1 / -1;
+  }
+
+  #dripfeed-root .dripfeed-utility-rail .search-box {
+    grid-column: 1;
+  }
+
+  #dripfeed-root .dripfeed-utility-rail .display-note {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  #dripfeed-root .reset-local {
+    display: none;
+  }
+}
+
+@media (max-width: 740px) {
+  html[data-ncn-app="dripfeed"] .rail {
+    gap: 10px;
+    padding: 8px 12px 10px;
+  }
+
+  html[data-ncn-app="dripfeed"] .rail-title {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-ncn-app="dripfeed"] .rail-title > span {
+    max-width: none;
+    margin-top: 7px;
+  }
+
+  html[data-ncn-app="dripfeed"] .rail-title::after {
+    margin-top: 5px;
+  }
+
+  #dripfeed-root .dripfeed-filter-rail {
+    padding-top: 6px;
+  }
+
+  #dripfeed-root .dripfeed-filter-rail .filter-chip {
+    min-height: 36px;
+    padding-inline: 10px;
+  }
+
+  #dripfeed-root .filter-transmit {
+    min-width: 112px;
+    padding-inline: 10px;
+  }
+
+  #dripfeed-root .dripfeed-utility-rail {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  #dripfeed-root .dripfeed-utility-rail .system-line {
+    display: none;
+  }
+
+  #dripfeed-root .dripfeed-utility-rail .search-box {
+    grid-column: 1;
+  }
+
+  #dripfeed-root .dripfeed-utility-rail .display-note {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 430px) {
+  html[data-ncn-app="dripfeed"] .rail {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-ncn-app="dripfeed"] .rail-mark {
+    display: none;
+  }
+
+  html[data-ncn-app="dripfeed"] .drip-word {
+    font-size: clamp(2.55rem, 14.8vw, 4rem);
+  }
+
+  html[data-ncn-app="dripfeed"] .feed-word {
+    font-size: clamp(2.4rem, 14vw, 3.85rem);
+  }
+
+  #dripfeed-root .filter-transmit {
+    min-width: 104px;
+    font-size: .63rem;
+  }
+
+  #dripfeed-root .dripfeed-utility-rail .display-note {
+    font-size: .56rem;
+  }
 }
