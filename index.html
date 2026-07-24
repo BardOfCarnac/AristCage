@@ -92,5 +92,34 @@
   <script src="js/heuristic-rangefinder.js?v=front-carrier-15" data-optional-module="heuristic-rangefinder"></script>
   <script src="js/optical-projection.js?v=semantic-three-ports-2" data-optional-module="optical-projection"></script>
   <script src="js/diagnostics.js?v=shared-camera-1"></script>
+  <script>
+    (() => {
+      const parameters = new URLSearchParams(location.search);
+      if (parameters.get('terminalfx') !== '1') return;
+
+      const railActions = document.querySelector('.rail-actions');
+      const chamberButton = document.querySelector('#layered-chamber-toggle');
+      if (!railActions || !chamberButton) return;
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'terminal-environment-toggle';
+      button.id = 'terminal-environment-toggle';
+      button.setAttribute('aria-pressed', 'false');
+      button.title = 'Toggle the optional terminal weather and fault lab mode';
+      button.textContent = 'Terminal FX Off';
+      chamberButton.insertAdjacentElement('afterend', button);
+
+      const stylesheet = document.createElement('link');
+      stylesheet.rel = 'stylesheet';
+      stylesheet.href = 'css/terminal-environment-mode.css?v=terminal-mode-2';
+      document.head.append(stylesheet);
+
+      const script = document.createElement('script');
+      script.src = 'js/terminal-environment-mode.js?v=terminal-mode-2';
+      script.dataset.debug = parameters.get('terminalfxdebug') === '1' ? 'true' : 'false';
+      document.body.append(script);
+    })();
+  </script>
 </body>
 </html>
