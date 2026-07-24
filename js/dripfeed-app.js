@@ -112,6 +112,7 @@
       this.unsplash = options.unsplash || new DF.unsplash.UnsplashClient(DF.config);
       this.state = { category: 'all', query: '', active: null };
       this.depth = options.depthAdapter || new DF.depth.SharedDepthAdapter(this);
+      this.readerTransition = options.readerTransition || new DF.readerTransition.ReaderTransition(this);
       this.submit = new DF.submit.SubmitController(this);
     }
 
@@ -140,7 +141,7 @@
         const tile = event.target.closest('[data-post-id]');
         if (tile) {
           const post = this.store.posts.find(candidate => candidate.id === tile.dataset.postId);
-          if (post) this.openReader(post);
+          if (post) this.openReader(post, tile);
           return;
         }
 
@@ -154,7 +155,7 @@
           this.render();
           this.toast('Local classified posts cleared.');
         }
-        if (action === 'close-reader') this.closeOverlay('reader');
+        if (action === 'close-reader') this.readerTransition.close();
       });
 
       this.root.addEventListener('keydown', event => {
@@ -170,7 +171,7 @@
       });
 
       this.root.querySelector('[data-overlay="reader"]')?.addEventListener('click', event => {
-        if (event.target === event.currentTarget) this.closeOverlay('reader');
+        if (event.target === event.currentTarget) this.readerTransition.close();
       });
       this.root.querySelector('[data-overlay="submit"]')?.addEventListener('click', event => {
         if (event.target === event.currentTarget) this.submit.close();
@@ -211,11 +212,8 @@
       this.depth.afterRender();
     }
 
-    openReader(post) {
-      this.state.active = post;
-      this.root.querySelector('[data-reader-target]').innerHTML = DF.render.readerMarkup(post);
-      this.openOverlay('reader');
-      this.depth.setReading(true);
+    openReader(post, sourceElement) {
+      return this.readerTransition.open(post, sourceElement);
     }
 
     openOverlay(name) {
@@ -226,14 +224,14 @@
     }
 
     closeOverlay(name) {
+      if (name === 'reader') {
+        this.readerTransition.close({ immediate: true });
+        return;
+      }
       const overlay = this.root.querySelector(`[data-overlay="${name}"]`);
       overlay?.classList.remove('open');
       overlay?.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
-      if (name === 'reader') {
-        this.depth.setReading(false);
-        this.state.active = null;
-      }
     }
 
     toast(message) {
@@ -263,12 +261,13 @@
 
     deactivate() {
       this.depth.pause?.();
-      this.closeOverlay('reader');
+      this.readerTransition.close({ immediate: true });
       this.closeOverlay('submit');
     }
 
     destroy() {
       clearInterval(this.clockTimer);
+      this.readerTransition.destroy?.();
       this.depth.destroy?.();
       this.root.replaceChildren();
       this.mounted = false;
