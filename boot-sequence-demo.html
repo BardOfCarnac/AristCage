@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NCN Courier Relay Boot Sequence</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --red-0: #120003;
+    --red-1: #3b0209;
+    --red-2: #8f0713;
+    --red-3: #e21a20;
+    --hot: #ff4a2f;
+    --white: #ffe4d3;
+    --ui-scale: clamp(.72, 1.2vw, 1);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #020000; }
+  body {
+    font-family: "Courier New", ui-monospace, SFMono-Regular, Consolas, monospace;
+    color: var(--white);
+    letter-spacing: .08em;
+  }
+  button { font: inherit; }
+
+  .viewer {
+    position: fixed;
+    inset: 0;
+    isolation: isolate;
+    background:
+      radial-gradient(circle at 50% 48%, rgba(90, 0, 7, .11), transparent 40%),
+      #010000;
+    perspective: 900px;
+    perspective-origin: 50% 50%;
+  }
+
+  .viewer::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    background:
+      linear-gradient(rgba(255,255,255,.018), rgba(255,255,255,0) 2px) 0 0/100% 4px,
+      radial-gradient(ellipse at center, transparent 46%, rgba(0,0,0,.58) 100%);
+    mix-blend-mode: screen;
+    opacity: .72;
+  }
+
+  .viewer::after {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    z-index: 19;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent 44%, rgba(255,72,42,.035) 49%, transparent 54%);
+    animation: scan 5.5s linear infinite;
+  }
+
+  @keyframes scan { to { transform: translateX(28%); } }
+
+  .chamber {
+    position: absolute;
+    inset: 4.2vh 4.2vw;
+    transform-style: preserve-3d;
+    opacity: 0;
+    animation: chamberWake 7.5s cubic-bezier(.2,.7,.2,1) forwards;
+  }
+
+  @keyframes chamberWake {
+    0%, 2% { opacity: 0; filter: brightness(.2); transform: translateZ(-120px) scale(.91); }
+    5% { opacity: .35; }
+    9% { opacity: .09; }
+    12% { opacity: .67; }
+    18% { opacity: .34; }
+    24% { opacity: .9; filter: brightness(.68); transform: translateZ(-45px) scale(.96); }
+    47% { opacity: 1; filter: brightness(.92); }
+    62% { transform: translateZ(0) scale(1); filter: brightness(1.34); }
+    72%, 100% { opacity: 1; transform: translateZ(0) scale(1); filter: brightness(1); }
+  }
+
+  .plane {
+    position: absolute;
+    overflow: hidden;
+    border: 1px solid rgba(222, 18, 27, .34);
+    background-color: rgba(7, 0, 1, .86);
+    background-image:
+      linear-gradient(rgba(149, 7, 17, .19) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(149, 7, 17, .19) 1px, transparent 1px);
+    background-size: 44px 44px;
+    box-shadow: inset 0 0 32px rgba(91, 0, 8, .18), 0 0 14px rgba(100, 0, 8, .12);
+    backface-visibility: hidden;
+    transition: filter .5s ease;
+  }
+
+  .back {
+    inset: 11% 17%;
+    transform: translateZ(-126px);
+  }
+
+  .left {
+    top: 11%; bottom: 11%; left: 0; width: 18%;
+    transform-origin: right center;
+    transform: rotateY(63deg) translateZ(-18px);
+  }
+
+  .right {
+    top: 11%; bottom: 11%; right: 0; width: 18%;
+    transform-origin: left center;
+    transform: rotateY(-63deg) translateZ(-18px);
+  }
+
+  .floor {
+    left: 17%; right: 17%; bottom: -7%; height: 25%;
+    transform-origin: center top;
+    transform: rotateX(67deg) translateZ(-6px);
+    opacity: .78;
+  }
+
+  .ceiling {
+    left: 17%; right: 17%; top: -7%; height: 25%;
+    transform-origin: center bottom;
+    transform: rotateX(-67deg) translateZ(-6px);
+    opacity: .48;
+  }
+
+  .corner-line {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, var(--red-3), transparent);
+    filter: drop-shadow(0 0 5px var(--red-2));
+    opacity: 0;
+    animation: corners 7.5s ease forwards;
+  }
+  .corner-line.h { left: 16.8%; right: 16.8%; height: 1px; }
+  .corner-line.top { top: 11%; }
+  .corner-line.bottom { bottom: 11%; }
+  .corner-line.v { top: 11%; bottom: 11%; width: 1px; background: linear-gradient(transparent, var(--red-3), transparent); }
+  .corner-line.l { left: 17%; }
+  .corner-line.r { right: 17%; }
+  @keyframes corners { 0%, 14% { opacity: 0 } 25% { opacity: .25 } 58% { opacity: 1 } 100% { opacity: .62 } }
+
+  .surface-copy {
+    position: absolute;
+    inset: 7%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: clamp(5px, 1vh, 12px);
+    font-size: clamp(7px, 1.03vw, 15px);
+    line-height: 1.25;
+    color: rgba(255, 70, 49, .72);
+    text-shadow: 0 0 6px rgba(255, 24, 28, .35);
+    opacity: 0;
+    animation: surfaceText 7.5s steps(1,end) forwards;
+  }
+
+  .left .surface-copy,
+  .right .surface-copy {
+    inset: 5% 7%;
+    font-size: clamp(6px, .76vw, 11px);
+    gap: clamp(4px, .7vh, 8px);
+  }
+
+  .surface-copy .strong { color: rgba(255, 193, 153, .86); }
+  .surface-copy .dim { color: rgba(177, 30, 34, .58); }
+  .surface-copy .fail { color: rgba(255, 58, 44, .92); }
+  .surface-copy .line { white-space: nowrap; overflow: hidden; text-overflow: clip; }
+  .surface-copy .line::after { content: ""; display: inline-block; width: .58em; height: .9em; margin-left: .4em; background: currentColor; opacity: .65; animation: blink .7s steps(1) infinite; }
+  .surface-copy .line.done::after { display:none; }
+
+  @keyframes surfaceText {
+    0%, 8% { opacity: 0; }
+    11% { opacity: .18; }
+    15% { opacity: .64; }
+    18% { opacity: .31; }
+    22%, 48% { opacity: 1; }
+    51% { opacity: .54; }
+    55% { opacity: .9; }
+    59% { opacity: .2; }
+    64%, 100% { opacity: 0; }
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .lift-clones {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    transform-style: preserve-3d;
+    pointer-events: none;
+  }
+  .lift {
+    position: absolute;
+    color: rgba(255, 91, 55, .88);
+    text-shadow: 0 0 8px rgba(255, 35, 30, .75);
+    font-size: clamp(7px, .92vw, 13px);
+    opacity: 0;
+    white-space: nowrap;
+  }
+  .lift.a { left: 7%; top: 34%; transform: rotateY(61deg) translateZ(-20px); }
+  .lift.b { right: 7%; top: 42%; transform: rotateY(-61deg) translateZ(-20px); }
+  .lift.c { left: 37%; top: 58%; transform: translateZ(-126px); }
+  .lift.d { left: 31%; top: 27%; transform: translateZ(-126px); }
+  .lift { animation: liftText 2.05s cubic-bezier(.18,.78,.18,1) 4.15s forwards; }
+  .lift.b { animation-delay: 4.26s; }
+  .lift.c { animation-delay: 4.35s; }
+  .lift.d { animation-delay: 4.44s; }
+
+  @keyframes liftText {
+    0% { opacity: 0; filter: blur(1px); }
+    12% { opacity: .9; }
+    66% { opacity: .72; }
+    100% { opacity: 0; left: 50%; right: auto; top: 50%; transform: translate(-50%, -50%) translateZ(72px) rotateX(0) rotateY(0); filter: blur(0); }
+  }
+
+  .relay-card {
+    position: absolute;
+    left: 50%; top: 50%;
+    z-index: 10;
+    width: min(78vw, 720px);
+    padding: clamp(18px, 4vw, 44px);
+    transform: translate(-50%, -50%) translateZ(130px) scale(.82);
+    opacity: 0;
+    border: 1px solid rgba(255, 70, 44, .26);
+    background: linear-gradient(135deg, rgba(10,0,1,.9), rgba(20,0,2,.64));
+    box-shadow: 0 0 36px rgba(255, 12, 17, .12), inset 0 0 22px rgba(255, 23, 18, .04);
+    animation: relayResolve 7.5s cubic-bezier(.16,.74,.18,1) forwards;
+  }
+
+  @keyframes relayResolve {
+    0%, 56% { opacity: 0; transform: translate(-50%, -50%) translateZ(-80px) scale(.7); filter: blur(4px); }
+    62% { opacity: .92; }
+    70% { opacity: 1; transform: translate(-50%, -50%) translateZ(96px) scale(1); filter: blur(0); }
+    84% { opacity: 1; }
+    91%, 100% { opacity: 0; transform: translate(-50%, -50%) translateZ(150px) scale(1.04); }
+  }
+
+  .relay-card h1 { margin: 0 0 1.4em; font-size: clamp(12px, 1.5vw, 19px); font-weight: 400; color: var(--white); }
+  .relay-row { display: flex; justify-content: space-between; gap: 24px; margin: .58em 0; font-size: clamp(8px, 1.14vw, 14px); color: rgba(255, 106, 70, .78); }
+  .relay-row .status { color: rgba(255, 218, 190, .9); }
+  .relay-row.alert, .relay-row.alert .status { color: #ff6547; }
+  .relay-card .public { margin-top: 1.4em; padding-top: 1.1em; border-top: 1px solid rgba(255, 65, 45, .22); color: #ffc2a2; }
+
+  .start-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 12;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateZ(170px);
+    animation: menuEnter 1.2s cubic-bezier(.18,.8,.22,1) 6.95s forwards;
+  }
+
+  @keyframes menuEnter {
+    from { opacity: 0; filter: blur(5px); transform: translateZ(80px) scale(.92); }
+    to { opacity: 1; filter: blur(0); transform: translateZ(170px) scale(1); pointer-events: auto; }
+  }
+
+  .menu {
+    width: min(84vw, 680px);
+    padding: clamp(22px, 5vw, 54px);
+    text-align: center;
+    background: radial-gradient(ellipse at center, rgba(35,0,4,.36), transparent 68%);
+  }
+
+  .postal-cap {
+    margin-bottom: 3.5vh;
+    font-size: clamp(7px, .88vw, 11px);
+    color: rgba(211, 50, 47, .56);
+    text-transform: uppercase;
+  }
+  .logo {
+    margin: 0;
+    font-family: Arial Black, Impact, sans-serif;
+    font-size: clamp(66px, 16vw, 172px);
+    line-height: .78;
+    letter-spacing: -.08em;
+    color: #fff0df;
+    text-shadow:
+      0 0 3px #fff,
+      0 0 14px rgba(255, 106, 53, .8),
+      0 0 34px rgba(255, 18, 22, .5),
+      8px 0 0 rgba(157, 0, 13, .42);
+  }
+  .subtitle {
+    margin: 1.5vh 0 5vh;
+    color: rgba(255, 80, 53, .88);
+    font-size: clamp(9px, 1.55vw, 17px);
+    letter-spacing: .32em;
+  }
+  .options { display: grid; gap: .4rem; max-width: 420px; margin: 0 auto; text-align: left; }
+  .option {
+    position: relative;
+    width: 100%;
+    padding: .72em 1.1em .72em 2.7em;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 108, 75, .55);
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: .16em;
+    cursor: pointer;
+    font-size: clamp(11px, 1.75vw, 19px);
+  }
+  .option::before { content: ""; position: absolute; left: .55em; top: 50%; width: 1.15em; height: 2px; background: currentColor; transform: translateY(-50%) scaleX(.3); transform-origin: left; }
+  .option.selected { color: #ffe0c7; text-shadow: 0 0 10px rgba(255, 56, 36, .9); }
+  .option.selected::before { transform: translateY(-50%) scaleX(1); box-shadow: 0 0 8px #ff3c2b; }
+  .option:focus-visible { outline: 1px solid rgba(255,120,80,.65); outline-offset: 2px; }
+  .descriptor {
+    min-height: 2.5em;
+    margin-top: 2.7vh;
+    color: rgba(204, 45, 44, .65);
+    font-size: clamp(8px, 1vw, 12px);
+    text-align: center;
+  }
+  .statusline {
+    position: absolute;
+    left: 3vw; right: 3vw; bottom: 2.2vh;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    color: rgba(154, 25, 30, .54);
+    font-size: clamp(7px, .8vw, 10px);
+    z-index: 15;
+  }
+  .replay {
+    position: absolute;
+    top: 18px; right: 18px;
+    z-index: 30;
+    padding: .65em .9em;
+    border: 1px solid rgba(205, 28, 36, .4);
+    background: rgba(8,0,1,.72);
+    color: rgba(255, 115, 82, .72);
+    text-transform: uppercase;
+    font-size: 10px;
+    cursor: pointer;
+  }
+  .replay:hover { color: #ffe3d0; border-color: rgba(255,85,62,.8); }
+
+  .flash {
+    position: absolute;
+    inset: 0;
+    z-index: 18;
+    pointer-events: none;
+    background: radial-gradient(circle at center, rgba(255,184,128,.2), rgba(255,20,20,.05) 30%, transparent 65%);
+    opacity: 0;
+    animation: flash 7.5s ease forwards;
+  }
+  @keyframes flash {
+    0%, 55% { opacity: 0; }
+    59% { opacity: .28; }
+    61% { opacity: .03; }
+    66% { opacity: .16; }
+    72%, 100% { opacity: 0; }
+  }
+
+  .selection-pulse {
+    position: absolute;
+    inset: 0;
+    z-index: 17;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(circle at center, rgba(255,84,52,.24), transparent 55%);
+  }
+  .selection-pulse.fire { animation: choose .6s ease; }
+  @keyframes choose { 0% { opacity: 0 } 35% { opacity: 1 } 100% { opacity: 0; transform: scale(1.12); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .viewer *, .viewer::after { animation-duration: .001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+  }
+</style>
+</head>
+<body>
+<div class="viewer" id="viewer">
+  <div class="chamber" aria-hidden="true">
+    <div class="plane back">
+      <div class="surface-copy">
+        <div class="line done strong">COURIER RELAY VIEWER</div>
+        <div class="line done strong">PRIVATE ROUTING NETWORK</div>
+        <div class="line done">OPERATING DISTRICT ..... NC-07</div>
+        <div class="line done">LOCAL SUBROUTE ......... 07-C-14</div>
+        <div class="line done">TICKET INFORMATION ..... RESTORING</div>
+        <div class="line done">DISTRICT DIRECTORY ..... LOADING</div>
+        <div class="line done">SUBROUTE INDEX ......... VERIFYING</div>
+      </div>
+    </div>
+    <div class="plane left">
+      <div class="surface-copy">
+        <div class="line done strong">TERMINAL CRV-04-771</div>
+        <div class="line done">RELAY MESSAGING</div>
+        <div class="line done">INITIALISING</div>
+        <div class="line done dim">COURIER IDENTIFICATION</div>
+        <div class="line done dim">STANDBY</div>
+        <div class="line done">DISPATCH QUEUE</div>
+        <div class="line done strong">SEALED</div>
+      </div>
+    </div>
+    <div class="plane right">
+      <div class="surface-copy">
+        <div class="line done">ROUTE CLOCK</div>
+        <div class="line done strong">SYNCHRONISED</div>
+        <div class="line done">LOCAL EXCHANGE</div>
+        <div class="line done strong">AVAILABLE</div>
+        <div class="line done">UPLINE EXCHANGE</div>
+        <div class="line done fail">NO RESPONSE</div>
+      </div>
+    </div>
+    <div class="plane floor"></div>
+    <div class="plane ceiling"></div>
+    <span class="corner-line h top"></span><span class="corner-line h bottom"></span>
+    <span class="corner-line v l"></span><span class="corner-line v r"></span>
+
+    <div class="lift-clones">
+      <span class="lift a">LOCAL EXCHANGE / AVAILABLE</span>
+      <span class="lift b">UPLINE EXCHANGE / NO RESPONSE</span>
+      <span class="lift c">SUBROUTE INDEX / VERIFIED</span>
+      <span class="lift d">COURIER RELAY VIEWER</span>
+    </div>
+  </div>
+
+  <section class="relay-card" aria-live="polite">
+    <h1>COURIER RELAY VIEWER / PRIVATE ROUTING NETWORK</h1>
+    <div class="relay-row"><span>SEARCHING REGISTERED RELAYS</span><span class="status">COMPLETE</span></div>
+    <div class="relay-row"><span>SEARCHING COURIER CHANNELS</span><span class="status">COMPLETE</span></div>
+    <div class="relay-row"><span>SEARCHING PUBLIC CARRIERS</span><span class="status">01 FOUND</span></div>
+    <div class="relay-row alert"><span>UNREGISTERED CARRIER DETECTED</span><span class="status">ACCEPTED</span></div>
+    <div class="relay-row"><span>SIGNAL FORMAT</span><span class="status">COMPATIBLE</span></div>
+    <div class="relay-row"><span>EXTERNAL SERVICE</span><span class="status">ATTACHED</span></div>
+    <div class="relay-row public"><span>PUBLIC RELAY ACCESS</span><span class="status">ENABLED</span></div>
+  </section>
+
+  <section class="start-screen" aria-label="NCN service selection">
+    <div class="menu">
+      <div class="postal-cap">Postal routing viewer CRV-04-771 · Public relay override active</div>
+      <h1 class="logo">NCN</h1>
+      <div class="subtitle">NIGHT CITY NEWS</div>
+      <div class="options" role="menu">
+        <button class="option selected" role="menuitem" data-description="Live headlines, alerts and public traffic from the RedWire relay.">Newswire</button>
+        <button class="option" role="menuitem" data-description="Local classifieds, notices, images and unofficial transmissions.">Drip Feed</button>
+        <button class="option" role="menuitem" data-description="Terminal guide, archive access, optical controls and device services.">Viewer Services</button>
+      </div>
+      <div class="descriptor" id="descriptor">Live headlines, alerts and public traffic from the RedWire relay.</div>
+    </div>
+  </section>
+
+  <button class="replay" id="replay" type="button">Replay boot</button>
+  <div class="statusline"><span>ROUTE CHANNEL 01 / DISTRICT NC-07</span><span>NODE STATUS: LIVE</span></div>
+  <div class="flash"></div>
+  <div class="selection-pulse" id="selection-pulse"></div>
+</div>
+<script>
+(() => {
+  const viewer = document.getElementById('viewer');
+  const options = [...document.querySelectorAll('.option')];
+  const descriptor = document.getElementById('descriptor');
+  const replay = document.getElementById('replay');
+  const pulse = document.getElementById('selection-pulse');
+  let selected = 0;
+
+  function select(index, focus = false) {
+    selected = (index + options.length) % options.length;
+    options.forEach((option, i) => {
+      option.classList.toggle('selected', i === selected);
+      option.setAttribute('aria-current', i === selected ? 'true' : 'false');
+    });
+    descriptor.textContent = options[selected].dataset.description;
+    if (focus) options[selected].focus({ preventScroll: true });
+  }
+
+  function activate() {
+    pulse.classList.remove('fire');
+    void pulse.offsetWidth;
+    pulse.classList.add('fire');
+    descriptor.textContent = `${options[selected].textContent.trim().toUpperCase()} / SERVICE HANDOFF READY`;
+  }
+
+  options.forEach((option, index) => {
+    option.addEventListener('mouseenter', () => select(index));
+    option.addEventListener('focus', () => select(index));
+    option.addEventListener('click', activate);
+  });
+
+  addEventListener('keydown', event => {
+    if (event.key === 'ArrowDown') { event.preventDefault(); select(selected + 1, true); }
+    if (event.key === 'ArrowUp') { event.preventDefault(); select(selected - 1, true); }
+    if (event.key === 'Enter') activate();
+    if (event.key.toLowerCase() === 'r') replay.click();
+  });
+
+  replay.addEventListener('click', () => {
+    const clone = viewer.cloneNode(true);
+    viewer.replaceWith(clone);
+    location.reload();
+  });
+
+  select(0);
+  setTimeout(() => {
+    const screen = document.querySelector('.start-screen');
+    if (screen) screen.style.pointerEvents = 'auto';
+  }, 7000);
+})();
+</script>
+</body>
+</html>
