@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NCN Weather Department Demo</title>
+  <link rel="stylesheet" href="css/weather-module.css">
+  <link rel="stylesheet" href="css/weather-demo.css">
+</head>
+<body>
+  <div class="demo-shell">
+    <div class="demo-controls" aria-label="Weather controls">
+      <label>Preset
+        <select id="preset">
+          <option>clear</option>
+          <option>dust</option>
+          <option selected>mist</option>
+          <option>heavy-mist</option>
+          <option>light-rain</option>
+          <option>rain</option>
+          <option>electrical-weather</option>
+        </select>
+      </label>
+      <label>Intensity <input id="intensity" type="range" min="0" max="1" step="0.01" value="0.48"></label>
+      <label>Wind X <input id="wind-x" type="range" min="-0.5" max="0.5" step="0.01" value="0.08"></label>
+      <label>Wind Z <input id="wind-z" type="range" min="-0.3" max="0.3" step="0.01" value="-0.04"></label>
+      <label>Quality
+        <select id="quality">
+          <option>low</option>
+          <option selected>medium</option>
+          <option>high</option>
+          <option>reduced</option>
+        </select>
+      </label>
+      <button id="reading" type="button">Toggle reading zone</button>
+      <button id="pulse" type="button">Electrical request</button>
+      <button id="block" type="button">Block pulse</button>
+      <button id="suspend" type="button">Suspend</button>
+      <button id="resume" type="button">Resume</button>
+      <button id="reset" type="button">Reset</button>
+      <button id="destroy" type="button">Destroy</button>
+      <button id="reinit" type="button">Reinitialise</button>
+    </div>
+
+    <div class="demo-chamber">
+      <div class="demo-layer" data-layer="far"></div>
+      <div class="demo-layer" data-layer="rear"></div>
+      <div class="demo-layer" data-layer="middle"></div>
+      <div class="demo-layer" data-layer="near"></div>
+      <article class="demo-card is-reading">
+        <h1>Substation fire closes Charter Hill relay</h1>
+        <p>The article remains visually dominant. Weather is attenuated locally around this reading zone while continuing to occupy the surrounding chamber depth.</p>
+      </article>
+    </div>
+    <pre class="demo-metrics" aria-live="polite"></pre>
+  </div>
+
+  <script src="js/weather-presets.js"></script>
+  <script src="js/weather-module.js"></script>
+  <script src="js/weather-demo.js"></script>
+</body>
+</html>
