@@ -134,16 +134,17 @@ Use the browser console:
 
 ```js
 NCNViewerHost.verify();
+NCNViewerHost.snapshot();
 ```
 
-This confirms that the shared services, protected application boundaries, named
-layers, module states and active application roots are coherent without changing
-viewer state.
+The verification confirms that the shared services, protected application
+boundaries, named layers, module states and active application roots are coherent
+without changing viewer state. The snapshot includes the active weather, effects
+and chamber-motion adapter snapshots where the implementations provide them.
 
 ## Lifecycle smoke test
 
 ```js
-NCNViewerHost.snapshot();
 await NCNViewerHost.suspend("manual-test");
 await NCNViewerHost.resume("manual-test");
 await NCNViewerHost.reset("manual-test");
