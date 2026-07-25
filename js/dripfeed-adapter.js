@@ -52,6 +52,10 @@ window.NCNDripfeed = (() => {
     );
   }
 
+  function isReading() {
+    return Boolean(readingElement());
+  }
+
   function getReadingZone() {
     return rectFor(readingElement());
   }
@@ -118,6 +122,7 @@ window.NCNDripfeed = (() => {
     getReadingZone,
     getControlZones,
     getDepthPlaneDefinitions,
+    isReading,
     suspend,
     resume,
     reset,
@@ -125,6 +130,7 @@ window.NCNDripfeed = (() => {
     isActive,
     snapshot: () => Object.freeze({
       active: isActive(),
+      reading: isReading(),
       mounted: Boolean(instance()),
       suspended,
       hasReadingZone: Boolean(readingElement())
