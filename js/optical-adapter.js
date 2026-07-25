@@ -36,7 +36,7 @@ window.NCNOptical = (() => {
     if (expanded) return expanded;
     const inspector = document.querySelector("#desktop-inspector");
     if (inspector && inspector.getClientRects().length && inspector.textContent.trim()) return inspector;
-    return document.querySelector("#feed");
+    return null;
   }
 
   function getReadingZone() {
