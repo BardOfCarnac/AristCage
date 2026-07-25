@@ -56,6 +56,7 @@
   let readyPromise = null;
   let readyState = "idle";
   let failure = null;
+  let weatherProof = null;
 
   function moduleRecord(name) {
     return (modules?.snapshot?.() || []).find(record => record.name === name) || null;
@@ -119,6 +120,32 @@
     return record;
   }
 
+  function applyWeatherProofMode() {
+    const requested = new URLSearchParams(window.location.search).get("weatherTest");
+    if (!requested) return null;
+
+    const mode = String(requested).toLowerCase();
+    const profiles = Object.freeze({
+      mist: Object.freeze({ enabled: true, preset: "mist", intensity: 0.9, wind: 0.18, quality: "high" }),
+      heavy: Object.freeze({ enabled: true, preset: "heavy-mist", intensity: 1, wind: 0.22, quality: "high" }),
+      rain: Object.freeze({ enabled: true, preset: "rain", intensity: 0.9, wind: 0.28, quality: "high" }),
+      electrical: Object.freeze({ enabled: true, preset: "electrical-weather", intensity: 0.9, wind: 0.3, quality: "high" })
+    });
+    const profile = profiles[mode] || profiles.heavy;
+    const selected = profiles[mode] ? mode : "heavy";
+    const applied = integration?.applyProfile?.("weather", profile, {
+      application: window.NCNApplications?.current?.() || "redwire",
+      reason: "weather-mobile-proof",
+      requestEffect: selected === "electrical",
+      effectIntensity: 0.45
+    });
+
+    document.documentElement.dataset.weatherTest = selected;
+    weatherProof = Object.freeze({ mode: selected, applied: Boolean(applied), profile });
+    events?.emit?.("integration:weather-proof", weatherProof);
+    return weatherProof;
+  }
+
   async function start() {
     if (!integration?.ensureCoreServices || !intake?.install) {
       throw new Error("Integration services are unavailable for departmental installation.");
@@ -133,6 +160,7 @@
       await installPublication(specification);
     }
 
+    applyWeatherProofMode();
     readyState = "ready";
     document.documentElement.dataset.integratedDepartments = "ready";
     const current = snapshot();
@@ -158,6 +186,7 @@
       state: readyState,
       ready: readyState === "ready",
       failure: failure ? String(failure.message || failure) : null,
+      weatherProof,
       publications: Object.freeze(publications.map(item => item.name)),
       installed: Object.freeze([...installed.values()]),
       modules: modules?.snapshot?.() || []
@@ -167,6 +196,7 @@
   window.NCNIntegratedDepartments = Object.freeze({
     ready,
     installPublication,
+    applyWeatherProofMode,
     snapshot,
     isReady: () => readyState === "ready"
   });
