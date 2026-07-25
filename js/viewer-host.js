@@ -37,6 +37,23 @@ window.NCNViewerHost = (() => {
     return activeApplication() === "dripfeed" ? dripfeed : optical;
   }
 
+  function zoneFor(element) {
+    if (!element?.isConnected) return null;
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    return Object.freeze({
+      element,
+      rect: Object.freeze({
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height
+      })
+    });
+  }
+
   const layerContext = Object.freeze({
     get environment() { return environmentHost?.root?.() || null; },
     get weather() { return environmentHost?.weatherLayers?.() || Object.freeze({}); },
@@ -57,7 +74,8 @@ window.NCNViewerHost = (() => {
     getControlZones() {
       if (activeApplication() === "dripfeed") return dripfeed?.getControlZones?.() || [];
       return [document.querySelector(".rail"), document.querySelector("#desktop-inspector")]
-        .filter(element => element?.isConnected);
+        .map(zoneFor)
+        .filter(Boolean);
     },
     getDepthPlaneDefinitions: () => currentView()?.getDepthPlaneDefinitions?.() || []
   });
@@ -194,6 +212,8 @@ window.NCNViewerHost = (() => {
     for (const name of environmentHost?.LAYER_NAMES || []) {
       check(`layer:${name}`, Boolean(environmentHost?.layer?.(name)), name);
     }
+    const weatherLayers = environmentHost?.weatherLayers?.() || {};
+    check("four weather layers", ["far", "rear", "middle", "near"].every(name => Boolean(weatherLayers[name])));
 
     const moduleStates = modules?.snapshot?.() || [];
     for (const module of moduleStates) {
@@ -237,16 +257,16 @@ window.NCNViewerHost = (() => {
   async function suspend(reason = "host") {
     if (!initialised || destroyed) return false;
     lifecycle?.transition?.(lifecycle.STATES.SUSPENDED || lifecycle.STATES.SLEEPING, { reason });
-    await modules.suspendAll(reason);
     runtime?.suspend?.(reason);
+    await modules.suspendAll(reason);
     events?.emit?.("host:suspended", { reason });
     return true;
   }
 
   async function resume(reason = "host") {
     if (!initialised || destroyed) return false;
-    runtime?.resume?.(reason);
     await modules.resumeAll(reason);
+    runtime?.resume?.(reason);
     lifecycle?.transition?.(lifecycle.STATES.READY, { reason, force: true });
     events?.emit?.("host:resumed", { reason });
     return true;
