@@ -82,7 +82,7 @@
         return {
           frame({ progress }) {
             positionNode(node, target);
-            node.style.opacity = intensity.toFixed(3);
+            node.style.opacity = Number(intensity).toFixed(3);
             const position = mix(-12, 112, progress);
             line.style.transform = options.direction === "horizontal"
               ? `translate3d(${position}%,0,0) rotate(90deg)`
