@@ -4,6 +4,9 @@ The production viewer exposes a stable receiving shell for boot, weather,
 effects and chamber-rearrangement modules while preserving the established
 RedWire Optical renderer and Dripfeed application.
 
+This branch remains an integration foundation rather than a departmental merge.
+No published weather, effects, chamber-motion or boot replacement is included.
+
 ## Architecture
 
 - `NCNViewerLifecycle` decides which machine state is active.
