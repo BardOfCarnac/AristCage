@@ -15,6 +15,7 @@ window.NCNIntegration = (() => {
   const intake = window.NCNModuleIntake;
 
   let servicesReady = false;
+  let servicesPromise = null;
   let bootRunning = false;
 
   function context() {
@@ -50,7 +51,7 @@ window.NCNIntegration = (() => {
   function createBootAdapter() {
     const sequence = () => window.NCNBootSequence || null;
     return Object.freeze({
-      init(sharedContext) { return sequence()?.init?.(sharedContext); },
+      init() { return sequence()?.init?.(context()); },
       suspend(reason) { return sequence()?.suspend?.(reason); },
       resume(reason) { return sequence()?.resume?.(reason); },
       reset(reason) { return sequence()?.reset?.(reason); },
@@ -65,8 +66,7 @@ window.NCNIntegration = (() => {
     });
   }
 
-  async function ensureCoreServices() {
-    if (servicesReady) return snapshot();
+  async function initialiseCoreServices() {
     if (!host?.isReady?.()) await host?.init?.();
 
     if (!modules?.has?.(contract.MODULES?.VISUAL_DIRECTOR || "visual-director")) {
@@ -94,6 +94,17 @@ window.NCNIntegration = (() => {
     servicesReady = true;
     events?.emit?.("integration:ready", snapshot());
     return snapshot();
+  }
+
+  async function ensureCoreServices() {
+    if (servicesReady) return snapshot();
+    if (!servicesPromise) {
+      servicesPromise = initialiseCoreServices().catch(error => {
+        servicesPromise = null;
+        throw error;
+      });
+    }
+    return servicesPromise;
   }
 
   function activeDependants(name) {
