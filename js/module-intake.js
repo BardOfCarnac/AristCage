@@ -10,10 +10,14 @@ window.NCNModuleIntake = (() => {
   const history = [];
 
   const MANAGED_CAPABILITIES = Object.freeze(["init", "suspend", "resume", "reset", "destroy"]);
-  const PROFILE_CAPABILITIES = Object.freeze(["applyProfile", "configure", "setProfile", "setWeather", "setEnabled"]);
+  const PROFILE_CAPABILITIES = Object.freeze({
+    weather: Object.freeze(["applyProfile", "configure", "setProfile", "setWeather", "setEnabled"]),
+    effects: Object.freeze(["applyProfile", "configure", "setProfile"]),
+    "chamber-motion": Object.freeze(["applyProfile", "configure", "setProfile", "setEnabled"])
+  });
   const KNOWN_CAPABILITIES = Object.freeze([...new Set([
     ...MANAGED_CAPABILITIES,
-    ...PROFILE_CAPABILITIES,
+    ...Object.values(PROFILE_CAPABILITIES).flat(),
     "run",
     "snapshot"
   ])]);
@@ -119,10 +123,11 @@ window.NCNModuleIntake = (() => {
     });
 
     const target = normalised.replaces || normalised.name || normalised.department;
-    if (["weather", "effects", "chamber-motion"].includes(target)) {
-      const method = PROFILE_CAPABILITIES.find(capability => declaredCapabilities.has(capability));
+    const profileMethods = PROFILE_CAPABILITIES[target];
+    if (profileMethods) {
+      const method = profileMethods.find(capability => declaredCapabilities.has(capability));
       check("application profile entry point", Boolean(method), method || "missing");
-      if (!method) errors.push(`${target} must expose an application-profile entry point.`);
+      if (!method) errors.push(`${target} must expose an accepted application-profile entry point.`);
     }
     if (target === "boot") {
       const pass = declaredCapabilities.has("run");
