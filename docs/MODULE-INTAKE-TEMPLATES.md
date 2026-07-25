@@ -14,7 +14,7 @@ const effectsManifest = {
   layers: ["environment:effects"],
   visualChannels: ["boot", "interface", "article", "environment", "chamber", "fault"],
   runtimeGroups: ["effects"],
-  capabilities: ["init", "suspend", "resume", "reset", "destroy"],
+  capabilities: ["init", "suspend", "resume", "reset", "destroy", "applyProfile"],
   owns: ["effect registry", "temporary effect nodes", "effect cancellation"],
   protectedRoots: [],
   animationLoop: "shared-runtime",
@@ -25,7 +25,8 @@ const effectsManifest = {
 ```
 
 The effects module creates reusable primitives. It does not schedule narrative
-faults, boot phases, weather conditions or chamber events.
+faults, boot phases, weather conditions or chamber events. `applyProfile(profile)`
+accepts the active application's ambient and interaction policy.
 
 ## Weather
 
@@ -38,7 +39,7 @@ const weatherManifest = {
   layers: ["weather:far", "weather:rear", "weather:middle", "weather:near"],
   visualChannels: ["environment", "fault"],
   runtimeGroups: ["environment"],
-  capabilities: ["init", "suspend", "resume", "reset", "destroy"],
+  capabilities: ["init", "suspend", "resume", "reset", "destroy", "applyProfile"],
   owns: ["weather canvases", "particle pools", "weather presets"],
   protectedRoots: [],
   animationLoop: "shared-runtime",
@@ -49,7 +50,9 @@ const weatherManifest = {
 ```
 
 Weather consumes reading and control-zone descriptors through `context.views`.
-It never queries into Optical or Dripfeed internals.
+It never queries into Optical or Dripfeed internals. `applyProfile(profile)` accepts
+the current application's weather request and translates legacy mist profiles when
+needed.
 
 ## Chamber movement
 
@@ -62,7 +65,7 @@ const chamberMotionManifest = {
   layers: ["environment:chamber-motion"],
   visualChannels: ["chamber"],
   runtimeGroups: ["chamber"],
-  capabilities: ["init", "suspend", "resume", "reset", "destroy"],
+  capabilities: ["init", "suspend", "resume", "reset", "destroy", "applyProfile"],
   owns: ["movement choreography", "temporary block transforms", "settling state"],
   protectedRoots: [],
   animationLoop: "shared-runtime",
@@ -74,6 +77,8 @@ const chamberMotionManifest = {
 
 The chamber supplies geometry. The module may animate approved block elements or
 its terminal-owned movement surface, but it does not transform application roots.
+`applyProfile(profile)` accepts the active application's enablement and intensity
+policy.
 
 ## Boot
 
@@ -86,7 +91,7 @@ const bootManifest = {
   layers: [],
   visualChannels: ["boot", "interface", "environment", "chamber", "fault"],
   runtimeGroups: ["boot"],
-  capabilities: ["init", "suspend", "resume", "reset", "destroy"],
+  capabilities: ["init", "suspend", "resume", "reset", "destroy", "run"],
   owns: ["startup sequence", "phase timing", "boot cancellation"],
   protectedRoots: [],
   animationLoop: "shared-runtime",
