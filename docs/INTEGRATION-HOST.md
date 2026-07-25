@@ -189,16 +189,18 @@ if (report.accepted) {
 
 Takeover is staged:
 
-1. Declared dependencies are made ready.
-2. The factory receives its scoped context.
-3. The returned instance is checked against the real required methods.
-4. Only then is the incumbent compatibility adapter destroyed.
-5. The candidate is registered and initialised.
-6. The active RedWire or Dripfeed profile is applied immediately.
+1. The existing slot and active dependants are checked.
+2. Declared dependencies are made ready.
+3. The factory receives its scoped context.
+4. The returned instance is checked against the real required methods.
+5. Only then is the incumbent compatibility adapter destroyed.
+6. The candidate is registered and initialised.
+7. The active RedWire or Dripfeed profile is applied immediately.
 
-Factory construction should ideally be side-effect-free until `init()`. The scoped
-context nevertheless tracks any early tasks or subscriptions so rejected factories
-can be cleaned up.
+Factories should construct state without starting visible work. Recurring tasks,
+listeners and generated resources should normally become active in `init()`. The
+scoped context still tracks early tasks and subscriptions so failed or rejected
+candidates can be cleaned up.
 
 Active dependants prevent unsafe service replacement. Dependencies initialise and
 resume first; dependants suspend, reset and destroy first.
