@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NCN Effects Smoke Tests</title>
+  <link rel="stylesheet" href="../css/effects.css" />
+  <style>
+    body { background:#080102; color:#ffd6c8; font:14px monospace; padding:24px; }
+    .viewer { position: relative; }
+    #target { width:320px; min-height:120px; padding:20px; border:1px solid #a33; background:#100203; }
+    .pass { color:#9f9; } .fail { color:#f88; }
+  </style>
+</head>
+<body>
+  <h1>NCN Effects Smoke Tests</h1>
+  <div class="viewer"><div class="rail-title">NCN</div><div id="target" class="entry" data-entry-id="test"><i class="priority"></i><strong>TEST TRANSMISSION</strong><p>Effects must leave no residue.</p></div></div>
+  <ol id="results"></ol>
+  <script src="../js/viewer-runtime.js"></script>
+  <script src="../js/viewer-lifecycle.js"></script>
+  <script src="../js/effects-core.js"></script>
+  <script src="../js/effects-targets.js"></script>
+  <script src="../js/effects.js"></script>
+  <script src="../js/effects-signal.js"></script>
+  <script src="../js/effects-disturbance.js"></script>
+  <script src="effects-smoke.js"></script>
+</body>
+</html>
