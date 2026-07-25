@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NCN Effects Department Gallery</title>
+  <link rel="stylesheet" href="css/effects.css" />
+  <link rel="stylesheet" href="css/effects-gallery.css" />
+</head>
+<body>
+  <header>
+    <h1>NCN Effects Department</h1>
+    <p>Technical gallery for targetable visual primitives. It requests effects directly and contains no boot, weather or random-event choreography.</p>
+  </header>
+  <main>
+    <section class="controls">
+      <label>Effect<select id="effect"></select></label>
+      <label>Target<select id="target"><option value="glyph">Glyph</option><option value="article" selected>Article</option><option value="block">Block</option><option value="wall">Wall</option><option value="terminal">Terminal</option></select></label>
+      <label>Intensity<input id="intensity" type="range" min="0" max="1" step="0.05" value="0.65" /></label>
+      <label>Duration<input id="duration" type="number" min="0" max="5000" step="50" value="650" /></label>
+      <label>Seed<input id="seed" type="number" value="2045" /></label>
+      <label>Channel<select id="channel"><option>interface</option><option>article</option><option>chamber</option><option>environment</option><option>fault</option><option>boot</option></select></label>
+      <label>Concurrency<select id="concurrency"><option>replace</option><option>stack</option><option>ignore</option><option>queue</option><option>merge</option></select></label>
+      <label>Motion<select id="reduced"><option value="false">Normal</option><option value="true">Reduced</option></select></label>
+    </section>
+    <div class="actions">
+      <button id="play">Play</button>
+      <button id="cancel">Cancel</button>
+      <button id="repeat">Rapid repeat</button>
+      <button id="suspend">Suspend</button>
+      <button id="resume">Resume</button>
+      <button id="clear">Clear all</button>
+    </div>
+    <section class="stage viewer" id="stage">
+      <div class="grid"></div>
+      <div class="rail-title" hidden>Gallery rail</div>
+      <div class="target target-glyph" data-target="glyph">N</div>
+      <article class="target target-article entry" data-target="article" data-entry-id="gallery-article">
+        <i class="priority"></i>
+        <h2>Relay route compromised in Watson</h2>
+        <p>Courier Information Service reports local channel separation and temporary packet loss.</p>
+      </article>
+      <div class="target target-block ncn-chamber-block" data-target="block"></div>
+      <div class="target target-wall" data-target="wall"></div>
+    </section>
+    <pre class="status" id="status"></pre>
+  </main>
+  <script src="js/viewer-runtime.js"></script>
+  <script src="js/viewer-lifecycle.js"></script>
+  <script src="js/effects-core.js"></script>
+  <script src="js/effects-targets.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/effects-signal.js"></script>
+  <script src="js/effects-disturbance.js"></script>
+  <script src="js/effects-gallery.js"></script>
+</body>
+</html>
