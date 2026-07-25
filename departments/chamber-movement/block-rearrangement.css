@@ -1,0 +1,5 @@
+/*
+  The production module is renderer-agnostic and requires no CSS selectors.
+  Chamber-owned block handles and the terminal-owned movement surface retain
+  styling ownership. This file intentionally contains no production transforms.
+*/
