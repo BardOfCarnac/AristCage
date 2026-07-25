@@ -10,7 +10,6 @@ window.NCNIntegrationHarness = (() => {
   const integration = window.NCNIntegration;
   const intake = window.NCNModuleIntake;
   const applications = window.NCNApplications;
-  const runtime = window.NCNViewerRuntime;
   const modules = window.NCNModules;
 
   const wait = delay => new Promise(resolve => window.setTimeout(resolve, delay));
@@ -67,7 +66,8 @@ window.NCNIntegrationHarness = (() => {
 
     await host.reset("integration-harness");
     const reset = host.snapshot();
-    checks.push(result("host verifies after reset", host.verify().passed, host.verify()));
+    const verification = host.verify();
+    checks.push(result("host verifies after reset", verification.passed, verification));
     checks.push(result("application restored", reset.application === initialApplication, reset.application));
     checks.push(result("runtime task count stable", reset.runtime?.taskCount === initialTaskCount, {
       before: initialTaskCount,
@@ -90,21 +90,24 @@ window.NCNIntegrationHarness = (() => {
       reason: "integration-harness"
     });
     await wait(delay);
+    const firstVerification = host.verify();
     checks.push(result(`switch to ${other}`, switched !== false && applications.current() === other, applications.current()));
-    checks.push(result("host verifies after first switch", host.verify().passed, host.verify()));
+    checks.push(result("host verifies after first switch", firstVerification.passed, firstVerification));
 
     const returned = await applications?.switchTo?.(initial, {
       animate: options.animate !== false,
       reason: "integration-harness-return"
     });
     await wait(delay);
+    const returnVerification = host.verify();
     checks.push(result(`return to ${initial}`, returned !== false && applications.current() === initial, applications.current()));
-    checks.push(result("host verifies after return", host.verify().passed, host.verify()));
+    checks.push(result("host verifies after return", returnVerification.passed, returnVerification));
 
     return Object.freeze({ passed: checks.every(check => check.pass), checks: Object.freeze(checks), initial });
   }
 
   async function run(options = {}) {
+    await integration?.ensureCoreServices?.();
     const reports = [passive()];
     if (options.lifecycle !== false) reports.push(await lifecycleCycle(options));
     if (options.applications === true) reports.push(await applicationCycle(options));
