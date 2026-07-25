@@ -31,12 +31,20 @@ window.NCNOptical = (() => {
     renderer()?.refresh?.();
   }
 
+  function expandedArticle() {
+    return document.querySelector("#feed > .entry.expanded:not(.panel)");
+  }
+
   function readingElement() {
-    const expanded = document.querySelector("#feed > .entry.expanded:not(.panel)");
+    const expanded = expandedArticle();
     if (expanded) return expanded;
     const inspector = document.querySelector("#desktop-inspector");
     if (inspector && inspector.getClientRects().length && inspector.textContent.trim()) return inspector;
     return null;
+  }
+
+  function isReading() {
+    return Boolean(expandedArticle());
   }
 
   function getReadingZone() {
@@ -93,6 +101,7 @@ window.NCNOptical = (() => {
     deactivate,
     refresh,
     getReadingZone,
+    isReading,
     getPlaneDefinitions: getDepthPlaneDefinitions,
     getDepthPlaneDefinitions,
     getCameraSnapshot: () => renderer()?.getCameraSnapshot?.() || null,
@@ -103,6 +112,7 @@ window.NCNOptical = (() => {
     isActive,
     snapshot: () => Object.freeze({
       active: isActive(),
+      reading: isReading(),
       suspended,
       hasReadingZone: Boolean(readingElement())
     })
