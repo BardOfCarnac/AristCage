@@ -1,0 +1,74 @@
+name: Chamber Movement Department
+
+on:
+  pull_request:
+    paths:
+      - "departments/chamber-movement/**"
+      - ".github/workflows/chamber-movement.yml"
+  push:
+    branches:
+      - agent/publish-block-rearrangement-pr86
+    paths:
+      - "departments/chamber-movement/**"
+      - ".github/workflows/chamber-movement.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Materialise corrected departmental publication
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          parts=(departments/chamber-movement/bootstrap-package.*.part)
+          if [[ ! -e "${parts[0]}" ]]; then
+            echo "No bootstrap archive present; publication is already materialised."
+            exit 0
+          fi
+
+          work="$(mktemp -d)"
+          cat "${parts[@]}" | base64 --decode > "$work/chamber-correction.tar.gz"
+          echo "289f13458721c889e829c379db145ac42b3eae84776b2dcec6cd4d252e0628b5  $work/chamber-correction.tar.gz" | sha256sum --check --strict
+          tar -xzf "$work/chamber-correction.tar.gz" -C "$work"
+
+          rm -rf departments/chamber-movement
+          mv "$work/ncn-block-rearrangement-pr86" departments/chamber-movement
+          node departments/chamber-movement/build-publication.js
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add departments/chamber-movement .github/workflows/chamber-movement.yml
+          git commit -m "Apply chamber movement correction brief"
+          git push origin HEAD:agent/publish-block-rearrangement-pr86
+
+      - name: Verify source-part integrity
+        working-directory: departments/chamber-movement
+        run: node tests/source-integrity.js
+      - name: Rebuild browser artifact
+        working-directory: departments/chamber-movement
+        run: node build-publication.js
+      - name: Verify committed artifact matches generated source
+        run: git diff --exit-code -- departments/chamber-movement/block-rearrangement.js
+      - name: Check production source syntax
+        working-directory: departments/chamber-movement
+        run: node --check block-rearrangement.js
+      - name: Check publication syntax
+        working-directory: departments/chamber-movement
+        run: node --check publication.js
+      - name: Run deterministic acceptance suite
+        working-directory: departments/chamber-movement
+        run: node tests/acceptance.js
+      - name: Run PR 86 publication contract
+        working-directory: departments/chamber-movement
+        run: node tests/publication-contract.js
