@@ -145,7 +145,7 @@ window.NCNChamberMotion = (() => {
     state.side = options.side === -1 ? -1 : options.side === 1 ? 1 : (Math.random() < 0.5 ? -1 : 1);
     state.row = Number.isFinite(options.row) ? options.row : Math.floor(Math.random() * 3) - 1;
     state.pulseEmitted = false;
-    state.lock = lifecycle?.acquire?.('chamber-block', 'chamber-motion', lifecycle.PRIITY?.ambient || lifecycle.PRIORITY.ambient);
+    state.lock = lifecycle?.acquire?.('chamber-block', 'chamber-motion', lifecycle.PRIORITY.ambient);
     position();
     block.classList.add('is-moving');
     emit('ncn:block-motion-start', eventDetail(0.42));
