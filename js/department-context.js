@@ -170,15 +170,17 @@ window.NCNDepartmentContext = (() => {
       }
     });
 
+    function scopedGetService(name) {
+      const key = String(name);
+      if (key === (contract.MODULES?.VISUAL_DIRECTOR || "visual-director")) return director;
+      if (!allowedDependencies.has(key)) return null;
+      return readOnlyService(window.NCNIntegration?.getService?.(key));
+    }
+
     const integration = Object.freeze({
-      getService(name) {
-        const key = String(name);
-        if (key === (contract.MODULES?.VISUAL_DIRECTOR || "visual-director")) return director;
-        if (!allowedDependencies.has(key)) return null;
-        return readOnlyService(window.NCNIntegration?.getService?.(key));
-      },
+      getService: scopedGetService,
       requireService(name) {
-        const service = this.getService(name);
+        const service = scopedGetService(name);
         if (!service) throw new Error(`${moduleName} cannot access undeclared dependency ${name}.`);
         return service;
       },
