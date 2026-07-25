@@ -19,7 +19,7 @@ window.NCNApplications = (() => {
     dripfeed: Object.freeze({
       name: 'dripfeed',
       mark: 'DF',
-      version: '14.07.2045 / DF 0.8.1 / APP 02 // PUBLIC CLASSIFIEDS',
+      version: '14.07.2045 / DF 0.8.1 / APP 02',
       documentTitle: 'Dripfeed // Night City News Terminal'
     })
   });
@@ -46,7 +46,7 @@ window.NCNApplications = (() => {
     if (mark) mark.textContent = current.mark;
     if (title) {
       if (current.name === 'dripfeed') {
-        title.innerHTML = '<span class="dripfeed-wordmark"><span class="drip-word">drip</span><span class="feed-word">FEED</span></span>';
+        title.innerHTML = '<span class="dripfeed-wordmark" aria-label="Dripfeed"><span class="drip-word">drip</span><span class="feed-word">FEED</span></span>';
       } else {
         title.textContent = current.title;
       }

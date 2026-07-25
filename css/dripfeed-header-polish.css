@@ -1,55 +1,46 @@
 /*==================================================
-  DRIPFEED SHARED MASTHEAD + FILTER RAIL
-
-  Loaded after the standalone overlay styles so these application-in-terminal
-  rules take precedence without disturbing the established tile wall.
+  DRIPFEED SHARED HEADER + FILTER RAIL
 ==================================================*/
 
-html[data-ncn-app="dripfeed"] .app {
-  width: 100%;
-  max-width: none;
-}
-
-html[data-ncn-app="dripfeed"] .app-shell {
-  display: none !important;
-}
-
-html[data-ncn-app="dripfeed"] .rail {
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: clamp(12px, 3vw, 24px);
-  align-items: center;
-  padding: 10px clamp(14px, 4vw, 32px) 12px;
-  background:
-    linear-gradient(90deg, rgba(240, 68, 57, .08), transparent 55%),
-    rgba(4, 3, 3, .97);
-}
-
+html[data-ncn-app="dripfeed"] .app-shell,
 html[data-ncn-app="dripfeed"] .rail-actions {
   display: none !important;
 }
 
+html[data-ncn-app="dripfeed"] .rail {
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 0;
+  padding: 10px clamp(12px, 3vw, 28px) 12px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(240, 68, 57, .08), transparent 58%),
+    rgba(4, 3, 3, .97);
+}
+
 html[data-ncn-app="dripfeed"] .rail-mark {
-  align-self: end;
-  padding-bottom: .38rem;
-  color: #f04439;
-  font-size: clamp(1.45rem, 4vw, 2.2rem);
-  letter-spacing: .08em;
+  display: none;
 }
 
 html[data-ncn-app="dripfeed"] .rail-title {
   display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(0, auto) 1fr;
-  column-gap: clamp(14px, 3vw, 28px);
+  grid-template-columns: minmax(0, auto) minmax(12rem, 1fr);
+  grid-template-areas:
+    "word meta"
+    "tag tag";
   align-items: end;
+  gap: 6px clamp(12px, 2.5vw, 26px);
+  min-width: 0;
+  width: 100%;
 }
 
 html[data-ncn-app="dripfeed"] .rail-title strong {
+  grid-area: word;
   display: block;
   min-width: 0;
+  overflow: hidden;
   color: #f04439;
-  font-size: 1rem;
-  line-height: .8;
+  line-height: 1;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -57,46 +48,49 @@ html[data-ncn-app="dripfeed"] .rail-title strong {
 html[data-ncn-app="dripfeed"] .dripfeed-wordmark {
   display: inline-flex;
   align-items: baseline;
-  min-width: 0;
+  max-width: 100%;
+  color: #f04439;
+  font-family: "Saira", "Arial Black", system-ui, sans-serif;
+  font-size: clamp(2.2rem, 6.4vw, 4.45rem);
+  font-weight: 900;
+  line-height: .82;
+  letter-spacing: -.075em;
   white-space: nowrap;
-  filter: drop-shadow(0 0 12px rgba(240, 68, 57, .18));
+  filter: drop-shadow(0 0 10px rgba(240, 68, 57, .18));
+}
+
+html[data-ncn-app="dripfeed"] .drip-word,
+html[data-ncn-app="dripfeed"] .feed-word {
+  display: inline;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  transform: none;
 }
 
 html[data-ncn-app="dripfeed"] .drip-word {
-  display: inline-block;
-  color: #f04439;
-  font-family: "Arial Rounded MT Bold", "Trebuchet MS", "Arial Black", sans-serif;
-  font-size: clamp(2.65rem, 9.2vw, 5.7rem);
-  font-weight: 900;
-  line-height: .72;
-  letter-spacing: -.13em;
   text-transform: lowercase;
-  transform: scaleX(1.05) scaleY(1.11);
-  transform-origin: left bottom;
 }
 
 html[data-ncn-app="dripfeed"] .feed-word {
-  display: inline-block;
-  margin-left: -.03em;
-  color: #971a19;
-  font-family: Impact, "Arial Black", "Helvetica Neue", sans-serif;
-  font-size: clamp(2.5rem, 8.7vw, 5.45rem);
-  font-weight: 900;
-  line-height: .72;
-  letter-spacing: -.055em;
+  margin-left: .045em;
+  color: #991c1a;
+  letter-spacing: -.045em;
   text-transform: uppercase;
-  transform: scaleY(1.04);
-  transform-origin: left bottom;
 }
 
 html[data-ncn-app="dripfeed"] .rail-title > span {
+  grid-area: meta;
   align-self: end;
-  max-width: 38ch;
-  margin: 0 0 .18rem;
+  min-width: 0;
+  max-width: 42ch;
+  margin: 0 0 .1rem;
+  overflow-wrap: anywhere;
   color: #ff914d;
-  font-size: clamp(.55rem, 1.8vw, .76rem);
-  line-height: 1.5;
-  letter-spacing: .15em;
+  font-size: clamp(.56rem, 1.45vw, .74rem);
+  line-height: 1.45;
+  letter-spacing: .14em;
   text-transform: uppercase;
 }
 
@@ -105,13 +99,13 @@ html[data-ncn-app="dripfeed"] .rail-title > span::after {
 }
 
 html[data-ncn-app="dripfeed"] .rail-title::after {
-  content: "BUY · SELL · BECOME NOTICEABLE";
-  grid-column: 1 / -1;
-  margin-top: 8px;
-  color: rgba(244, 234, 226, .62);
+  content: "PUBLIC CLASSIFIEDS // BUY · SELL · BECOME NOTICEABLE";
+  grid-area: tag;
+  margin-top: 2px;
+  color: rgba(244, 234, 226, .6);
   font-family: var(--font-main);
-  font-size: clamp(.56rem, 1.7vw, .72rem);
-  letter-spacing: .13em;
+  font-size: clamp(.54rem, 1.35vw, .7rem);
+  letter-spacing: .12em;
   text-transform: uppercase;
 }
 
@@ -121,48 +115,28 @@ html[data-ncn-app="dripfeed"] .rail-title::after {
   display: none !important;
 }
 
-/* The application has no backing screen. Only the tiles occupy the chamber. */
-#dripfeed-root,
-#dripfeed-root .dripfeed-app,
-#dripfeed-root .demo-stage,
-#dripfeed-root .listing-wall {
-  background: transparent !important;
-}
-
-#dripfeed-root .demo-stage {
-  border-inline: 0 !important;
-  isolation: auto;
-  contain: layout;
-}
-
-#dripfeed-root .demo-stage::before,
-#dripfeed-root .demo-stage::after {
-  content: none !important;
-  display: none !important;
-}
-
 #dripfeed-root .dripfeed-filter-rail {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: stretch;
-  margin-top: 0;
   padding: 8px 4px;
   border-bottom: 1px solid var(--line2);
   background: rgba(5, 4, 4, .84);
 }
 
-#dripfeed-root .dripfeed-filter-rail .filter-chips {
+#dripfeed-root .filter-chips {
   display: flex;
   flex-wrap: nowrap;
   gap: 5px;
   min-width: 0;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(240, 68, 57, .35) transparent;
 }
 
-#dripfeed-root .dripfeed-filter-rail .filter-chip {
+#dripfeed-root .filter-chip {
   flex: 0 0 auto;
   min-height: 38px;
   padding: 0 12px;
@@ -235,37 +209,45 @@ html[data-ncn-app="dripfeed"] .rail-title::after {
   }
 }
 
-@media (max-width: 740px) {
+@media (max-width: 740px), (hover: none) and (pointer: coarse) {
   html[data-ncn-app="dripfeed"] .rail {
-    gap: 10px;
-    padding: 8px 12px 10px;
+    padding: 9px 12px 10px;
   }
 
   html[data-ncn-app="dripfeed"] .rail-title {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "word"
+      "meta"
+      "tag";
+    gap: 5px;
+  }
+
+  html[data-ncn-app="dripfeed"] .dripfeed-wordmark {
+    font-size: clamp(2.2rem, 10.5vw, 3.25rem);
+    letter-spacing: -.065em;
   }
 
   html[data-ncn-app="dripfeed"] .rail-title > span {
     max-width: none;
-    margin-top: 7px;
+    margin: 0;
+    font-size: clamp(.54rem, 2.35vw, .67rem);
   }
 
   html[data-ncn-app="dripfeed"] .rail-title::after {
-    margin-top: 5px;
+    margin: 0;
+    font-size: clamp(.52rem, 2.25vw, .64rem);
   }
 
-  #dripfeed-root .dripfeed-filter-rail {
-    padding-top: 6px;
-  }
-
-  #dripfeed-root .dripfeed-filter-rail .filter-chip {
+  #dripfeed-root .filter-chip {
     min-height: 36px;
     padding-inline: 10px;
   }
 
   #dripfeed-root .filter-transmit {
-    min-width: 112px;
+    min-width: 108px;
     padding-inline: 10px;
+    font-size: .63rem;
   }
 
   #dripfeed-root .dripfeed-utility-rail {
@@ -283,32 +265,16 @@ html[data-ncn-app="dripfeed"] .rail-title::after {
   #dripfeed-root .dripfeed-utility-rail .display-note {
     grid-column: 2;
     grid-row: 1;
+    font-size: .56rem;
   }
 }
 
-@media (max-width: 430px) {
-  html[data-ncn-app="dripfeed"] .rail {
-    grid-template-columns: 1fr;
-  }
-
-  html[data-ncn-app="dripfeed"] .rail-mark {
-    display: none;
-  }
-
-  html[data-ncn-app="dripfeed"] .drip-word {
-    font-size: clamp(2.55rem, 14.8vw, 4rem);
-  }
-
-  html[data-ncn-app="dripfeed"] .feed-word {
-    font-size: clamp(2.4rem, 14vw, 3.85rem);
+@media (max-width: 390px) {
+  html[data-ncn-app="dripfeed"] .dripfeed-wordmark {
+    font-size: clamp(2rem, 10vw, 2.75rem);
   }
 
   #dripfeed-root .filter-transmit {
-    min-width: 104px;
-    font-size: .63rem;
-  }
-
-  #dripfeed-root .dripfeed-utility-rail .display-note {
-    font-size: .56rem;
+    min-width: 100px;
   }
 }
