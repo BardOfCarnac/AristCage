@@ -2,14 +2,15 @@
   NCN CHAMBER MOTION
 
   Optional physical chamber behaviour. It sleeps between scheduled events and
-  is visible only while RedWire's Filter or Submit panel is open.
+  is visible only while RedWire's Filter or Submit panel is open. Motion emits
+  optional environmental events; no listener is required.
 ==================================================*/
 
 window.NCNChamberMotion = (() => {
   const runtime = window.NCNViewerRuntime;
   const lifecycle = window.NCNViewerLifecycle;
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const MOTION_PANELS = new Set(["filter", "submit"]);
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const MOTION_PANELS = new Set(['filter', 'submit']);
 
   const state = {
     enabled: false,
@@ -18,6 +19,7 @@ window.NCNChamberMotion = (() => {
     duration: 2600,
     side: 1,
     row: 0,
+    pulseEmitted: false,
     lock: null
   };
 
@@ -31,9 +33,8 @@ window.NCNChamberMotion = (() => {
   };
 
   function panelAllowsMotion() {
-    if (typeof NCN_STATE === "undefined") return false;
-    return NCN_STATE.activeApp === "redwire"
-      && MOTION_PANELS.has(NCN_STATE.activePanel);
+    if (typeof NCN_STATE === 'undefined') return false;
+    return NCN_STATE.activeApp === 'redwire' && MOTION_PANELS.has(NCN_STATE.activePanel);
   }
 
   function camera() {
@@ -42,11 +43,29 @@ window.NCNChamberMotion = (() => {
       || null;
   }
 
+  function eventDetail(strength = 0.4) {
+    const snapshot = camera();
+    return {
+      x: state.side * (snapshot?.finalHalfWidth || 2.5) * 0.78,
+      y: (snapshot?.halfHeight || 2) * 0.25 - state.row * (snapshot?.cell || 0.5),
+      z: 3.8,
+      radius: 1.5,
+      strength,
+      side: state.side,
+      row: state.row,
+      duration: state.duration
+    };
+  }
+
+  function emit(type, detail) {
+    window.dispatchEvent(new CustomEvent(type, { detail }));
+  }
+
   function ensureBlock() {
     if (block?.isConnected) return block;
-    block = document.createElement("div");
-    block.className = "ncn-chamber-block";
-    block.setAttribute("aria-hidden", "true");
+    block = document.createElement('div');
+    block.className = 'ncn-chamber-block';
+    block.setAttribute('aria-hidden', 'true');
     block.innerHTML = '<i class="ncn-chamber-block-grid"></i><i class="ncn-chamber-block-edge"></i>';
     window.NCNEnvironmentHost.root().append(block);
     return block;
@@ -75,16 +94,14 @@ window.NCNChamberMotion = (() => {
     const top = Math.min(...ys);
     const right = Math.max(...xs);
     const bottom = Math.max(...ys);
-    const polygon = points.map(point => (
-      `${(point.x - left).toFixed(2)}px ${(point.y - top).toFixed(2)}px`
-    )).join(", ");
+    const polygon = points.map(point => `${(point.x - left).toFixed(2)}px ${(point.y - top).toFixed(2)}px`).join(', ');
 
     block.style.left = `${left}px`;
     block.style.top = `${top}px`;
     block.style.width = `${Math.max(12, right - left)}px`;
     block.style.height = `${Math.max(34, bottom - top)}px`;
     block.style.clipPath = `polygon(${polygon})`;
-    block.style.setProperty("--block-origin-x", side < 0 ? "100%" : "0%");
+    block.style.setProperty('--block-origin-x', side < 0 ? '100%' : '0%');
   }
 
   function clearTimer() {
@@ -95,9 +112,7 @@ window.NCNChamberMotion = (() => {
   function scheduleNext(initial = false) {
     clearTimer();
     if (!state.enabled || reduceMotion.matches || !panelAllowsMotion()) return;
-    const delay = initial
-      ? 650 + Math.random() * 650
-      : 4200 + Math.random() * 4600;
+    const delay = initial ? 650 + Math.random() * 650 : 4200 + Math.random() * 4600;
     ambientTimer = window.setTimeout(() => {
       ambientTimer = 0;
       if (!move()) scheduleNext(false);
@@ -109,9 +124,10 @@ window.NCNChamberMotion = (() => {
     state.active = false;
     state.lock?.release();
     state.lock = null;
-    block?.classList.remove("is-moving");
-    block?.style.removeProperty("transform");
+    block?.classList.remove('is-moving');
+    block?.style.removeProperty('transform');
     runtimeHandle?.disable?.();
+    if (wasActive) emit('ncn:block-motion-settle', eventDetail(options.completed ? 0.58 : 0.32));
     if (options.reschedule !== false && panelAllowsMotion()) scheduleNext(false);
     return wasActive;
   }
@@ -120,20 +136,20 @@ window.NCNChamberMotion = (() => {
     const forced = options.force === true;
     if (!panelAllowsMotion()) return false;
     if (!state.enabled && !forced) return false;
-    if (state.active || (!forced && !lifecycle?.allows?.("ambient"))) return false;
+    if (state.active || (!forced && !lifecycle?.allows?.('ambient'))) return false;
 
     ensureBlock();
     state.active = true;
     state.startedAt = performance.now();
     state.duration = Math.max(1200, Number(options.duration) || 2600);
-    state.side = options.side === -1 ? -1
-      : options.side === 1 ? 1
-        : (Math.random() < 0.5 ? -1 : 1);
+    state.side = options.side === -1 ? -1 : options.side === 1 ? 1 : (Math.random() < 0.5 ? -1 : 1);
     state.row = Number.isFinite(options.row) ? options.row : Math.floor(Math.random() * 3) - 1;
-    state.lock = lifecycle?.acquire?.("chamber-block", "chamber-motion", lifecycle.PRIORITY.ambient);
+    state.pulseEmitted = false;
+    state.lock = lifecycle?.acquire?.('chamber-block', 'chamber-motion', lifecycle.PRIITY?.ambient || lifecycle.PRIORITY.ambient);
     position();
-    block.classList.add("is-moving");
-    runtimeHandle?.enable?.("chamber-block");
+    block.classList.add('is-moving');
+    emit('ncn:block-motion-start', eventDetail(0.42));
+    runtimeHandle?.enable?.('chamber-block');
     return true;
   }
 
@@ -154,14 +170,19 @@ window.NCNChamberMotion = (() => {
     const rotation = state.side * travel * 14;
     block.style.transform = `translate3d(${offsetX.toFixed(3)}px, ${offsetY.toFixed(3)}px, 0) rotateY(${rotation.toFixed(3)}deg)`;
 
+    if (!state.pulseEmitted && progress >= 0.48) {
+      state.pulseEmitted = true;
+      emit('ncn:block-motion-pulse', eventDetail(0.46));
+    }
+
     if (progress >= 1) {
-      stop({ reschedule: true });
+      stop({ reschedule: true, completed: true });
       return false;
     }
     return true;
   }
 
-  const runtimeHandle = runtime?.register?.("chamber-motion", update, {
+  const runtimeHandle = runtime?.register?.('chamber-motion', update, {
     priority: 30,
     maxFps: 30,
     enabled: false,
@@ -171,11 +192,11 @@ window.NCNChamberMotion = (() => {
   function configure(profile = {}) {
     state.enabled = Boolean(profile.enabled) && !reduceMotion.matches;
     ensureBlock();
-    block.classList.toggle("is-profile-enabled", state.enabled);
+    block.classList.toggle('is-profile-enabled', state.enabled);
     if (!state.enabled) {
       clearTimer();
       stop({ reschedule: false });
-      block.classList.remove("is-moving");
+      block.classList.remove('is-moving');
       return;
     }
     scheduleNext(true);
@@ -190,19 +211,15 @@ window.NCNChamberMotion = (() => {
     scheduleNext(true);
   }
 
-  window.addEventListener("resize", position, { passive: true });
-  window.addEventListener("ncn:chamber-camera-change", position);
-  window.addEventListener("ncn:panel-change", handlePanelChange);
-  window.addEventListener("ncn:application-change", handlePanelChange);
-  window.addEventListener("ncn:lifecycle-change", event => {
-    if ([lifecycle.STATES.INTERACTING, lifecycle.STATES.REALIGNING].includes(event.detail?.next)) {
-      stop({ reschedule: false });
-    }
-    if (event.detail?.next === lifecycle.STATES.READY && panelAllowsMotion()) {
-      scheduleNext(true);
-    }
+  window.addEventListener('resize', position, { passive: true });
+  window.addEventListener('ncn:chamber-camera-change', position);
+  window.addEventListener('ncn:panel-change', handlePanelChange);
+  window.addEventListener('ncn:application-change', handlePanelChange);
+  window.addEventListener('ncn:lifecycle-change', event => {
+    if ([lifecycle.STATES.INTERACTING, lifecycle.STATES.REALIGNING].includes(event.detail?.next)) stop({ reschedule: false });
+    if (event.detail?.next === lifecycle.STATES.READY && panelAllowsMotion()) scheduleNext(true);
   });
-  reduceMotion.addEventListener?.("change", event => {
+  reduceMotion.addEventListener?.('change', event => {
     if (event.matches) configure({ enabled: false });
   });
 
