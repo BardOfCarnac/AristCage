@@ -1,186 +1,274 @@
 /*==================================================
-  NCN WEATHER RENDERER
+  NCN WEATHER INTEGRATION ADAPTER
 
-  Optional camera-aware floor atmosphere. Disabled profiles consume no frames.
-  Active weather is capped below interaction frame rate by the shared runtime.
+  Binds the published createWeather(context) factory to the terminal-owned
+  environment host, shared runtime, lifecycle, camera and application profiles.
 ==================================================*/
 
 window.NCNWeatherRenderer = (() => {
   const runtime = window.NCNViewerRuntime;
   const lifecycle = window.NCNViewerLifecycle;
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const host = window.NCNEnvironmentHost;
 
-  const state = {
+  let weather = null;
+  let initPromise = null;
+  let desired = {
     enabled: false,
-    mist: 0,
-    targetMist: 0,
-    wind: 0,
-    phase: 0
+    preset: 'clear',
+    intensity: 0,
+    wind: { x: 0, y: 0, z: 0 },
+    quality: 'auto',
+    seed: 2045
   };
-
-  let canvas = null;
-  let context = null;
-  let width = 0;
-  let height = 0;
-  let dpr = 1;
-
-  const clamp01 = value => Math.max(0, Math.min(1, value));
-  const lerp = (a, b, t) => a + (b - a) * t;
-
-  function ensureCanvas() {
-    if (canvas?.isConnected) return canvas;
-    canvas = document.createElement("canvas");
-    canvas.className = "ncn-floor-mist";
-    canvas.setAttribute("aria-hidden", "true");
-    context = canvas.getContext("2d");
-    window.NCNEnvironmentHost.root().append(canvas);
-    resize();
-    return canvas;
-  }
+  let feedObserver = null;
+  let zoneFrame = 0;
 
   function camera() {
-    return window.LayeredChamber?.getCameraSnapshot?.()
-      || window.NCNChamberCamera?.snapshot?.()
+    return window.NCNChamberCamera?.snapshot?.()
+      || window.LayeredChamber?.getCameraSnapshot?.()
       || null;
   }
 
-  function floorBand(cameraSnapshot) {
-    if (!cameraSnapshot) {
-      return { top: height * 0.64, bottom: height, vanishingX: width * 0.5 };
-    }
-    const nearLeft = cameraSnapshot.project(
-      -cameraSnapshot.finalHalfWidth,
-      -cameraSnapshot.halfHeight,
-      cameraSnapshot.near
-    );
-    const nearRight = cameraSnapshot.project(
-      cameraSnapshot.finalHalfWidth,
-      -cameraSnapshot.halfHeight,
-      cameraSnapshot.near
-    );
-    const far = cameraSnapshot.project(0, -cameraSnapshot.halfHeight, 10.5);
-    return {
-      top: Math.max(height * 0.48, far.y - 16),
-      bottom: Math.min(height, Math.max(nearLeft.y, nearRight.y)),
-      vanishingX: far.x
-    };
-  }
-
-  function resize() {
-    if (!canvas || !context) return;
-    width = window.innerWidth;
-    height = window.innerHeight;
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    runtimeHandle?.wake?.("weather-resize");
-  }
-
-  function clear() {
-    if (context && width && height) context.clearRect(0, 0, width, height);
-  }
-
-  function draw(frame) {
-    if (!state.enabled || !context || !width || !height) return false;
-    const ambientAllowed = lifecycle?.allows?.("ambient") ?? true;
-    state.mist = lerp(state.mist, state.targetMist, Math.min(1, frame.delta / 520));
-    if (ambientAllowed) state.phase += frame.delta * (0.00005 + state.wind * 0.00007);
-
-    clear();
-    if (state.mist < 0.008) return Math.abs(state.targetMist - state.mist) > 0.003;
-
-    const band = floorBand(camera());
-    const bandHeight = Math.max(80, band.bottom - band.top);
-    const layers = frame.quality === "reduced" ? 2 : 5;
-
-    context.save();
-    context.globalCompositeOperation = "screen";
-
-    for (let layer = 0; layer < layers; layer += 1) {
-      const depth = layer / Math.max(1, layers - 1);
-      const y = band.top + bandHeight * (0.2 + depth * 0.66);
-      const amplitude = bandHeight * (0.035 + depth * 0.045);
-      const frequency = 0.007 + layer * 0.0018;
-      const speed = state.phase * (22 + layer * 8);
-      const alpha = state.mist * (0.018 + depth * 0.026);
-      const gradient = context.createLinearGradient(0, band.top, 0, band.bottom);
-      gradient.addColorStop(0, "rgba(255,70,42,0)");
-      gradient.addColorStop(0.42, `rgba(255,78,50,${alpha * 0.38})`);
-      gradient.addColorStop(1, `rgba(255,102,66,${alpha})`);
-      context.fillStyle = gradient;
-      context.beginPath();
-      context.moveTo(0, band.bottom + 10);
-
-      for (let x = 0; x <= width + 24; x += 24) {
-        const perspective = 0.45
-          + Math.abs(x - band.vanishingX) / Math.max(width, 1) * 0.65;
-        const wave = Math.sin(x * frequency + speed + layer * 1.7)
-          + Math.sin(x * frequency * 0.43 - speed * 0.72 + layer) * 0.48;
-        context.lineTo(x, y + wave * amplitude * perspective);
+  function effectsAdapter() {
+    return Object.freeze({
+      play(name, target, options = {}) {
+        if (typeof window.NCNEffects?.play === 'function') {
+          return window.NCNEffects.play(name, target, options);
+        }
+        const request = new CustomEvent('ncn:effect-request', {
+          cancelable: true,
+          detail: { name, target, options, source: 'weather' }
+        });
+        return window.dispatchEvent(request);
       }
-
-      context.lineTo(width, band.bottom + 10);
-      context.closePath();
-      context.fill();
-    }
-
-    context.restore();
-    const settling = Math.abs(state.targetMist - state.mist) > 0.003;
-    return settling || (ambientAllowed && state.enabled && state.mist > 0.01);
-  }
-
-  const runtimeHandle = runtime?.register?.("weather-mist", draw, {
-    priority: 20,
-    maxFps: 15,
-    enabled: false,
-    wake: false
-  });
-
-  function configure(profile = {}) {
-    const enabled = Boolean(profile.enabled) && !reduceMotion.matches;
-    state.enabled = enabled;
-    state.targetMist = enabled ? clamp01(Number(profile.mist) || 0) : 0;
-    state.wind = Number.isFinite(profile.wind) ? Math.max(-1, Math.min(1, profile.wind)) : 0;
-
-    ensureCanvas();
-    canvas.classList.toggle("is-enabled", enabled);
-
-    if (enabled) {
-      state.mist = Math.min(state.mist, state.targetMist);
-      runtimeHandle?.enable?.("weather-profile");
-    } else {
-      state.mist = 0;
-      clear();
-      runtimeHandle?.disable?.();
-    }
-  }
-
-  function setWeather(next = {}) {
-    configure({
-      enabled: next.enabled ?? state.enabled,
-      mist: Number.isFinite(next.mist) ? next.mist : state.targetMist,
-      wind: Number.isFinite(next.wind) ? next.wind : state.wind
     });
   }
 
-  window.addEventListener("resize", resize, { passive: true });
-  window.addEventListener("ncn:chamber-camera-change", () => runtimeHandle?.wake?.("weather-camera"));
-  window.addEventListener("ncn:lifecycle-change", event => {
-    if (state.enabled && event.detail?.next === lifecycle?.STATES?.READY) {
-      runtimeHandle?.wake?.("weather-ready");
+  function allowAmbient() {
+    return lifecycle?.allows?.('ambient', lifecycle.PRIORITY.ambient) ?? true;
+  }
+
+  function ensureWeather() {
+    if (weather) return initPromise;
+    if (!window.createWeather || !runtime || !host) {
+      return Promise.reject(new Error('Weather dependencies are unavailable.'));
     }
-  });
-  reduceMotion.addEventListener?.("change", event => {
-    if (event.matches) configure({ enabled: false });
+
+    weather = window.createWeather({
+      id: 'ncn-terminal-weather',
+      taskName: 'weather-environment',
+      runtime,
+      layers: host.layers(),
+      camera,
+      effects: effectsAdapter(),
+      allowAmbient,
+      resizeTarget: window,
+      blockEvents: window,
+      seed: desired.seed,
+      intensity: desired.intensity,
+      particleCaps: { mist: 72, dust: 90, rain: 180 },
+      priority: 20
+    });
+    initPromise = weather.init().then(() => {
+      attachReadingObserver();
+      return weather;
+    });
+    return initPromise;
+  }
+
+  function mapLegacyProfile(profile = {}) {
+    const legacyMist = Number(profile.mist);
+    const intensity = Number.isFinite(profile.intensity)
+      ? profile.intensity
+      : Number.isFinite(legacyMist)
+        ? legacyMist
+        : desired.intensity;
+    let preset = profile.preset || desired.preset;
+    if (!profile.preset && Number.isFinite(legacyMist)) {
+      preset = legacyMist >= 0.62 ? 'heavy-mist' : legacyMist > 0.01 ? 'mist' : 'clear';
+    }
+    const wind = typeof profile.wind === 'number'
+      ? { x: profile.wind, y: 0, z: -Math.abs(profile.wind) * 0.16 }
+      : profile.wind || desired.wind;
+    return {
+      enabled: profile.enabled ?? desired.enabled,
+      preset,
+      intensity: Math.max(0, Math.min(1, Number(intensity) || 0)),
+      wind: {
+        x: Number(wind?.x) || 0,
+        y: Number(wind?.y) || 0,
+        z: Number(wind?.z) || 0
+      },
+      quality: profile.quality || desired.quality,
+      seed: Number.isFinite(Number(profile.seed)) ? Number(profile.seed) : desired.seed,
+      transitionDuration: Math.max(0, Number(profile.transitionDuration) || 0)
+    };
+  }
+
+  function applyDesired() {
+    return ensureWeather().then(instance => {
+      instance.setSeed(desired.seed);
+      if (desired.quality && desired.quality !== 'auto') instance.setQuality(desired.quality);
+      instance.setWind(desired.wind);
+      instance.setIntensity(desired.intensity);
+      if (!desired.enabled) {
+        instance.setEnabled(false);
+        instance.clearImmediate();
+        return instance;
+      }
+      instance.setEnabled(true);
+      if (desired.transitionDuration > 0) {
+        instance.transitionTo(desired.preset, { duration: desired.transitionDuration });
+      } else {
+        instance.setPreset(desired.preset);
+      }
+      scheduleZoneSync();
+      return instance;
+    }).catch(error => {
+      console.error('[NCN weather] integration failed', error);
+      return null;
+    });
+  }
+
+  function activeReadingElement() {
+    return document.querySelector(
+      '#feed .entry.expanded:not(.panel) .projection-plate, '
+      + '.optical-mode .optical-semantic-item[data-optical-role="body"], '
+      + '.dripfeed-reader[aria-hidden="false"], '
+      + '.dripfeed-reader.is-open'
+    );
+  }
+
+  function controlElements() {
+    return [
+      document.querySelector('.rail'),
+      document.querySelector('#feed .entry.panel .projection-plate'),
+      document.querySelector('.desktop-inspector:not(:empty)')
+    ].filter(Boolean);
+  }
+
+  function syncZones() {
+    zoneFrame = 0;
+    if (!weather) return;
+    const reading = activeReadingElement();
+    weather.setReadingZone(reading ? {
+      element: reading,
+      attenuation: 0.84,
+      padding: 24,
+      radius: 34
+    } : null);
+    weather.setControlZones(controlElements().map(element => ({
+      element,
+      attenuation: 0.68,
+      padding: 14,
+      radius: 22
+    })));
+  }
+
+  function scheduleZoneSync() {
+    if (zoneFrame) return;
+    zoneFrame = requestAnimationFrame(syncZones);
+  }
+
+  function attachReadingObserver() {
+    if (feedObserver) return;
+    const feed = document.querySelector('#feed');
+    if (feed) {
+      feedObserver = new MutationObserver(scheduleZoneSync);
+      feedObserver.observe(feed, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class', 'hidden', 'aria-hidden']
+      });
+    }
+    window.addEventListener('scroll', scheduleZoneSync, { passive: true });
+    window.addEventListener('resize', scheduleZoneSync, { passive: true });
+    window.addEventListener('ncn:chamber-camera-change', scheduleZoneSync);
+    window.addEventListener('ncn:application-change', scheduleZoneSync);
+    scheduleZoneSync();
+  }
+
+  function configure(profile = {}) {
+    desired = mapLegacyProfile(profile);
+    void applyDesired();
+    return desired;
+  }
+
+  function setWeather(next = {}) {
+    return configure({ ...desired, ...next });
+  }
+
+  function disable() {
+    desired = { ...desired, enabled: false, preset: 'clear', intensity: 0, transitionDuration: 0 };
+    if (weather) {
+      weather.setEnabled(false);
+      weather.clearImmediate();
+    }
+  }
+
+  function suspend() {
+    weather?.suspend?.();
+  }
+
+  function resume() {
+    if (desired.enabled) weather?.resume?.();
+  }
+
+  function reset() {
+    weather?.reset?.();
+    if (desired.enabled) void applyDesired();
+  }
+
+  function destroy() {
+    if (zoneFrame) cancelAnimationFrame(zoneFrame);
+    zoneFrame = 0;
+    feedObserver?.disconnect();
+    feedObserver = null;
+    window.removeEventListener('scroll', scheduleZoneSync);
+    window.removeEventListener('resize', scheduleZoneSync);
+    window.removeEventListener('ncn:chamber-camera-change', scheduleZoneSync);
+    window.removeEventListener('ncn:application-change', scheduleZoneSync);
+    weather?.destroy?.();
+    weather = null;
+    initPromise = null;
+  }
+
+  window.addEventListener('ncn:lifecycle-change', event => {
+    const next = event.detail?.next;
+    if (next === lifecycle?.STATES?.SLEEPING) suspend();
+    else if (next === lifecycle?.STATES?.READY) resume();
+    if ([lifecycle?.STATES?.REALIGNING, lifecycle?.STATES?.DEGRADED].includes(next)) {
+      weather?.attenuateForTransition?.(0.12);
+    }
   });
 
   return Object.freeze({
     configure,
     setWeather,
-    disable: () => configure({ enabled: false }),
-    snapshot: () => Object.freeze({ ...state })
+    disable,
+    suspend,
+    resume,
+    reset,
+    destroy,
+    setPreset(name) {
+      desired = { ...desired, enabled: true, preset: name, transitionDuration: 0 };
+      void applyDesired();
+    },
+    transitionTo(name, options = {}) {
+      desired = { ...desired, enabled: true, preset: name, transitionDuration: Number(options.duration) || 0 };
+      void applyDesired();
+    },
+    setIntensity(value) {
+      desired = { ...desired, intensity: Math.max(0, Math.min(1, Number(value) || 0)) };
+      weather?.setIntensity?.(desired.intensity);
+    },
+    setReadingZone(zone) {
+      weather?.setReadingZone?.(zone);
+    },
+    requestElectricalPulse(intensity) {
+      return weather?.requestElectricalPulse?.(intensity) || false;
+    },
+    snapshot: () => Object.freeze({ desired: { ...desired }, module: weather?.snapshot?.() || null })
   });
 })();
