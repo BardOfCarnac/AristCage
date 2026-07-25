@@ -32,6 +32,7 @@ jobs:
             js/module-manager.js
             js/visual-director.js
             js/module-intake.js
+            js/department-context.js
             js/optical-adapter.js
             js/environment-host.js
             js/dripfeed-adapter.js
@@ -74,6 +75,7 @@ jobs:
             'js/module-manager.js',
             'js/visual-director.js',
             'js/module-intake.js',
+            'js/department-context.js',
             'js/optical-adapter.js',
             'js/environment-host.js',
             'js/application-switcher.js',
