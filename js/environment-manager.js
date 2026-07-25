@@ -14,7 +14,13 @@ window.NCNEnvironment = (() => {
       name: "redwire",
       chamber: "background",
       renderer: "optical",
-      weather: Object.freeze({ enabled: true, mist: 0.42, wind: 0.16 }),
+      weather: Object.freeze({
+        enabled: true,
+        preset: "mist",
+        intensity: 0.72,
+        mist: 0.42,
+        wind: 0.16
+      }),
       effects: Object.freeze({ ambient: true, interaction: true }),
       chamberMotion: Object.freeze({ enabled: true })
     }),
@@ -22,7 +28,7 @@ window.NCNEnvironment = (() => {
       name: "dripfeed",
       chamber: "background",
       renderer: "application",
-      weather: Object.freeze({ enabled: false, mist: 0, wind: 0 }),
+      weather: Object.freeze({ enabled: false, preset: "clear", intensity: 0, mist: 0, wind: 0 }),
       effects: Object.freeze({ ambient: false, interaction: false }),
       chamberMotion: Object.freeze({ enabled: false })
     })
@@ -36,7 +42,7 @@ window.NCNEnvironment = (() => {
       name: String(name || "empty"),
       chamber: "background",
       renderer: "application",
-      weather: Object.freeze({ enabled: false, mist: 0, wind: 0 }),
+      weather: Object.freeze({ enabled: false, preset: "clear", intensity: 0, mist: 0, wind: 0 }),
       effects: Object.freeze({ ambient: false, interaction: false }),
       chamberMotion: Object.freeze({ enabled: false })
     });
@@ -88,7 +94,7 @@ window.NCNEnvironment = (() => {
   }
 
   function disablePresentation() {
-    routeProfile("weather", { enabled: false, mist: 0, wind: 0 }, () => {
+    routeProfile("weather", { enabled: false, preset: "clear", intensity: 0, mist: 0, wind: 0 }, () => {
       window.NCNWeatherRenderer?.disable?.();
     }, { application: activeProfile, reason: "disable-presentation" });
     routeProfile("chamber-motion", { enabled: false }, () => {
@@ -208,7 +214,7 @@ window.NCNEnvironment = (() => {
       const next = {
         enabled: !desired.enabled,
         mist: desired.enabled ? 0 : 0.42,
-        intensity: desired.enabled ? 0 : 0.42,
+        intensity: desired.enabled ? 0 : 0.72,
         wind: 0.16,
         preset: desired.enabled ? "clear" : "mist"
       };
