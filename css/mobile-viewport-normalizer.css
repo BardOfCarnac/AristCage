@@ -1,0 +1,15 @@
+/* Applied only when mobile-viewport-normalizer.js detects a real mismatch. */
+html[data-ncn-app="dripfeed"].ncn-mobile-viewport-normalized .viewer {
+  width: var(--ncn-mobile-screen-width);
+  max-width: none;
+  zoom: var(--ncn-mobile-layout-scale);
+}
+
+html[data-ncn-app="dripfeed"].ncn-mobile-viewport-normalized .diagnostics-panel,
+html[data-ncn-app="dripfeed"].ncn-mobile-viewport-normalized .diagnostics-toggle {
+  zoom: var(--ncn-mobile-layout-scale);
+}
+
+html[data-ncn-app="dripfeed"].ncn-mobile-viewport-normalized body {
+  overflow-x: hidden;
+}
