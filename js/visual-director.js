@@ -62,10 +62,15 @@ window.NCNVisualDirector = (() => {
     return key;
   }
 
-  function readingActive() {
+  function activeView() {
     const app = window.NCNApplications?.current?.()
       || (typeof NCN_STATE !== "undefined" ? NCN_STATE.activeApp : "redwire");
-    const adapter = app === "dripfeed" ? window.NCNDripfeed : window.NCNOptical;
+    return app === "dripfeed" ? window.NCNDripfeed : window.NCNOptical;
+  }
+
+  function readingActive() {
+    const adapter = activeView();
+    if (typeof adapter?.isReading === "function") return Boolean(adapter.isReading());
     return Boolean(adapter?.getReadingZone?.());
   }
 
