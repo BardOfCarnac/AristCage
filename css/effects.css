@@ -1,8 +1,8 @@
 /*==================================================
-  OPTICAL EFFECTS
+  NCN EFFECTS DEPARTMENT
 
-  Appearance-only effects live here. They never decide whether an object is
-  present, selected or expanded; the projection engine remains authoritative.
+  Appearance-only effects. This file does not define application state,
+  primary chamber structure or Optical geometry.
 ==================================================*/
 
 :root {
@@ -12,30 +12,166 @@
 
 .rail-title {
   transform: translate3d(var(--title-register-x), var(--title-register-y), 0);
-  will-change: transform;
 }
 
-/* A rare registration error shifts projected information as one optical plane.
-   It is intentionally tiny and returns to perfect alignment immediately. */
 .viewer.optical-registration-fault .entry-content,
 .viewer.optical-registration-fault .rail-title {
   translate: 1px 0;
 }
 
-/* Interaction energy is carried by the existing priority rail rather than a
-   new colour or a page-wide flash. */
-.entry.energy-pulse .priority {
-  will-change: box-shadow;
+.entry.energy-pulse .priority,
+.ncn-effect-active {
+  will-change: opacity, transform, filter;
+}
+
+.ncn-effect-overlay {
+  position: fixed;
+  z-index: 70;
+  overflow: hidden;
+  pointer-events: none;
+  box-sizing: border-box;
+  transform-origin: 50% 50%;
+  contain: layout paint style;
+}
+
+.ncn-effect-clone-overlay {
+  overflow: visible;
+}
+
+.ncn-effect-clone-overlay > * {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+.ncn-effect-relay-scan {
+  isolation: isolate;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(255, 20, 12, calc(var(--ncn-effect-level, .5) * .08)) 46%,
+      rgba(255, 132, 66, calc(var(--ncn-effect-level, .5) * .18)) 50%,
+      transparent 54%
+    );
+  mix-blend-mode: screen;
+}
+
+.ncn-effect-scan-line {
+  position: absolute;
+  left: 0;
+  top: -4%;
+  width: 100%;
+  height: 6%;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(255, 58, 26, .35),
+    rgba(255, 188, 112, .92),
+    rgba(255, 74, 32, .38),
+    transparent
+  );
+  box-shadow: 0 0 18px rgba(255, 76, 34, .45);
+}
+
+.ncn-effect-relay-scan-static::before {
+  content: "";
+  position: absolute;
+  inset: 42% 0 auto;
+  height: 8%;
+  background: rgba(255, 102, 52, .32);
+  box-shadow: 0 0 12px rgba(255, 102, 52, .45);
+}
+
+.ncn-effect-heat-resolve {
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 0 11px rgba(255, 64, 28, var(--ncn-effect-heat, .3)));
+}
+
+.ncn-effect-channel {
+  mix-blend-mode: screen;
+}
+
+.ncn-effect-channel-red {
+  filter: sepia(1) saturate(9) hue-rotate(328deg) brightness(1.2);
+}
+
+.ncn-effect-channel-cyan {
+  filter: sepia(1) saturate(8) hue-rotate(145deg) brightness(1.05);
+}
+
+.ncn-effect-static-burst {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      rgba(255, 84, 44, .23) 1px,
+      transparent 2px,
+      transparent 5px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, .04) 0,
+      transparent var(--ncn-static-size, 7px)
+    );
+  background-position: var(--ncn-static-x, 0) var(--ncn-static-y, 0);
+  mix-blend-mode: screen;
+}
+
+.ncn-effect-light-flash {
+  background:
+    radial-gradient(
+      ellipse at 50% 50%,
+      rgba(255, 244, 226, .92),
+      rgba(255, 112, 54, .42) 42%,
+      rgba(255, 24, 12, .08) 72%,
+      transparent
+    );
+  mix-blend-mode: screen;
+}
+
+.ncn-effect-particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  border-radius: 50%;
+  background: rgba(255, 196, 122, .96);
+  box-shadow:
+    0 0 4px rgba(255, 188, 112, .9),
+    0 0 10px rgba(255, 62, 30, .62);
+}
+
+.ncn-effect-particles-static .ncn-effect-particle {
+  width: 3px;
+  height: 3px;
+}
+
+.ncn-effect-electrical svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.ncn-effect-electrical-path {
+  fill: none;
+  stroke: rgba(255, 204, 152, .95);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 5px rgba(255, 58, 24, .9));
 }
 
 @media (prefers-reduced-motion: reduce) {
   .rail-title {
     transform: none;
-    will-change: auto;
   }
 
   .viewer.optical-registration-fault .entry-content,
   .viewer.optical-registration-fault .rail-title {
     translate: none;
+  }
+
+  .ncn-effect-overlay {
+    animation: none !important;
+    transition: none !important;
   }
 }
