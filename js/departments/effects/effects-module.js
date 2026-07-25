@@ -1,9 +1,9 @@
 /*==================================================
   NCN EFFECTS DEPARTMENT · HOST PUBLICATION
 
-  A replaceable effects-slot factory for NCNIntegrationContract v1.
-  It writes visible output only inside context.layers.effects, uses the shared
-  runtime for frame work, and requests visual authority from the visual director.
+  Replaceable effects-slot factory for NCNIntegrationContract v1.
+  Visible output is confined to context.layers.effects. Frame work uses the
+  shared runtime, and every effect requests authority from the visual director.
 ==================================================*/
 (() => {
   "use strict";
@@ -16,6 +16,7 @@
     const t = clamp01(progress);
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   };
+  const PURPOSES = Object.freeze(["ambient", "interaction", "required"]);
 
   function hash(value) {
     let result = 2166136261;
@@ -89,6 +90,18 @@
     });
   }
 
+  function inferPurpose(channel) {
+    if (channel === "boot") return "required";
+    if (channel === "interface" || channel === "article") return "interaction";
+    return "ambient";
+  }
+
+  function normalisePurpose(value, channel) {
+    const purpose = String(value || inferPurpose(channel)).trim();
+    if (!PURPOSES.includes(purpose)) throw new RangeError(`Unknown effect purpose: ${purpose}`);
+    return purpose;
+  }
+
   function createNCNEffectsDepartment(context) {
     if (!context?.runtime?.register) throw new Error("Effects requires the shared department runtime.");
     if (!context?.director?.envelope || !context?.director?.claim) throw new Error("Effects requires the visual director.");
@@ -110,6 +123,7 @@
     let suspended = false;
     let destroyed = false;
     let clearing = false;
+    let registryLocked = false;
     let styleNode = null;
     let unsubscribeRuntime = null;
     let reducedMotion = Boolean(context.settings?.reducedMotion);
@@ -125,7 +139,6 @@
 
     function ensureLayer() {
       if (!layer.isConnected) throw new Error("environment:effects is disconnected.");
-      layer.dataset.effectsDepartment = "ready";
       return layer;
     }
 
@@ -140,21 +153,26 @@
       node.remove?.();
     }
 
+    function setVisible(visible) {
+      ownedNodes.forEach(node => {
+        if (node === styleNode) return;
+        node.hidden = !visible;
+      });
+    }
+
     function installStyle() {
       if (styleNode?.isConnected) return styleNode;
       styleNode = own(document.createElement("style"));
       styleNode.dataset.effectsDepartmentStyle = "1";
       styleNode.textContent = `
-        .ncn-effect-host-layer{position:fixed;inset:0;overflow:hidden;pointer-events:none;contain:strict;isolation:isolate;z-index:0}
-        .ncn-effect-host-layer>.ncn-effect-node{position:fixed;box-sizing:border-box;pointer-events:none;transform-origin:center;will-change:transform,opacity,filter;overflow:visible}
-        .ncn-effect-clone{position:absolute;inset:0;width:100%;height:100%;margin:0!important;pointer-events:none!important}
-        .ncn-effect-scan-line{position:absolute;left:-12%;right:-12%;height:2px;top:0;background:linear-gradient(90deg,transparent,rgba(255,62,28,.95),rgba(255,236,210,.95),rgba(255,62,28,.95),transparent);box-shadow:0 0 8px rgba(255,70,36,.75),0 0 22px rgba(255,40,16,.45)}
-        .ncn-effect-static{position:absolute;inset:0;background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.18) 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,rgba(255,42,18,.12) 0 1px,transparent 1px 4px);mix-blend-mode:screen}
-        .ncn-effect-particle{position:absolute;width:3px;height:3px;border-radius:50%;background:rgba(255,225,190,.95);box-shadow:0 0 8px rgba(255,72,28,.9)}
-        .ncn-effect-arc{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+        [data-ncn-effect-node]{position:fixed;box-sizing:border-box;pointer-events:none;transform-origin:center;will-change:transform,opacity,filter;overflow:visible}
+        [data-ncn-effect-node] .ncn-effect-clone{position:absolute;inset:0;width:100%;height:100%;margin:0!important;pointer-events:none!important}
+        [data-ncn-effect-node] .ncn-effect-scan-line{position:absolute;left:-12%;right:-12%;height:2px;top:0;background:linear-gradient(90deg,transparent,rgba(255,62,28,.95),rgba(255,236,210,.95),rgba(255,62,28,.95),transparent);box-shadow:0 0 8px rgba(255,70,36,.75),0 0 22px rgba(255,40,16,.45)}
+        [data-ncn-effect-node] .ncn-effect-static{position:absolute;inset:0;background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.18) 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,rgba(255,42,18,.12) 0 1px,transparent 1px 4px);mix-blend-mode:screen}
+        [data-ncn-effect-node] .ncn-effect-particle{position:absolute;width:3px;height:3px;border-radius:50%;background:rgba(255,225,190,.95);box-shadow:0 0 8px rgba(255,72,28,.9)}
+        [data-ncn-effect-node] .ncn-effect-arc{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
       `;
       ensureLayer().append(styleNode);
-      ensureLayer().classList.add("ncn-effect-host-layer");
       return styleNode;
     }
 
@@ -181,7 +199,9 @@
     function createNode(target, className = "", cloneTarget = false) {
       const node = own(document.createElement("div"));
       node.className = `ncn-effect-node ${className}`.trim();
+      node.dataset.ncnEffectNode = "1";
       node.setAttribute("aria-hidden", "true");
+      node.hidden = suspended;
       ensureLayer().append(node);
       if (cloneTarget) {
         const element = target.getElement?.();
@@ -205,13 +225,22 @@
       return rect.width > 0 && rect.height > 0;
     }
 
-    function register(name, definition) {
+    function registerCanonical(name, definition) {
       if (destroyed) throw new Error("Destroyed effects module cannot register effects.");
+      if (registryLocked) throw new Error("The canonical effects registry is locked.");
       if (!name || typeof definition?.create !== "function") {
         throw new TypeError("Effect definitions require a name and create(context).");
       }
-      registry.set(String(name), Object.freeze({ ...definition }));
-      return api;
+      const key = String(name);
+      if (registry.has(key)) throw new Error(`Duplicate canonical effect name: ${key}`);
+      registry.set(key, Object.freeze({ ...definition }));
+      return registrationApi;
+    }
+
+    function purposeAllowed(purpose) {
+      if (!profile.enabled) return false;
+      if (purpose === "required") return true;
+      return purpose === "ambient" ? profile.ambient : profile.interaction;
     }
 
     function removeFromQueue(handle) {
@@ -231,22 +260,30 @@
     }
 
     function beginQueued(key) {
+      if (suspended) return;
       const queue = queues.get(key);
       if (!queue?.length || channelIndex.get(key)?.size) return;
       const next = queue.shift();
       if (!queue.length) queues.delete(key);
+      if (!purposeAllowed(next.purpose)) {
+        next.cancel(`profile-${next.purpose}-disabled`);
+        beginQueued(key);
+        return;
+      }
       next._start();
     }
 
     function passiveHandle(name, target, options, status, reason) {
       const id = `effect-${nextEffectId++}`;
-      const result = Object.freeze({ id, name, channel: options.channel, status, reason });
+      const result = Object.freeze({ id, name, channel: options.channel, purpose: options.purpose, status, reason });
       return Object.freeze({
         id,
         name,
         target,
         channel: options.channel,
+        purpose: options.purpose,
         priority: options.priority,
+        localIntensity: options.localIntensity,
         intensity: 0,
         state: status,
         finished: Promise.resolve(result),
@@ -266,6 +303,7 @@
         ...requestedOptions
       };
       options.channel = options.channel || definition.channel || "interface";
+      options.purpose = normalisePurpose(options.purpose || definition.purpose, options.channel);
       options.concurrency = options.concurrency || definition.concurrency || "stack";
       options.priority = Number(options.priority ?? definition.priority ?? 10);
       options.duration = Math.max(0, Number(options.duration ?? definition.duration ?? 500));
@@ -274,7 +312,10 @@
         ? Number(options.seed)
         : hash(`${name}:${nextEffectId}:${targetIdentity(target)}`);
 
-      if (profile.enabled === false) return passiveHandle(name, target, options, "ignored", "profile-disabled");
+      if (suspended) return passiveHandle(name, target, options, "ignored", "suspended");
+      if (!purposeAllowed(options.purpose)) {
+        return passiveHandle(name, target, options, "ignored", `profile-${options.purpose}-disabled`);
+      }
 
       const key = channelKey(target, options.channel);
       const occupants = [...(channelIndex.get(key) || [])]
@@ -289,9 +330,12 @@
           .forEach(handle => handle.cancel("replaced"));
       }
       if (options.concurrency === "merge" && occupants.length) {
-        const existing = occupants.sort((a, b) => b.priority - a.priority)[0];
-        existing.setIntensity(Math.max(existing.localIntensity, options.localIntensity));
+        const existing = occupants
+          .filter(handle => handle.name === String(name))
+          .sort((a, b) => b.priority - a.priority)[0];
+        if (!existing) return passiveHandle(name, target, options, "ignored", "merge-incompatible");
         existing._controller?.merge?.(options);
+        existing.setIntensity(Math.max(existing.localIntensity, options.localIntensity), "merge");
         return existing;
       }
 
@@ -318,9 +362,11 @@
         name,
         target,
         channel: options.channel,
+        purpose: options.purpose,
         priority: options.priority,
         localIntensity: options.localIntensity,
         intensity: 0,
+        seed: options.seed,
         state: "queued",
         finished,
         _channelKey: key,
@@ -330,6 +376,7 @@
         _elapsed: 0,
         _started: false,
         _resolved: false,
+        _exclusive: options.exclusive === true,
         _start: null,
         cancel: null,
         setIntensity: null
@@ -350,64 +397,79 @@
         handle._claim = null;
         removeFromChannel(handle);
         active.delete(id);
-        const result = Object.freeze({ id, name, channel: handle.channel, status, reason });
+        const result = Object.freeze({ id, name, channel: handle.channel, purpose: handle.purpose, status, reason });
         resolveFinished(result);
         emit("finished", result);
         if (started && !clearing) beginQueued(key);
         return true;
       }
 
-      handle.cancel = reason => finish("cancelled", reason || "cancelled");
-      handle.setIntensity = value => {
-        handle.localIntensity = clamp01(value);
-        const directorEnvelope = context.director.envelope(handle.channel, {
-          intensity: handle.localIntensity * profile.intensity
-        });
-        handle.intensity = directorEnvelope.allowed ? directorEnvelope.intensity : 0;
-        handle._controller?.setIntensity?.(handle.intensity);
-        return handle.intensity;
-      };
-
-      handle._start = () => {
-        if (handle._resolved || destroyed) return;
-        if (!target.isValid()) {
-          finish("cancelled", "invalid-target");
-          return;
+      function claimAuthority(reason = "start") {
+        if (!purposeAllowed(handle.purpose)) {
+          finish("cancelled", `profile-${handle.purpose}-disabled`);
+          return false;
         }
-
         const requested = handle.localIntensity * profile.intensity;
         const directorEnvelope = context.director.envelope(handle.channel, { intensity: requested });
         if (!directorEnvelope.allowed) {
           finish("ignored", `director:${directorEnvelope.mode}`);
-          return;
+          return false;
         }
+        handle._claim?.release?.(`effect:${reason}`);
+        handle._claim = null;
         const claim = context.director.claim(handle.channel, {
           priority: handle.priority,
           intensity: requested,
-          exclusive: options.exclusive === true
+          exclusive: handle._exclusive
         });
         if (!claim?.granted) {
-          finish("ignored", claim?.reason || "director-denied");
-          return;
+          finish("cancelled", claim?.reason || "director-denied");
+          return false;
         }
-
         handle._claim = claim;
         handle.intensity = claim.intensity;
+        handle._controller?.setIntensity?.(handle.intensity);
+        return true;
+      }
+
+      handle.cancel = reason => finish("cancelled", reason || "cancelled");
+      handle.setIntensity = (value, reason = "set-intensity") => {
+        if (handle._resolved) return 0;
+        handle.localIntensity = clamp01(value);
+        if (!handle._started) return handle.localIntensity;
+        if (!claimAuthority(reason)) return 0;
+        emit("intensity", { id, intensity: handle.intensity, localIntensity: handle.localIntensity, reason });
+        return handle.intensity;
+      };
+
+      handle._start = () => {
+        if (handle._resolved || destroyed || suspended) return;
+        if (!target.isValid()) {
+          finish("cancelled", "invalid-target");
+          return;
+        }
+        if (!claimAuthority("start")) return;
+
         handle._started = true;
-        handle.state = suspended ? "suspended" : "running";
+        handle.state = "running";
         active.set(id, handle);
         channelSet(key).add(handle);
 
         const random = seededRandom(options.seed);
         const useReduced = reducedMotion && typeof definition.reducedCreate === "function";
         const create = useReduced ? definition.reducedCreate : definition.create;
+        const liveIntensity = Object.freeze({
+          valueOf: () => handle.intensity,
+          toString: () => String(handle.intensity),
+          [Symbol.toPrimitive]: () => handle.intensity
+        });
         try {
           handle._controller = create({
             context,
             layer,
             target,
             options,
-            intensity: handle.intensity,
+            intensity: liveIntensity,
             random,
             reducedMotion,
             createNode,
@@ -454,13 +516,12 @@
           group: "effects",
           priority: handle.priority,
           maxFps,
-          enabled: !suspended,
-          wake: !suspended
+          enabled: true,
+          wake: true
         });
         handle._runtime = runtimeHandle;
         runtimeHandles.add(runtimeHandle);
-        if (suspended) runtimeHandle.disable?.();
-        emit("started", { id, name, channel: handle.channel, intensity: handle.intensity });
+        emit("started", { id, name, channel: handle.channel, purpose: handle.purpose, intensity: handle.intensity, seed: handle.seed });
       };
 
       return handle;
@@ -470,15 +531,14 @@
       if (!handleOrId) return false;
       if (typeof handleOrId.cancel === "function") return handleOrId.cancel(reason);
       const id = String(handleOrId);
-      const live = active.get(id)
-        || [...queues.values()].flat().find(item => item.id === id);
+      const live = active.get(id) || [...queues.values()].flat().find(item => item.id === id);
       return live?.cancel?.(reason) || false;
     }
 
     function clear(filter = null) {
       const predicate = typeof filter === "function"
         ? filter
-        : handle => !filter || handle.channel === filter || handle.name === filter;
+        : handle => !filter || handle.channel === filter || handle.name === filter || handle.purpose === filter;
       const affected = new Set();
       clearing = true;
       try {
@@ -497,23 +557,27 @@
       } finally {
         clearing = false;
       }
-      affected.forEach(beginQueued);
+      if (!suspended) affected.forEach(beginQueued);
       return affected.size;
     }
 
     function applyProfile(next = {}, meta = {}) {
-      const intensity = Number.isFinite(Number(next.intensity))
-        ? clamp01(next.intensity)
-        : 1;
+      const intensity = Number.isFinite(Number(next.intensity)) ? clamp01(next.intensity) : profile.intensity;
       profile = Object.freeze({
-        enabled: next.enabled !== false,
-        ambient: Boolean(next.ambient),
-        interaction: Boolean(next.interaction),
+        enabled: next.enabled === undefined ? profile.enabled : next.enabled !== false,
+        ambient: next.ambient === undefined ? profile.ambient : Boolean(next.ambient),
+        interaction: next.interaction === undefined ? profile.interaction : Boolean(next.interaction),
         intensity,
-        application: meta.application || context.applications?.current?.() || null,
+        application: meta.application || context.applications?.current?.() || profile.application || null,
         reason: meta.reason || "profile"
       });
-      if (!profile.enabled) clear();
+
+      if (!profile.enabled) {
+        clear();
+      } else {
+        clear(handle => !purposeAllowed(handle.purpose));
+        [...active.values()].forEach(handle => handle.setIntensity(handle.localIntensity, "profile"));
+      }
       emit("profile", { profile, meta });
       return profile;
     }
@@ -521,8 +585,11 @@
     function suspend(reason = "host") {
       if (destroyed || suspended) return false;
       suspended = true;
-      active.forEach(handle => {
+      setVisible(false);
+      [...active.values()].forEach(handle => {
         handle.state = "suspended";
+        handle._claim?.release?.(`effect:suspend:${reason}`);
+        handle._claim = null;
         handle._runtime?.suspend?.();
         handle._controller?.suspend?.(reason);
       });
@@ -533,13 +600,43 @@
     function resume(reason = "host") {
       if (destroyed || !suspended) return false;
       suspended = false;
-      active.forEach(handle => {
+      [...active.values()].forEach(handle => {
+        if (handle._resolved) return;
+        if (!claimAuthorityForResume(handle, reason)) return;
         handle.state = "running";
         handle._controller?.resume?.(reason);
         handle._runtime?.reset?.(`effects-resume-reset:${reason}`);
         handle._runtime?.resume?.(`effects-resume:${reason}`);
       });
+      setVisible(true);
+      [...queues.keys()].forEach(beginQueued);
       emit("resume", { reason });
+      return true;
+    }
+
+    function claimAuthorityForResume(handle, reason) {
+      if (!purposeAllowed(handle.purpose)) {
+        handle.cancel(`profile-${handle.purpose}-disabled`);
+        return false;
+      }
+      const requested = handle.localIntensity * profile.intensity;
+      const directorEnvelope = context.director.envelope(handle.channel, { intensity: requested });
+      if (!directorEnvelope.allowed) {
+        handle.cancel(`director:${directorEnvelope.mode}`);
+        return false;
+      }
+      const claim = context.director.claim(handle.channel, {
+        priority: handle.priority,
+        intensity: requested,
+        exclusive: handle._exclusive
+      });
+      if (!claim?.granted) {
+        handle.cancel(claim?.reason || `resume-denied:${reason}`);
+        return false;
+      }
+      handle._claim = claim;
+      handle.intensity = claim.intensity;
+      handle._controller?.setIntensity?.(handle.intensity);
       return true;
     }
 
@@ -565,18 +662,14 @@
         reducedMotion = quality === "reduced" || Boolean(context.settings?.reducedMotion);
       }) || null;
       initialised = true;
-      emit("init", { effects: Object.freeze([...registry.keys()]) });
+      emit("init", { effects: Object.freeze([...registry.keys()]), registryLocked });
       return api;
     }
 
     async function destroy(reason = "host-destroy") {
       if (destroyed) return false;
       clearing = true;
-      try {
-        clear();
-      } finally {
-        clearing = false;
-      }
+      try { clear(); } finally { clearing = false; }
       [...runtimeHandles].forEach(handle => {
         try { handle.disable?.(); handle.unregister?.(); } catch (error) { console.error(error); }
       });
@@ -586,8 +679,6 @@
       listeners.clear();
       [...ownedNodes].forEach(removeOwned);
       ownedNodes.clear();
-      layer.classList.remove("ncn-effect-host-layer");
-      delete layer.dataset.effectsDepartment;
       initialised = false;
       suspended = true;
       destroyed = true;
@@ -599,20 +690,24 @@
     function snapshot() {
       return Object.freeze({
         department: "effects",
-        version: window.NCNEffectsDepartmentManifest?.version || "1.1.0-host",
+        version: window.NCNEffectsDepartmentManifest?.version || "1.1.1-host",
         initialised,
         suspended,
         destroyed,
         reducedMotion,
+        registryLocked,
         profile,
         registered: Object.freeze([...registry.keys()]),
         active: Object.freeze([...active.values()].map(handle => Object.freeze({
           id: handle.id,
           name: handle.name,
           channel: handle.channel,
+          purpose: handle.purpose,
           state: handle.state,
+          localIntensity: handle.localIntensity,
           intensity: handle.intensity,
-          priority: handle.priority
+          priority: handle.priority,
+          seed: handle.seed
         }))),
         queued: [...queues.values()].reduce((sum, queue) => sum + queue.length, 0),
         temporaryNodes: ownedNodes.size - (styleNode?.isConnected ? 1 : 0),
@@ -634,25 +729,35 @@
       cancel,
       clear,
       snapshot,
-      register,
       list: () => [...registry.keys()].map(name => {
         const definition = registry.get(name);
         return Object.freeze({
           name,
           channel: definition?.channel || "interface",
+          purpose: definition?.purpose || inferPurpose(definition?.channel || "interface"),
           cost: definition?.cost || "unknown",
           features: Object.freeze([...(definition?.features || [])])
         });
       }),
       names: () => Object.freeze([...registry.keys()]),
       subscribe(listener) {
+        if (typeof listener !== "function") throw new TypeError("Effects subscribers must be functions.");
         listeners.add(listener);
         return () => listeners.delete(listener);
       }
     });
 
-    const catalogueInstallers = window.NCNEffectsDepartmentCatalogues || [];
-    catalogueInstallers.forEach(install => install(api, Object.freeze({ envelope, ease, mix, clamp01 })));
+    const registrationApi = Object.freeze({ register: registerCanonical });
+    const catalogueInstallers = Object.freeze([...(window.NCNEffectsDepartmentCatalogues || [])]);
+    catalogueInstallers.forEach(install => install(registrationApi, Object.freeze({ envelope, ease, mix, clamp01 })));
+    const expectedNames = Object.freeze([...(window.NCNEffectsDepartmentEffectNames || [])]);
+    if (expectedNames.length) {
+      const registeredNames = [...registry.keys()];
+      const mismatch = registeredNames.length !== expectedNames.length
+        || expectedNames.some(name => !registry.has(name));
+      if (mismatch) throw new Error("Canonical effects registry does not match the published public-name list.");
+    }
+    registryLocked = true;
     return api;
   }
 
