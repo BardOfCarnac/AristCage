@@ -25,6 +25,16 @@ window.NCNIntegration = (() => {
   let profileListenersReady = false;
   let bootRunning = false;
 
+  function getService(name, options = {}) {
+    const key = String(name || "").trim();
+    if (!key) throw new TypeError("A service name is required.");
+    const service = modules?.get?.(key) || null;
+    if (!service && options.required === true) {
+      throw new Error(`Required integration service is unavailable: ${key}`);
+    }
+    return service;
+  }
+
   function context() {
     return Object.freeze({
       ...(host?.context?.() || {}),
@@ -81,7 +91,7 @@ window.NCNIntegration = (() => {
 
   function applyProfile(name, profile = {}, meta = {}) {
     const key = String(name || "").trim();
-    const service = modules?.get?.(key);
+    const service = getService(key);
     if (!service) return false;
 
     let result;
@@ -255,7 +265,7 @@ window.NCNIntegration = (() => {
     events?.emit?.(contract.EVENTS?.BOOT_START || "boot:start", { options });
 
     try {
-      const boot = modules?.get?.(contract.MODULES?.BOOT || "boot");
+      const boot = getService(contract.MODULES?.BOOT || "boot", { required: true });
       const result = typeof boot?.run === "function" ? await boot.run(options) : false;
       events?.emit?.(contract.EVENTS?.BOOT_COMPLETE || "boot:complete", { result });
       if (lifecycle?.current?.() === lifecycle?.STATES?.BOOTING) {
@@ -287,6 +297,8 @@ window.NCNIntegration = (() => {
   const api = Object.freeze({
     ensureCoreServices,
     installModule,
+    getService,
+    requireService: name => getService(name, { required: true }),
     applyProfile,
     syncApplicationProfile,
     runBoot,
