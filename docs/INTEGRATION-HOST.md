@@ -1,7 +1,8 @@
 # NCN Viewer Integration Host
 
-The production viewer now exposes a stable receiving shell for boot, weather,
-effects and chamber-rearrangement modules.
+The production viewer exposes a stable receiving shell for boot, weather,
+effects and chamber-rearrangement modules while preserving the established
+RedWire Optical renderer and Dripfeed application.
 
 ## Ownership
 
@@ -10,14 +11,51 @@ effects and chamber-rearrangement modules.
 - `NCNEvents` carries module-to-module messages.
 - `NCNScene` provides named DOM and projection surfaces.
 - `NCNOptical` protects the established Optical renderer behind a narrow adapter.
+- `NCNDripfeed` protects the established tile wall and reader behind a narrow adapter.
 - `NCNModules` owns module initialisation, suspension, reset and destruction.
 - `NCNViewerHost` composes these services into the context supplied to modules.
+
+Neither application renderer is a general-purpose environmental surface. Incoming
+modules must use terminal-owned environment layers and the view adapters.
+
+## Module context
+
+A factory registered through `NCNViewerHost.registerModule()` receives:
+
+```js
+{
+  runtime,
+  lifecycle,
+  events,
+  scene,
+  layers,
+  views,
+  optical,
+  dripfeed,
+  applications,
+  environment,
+  settings
+}
+```
+
+Useful dynamic values include:
+
+```js
+context.settings.reducedMotion;
+context.settings.quality;
+context.layers.weather;       // { far, rear, middle, near }
+context.layers.chamberMotion;
+context.layers.effects;
+context.views.getReadingZone();
+context.views.getControlZones();
+context.views.getDepthPlaneDefinitions();
+```
 
 ## Registering an incoming module
 
 ```js
 NCNViewerHost.registerModule("weather-v2", context => {
-  const layer = context.scene.require("environment:weather-mid");
+  const weatherLayers = context.layers.weather;
   const task = context.runtime.register("weather-v2:update", update, {
     group: "environment",
     maxFps: 20,
@@ -34,13 +72,20 @@ NCNViewerHost.registerModule("weather-v2", context => {
     suspend() { task.suspend(); },
     resume() { task.resume(); },
     reset() { task.reset(); },
-    destroy() { task.unregister(); layer.replaceChildren(); }
+    destroy() {
+      task.unregister();
+      Object.values(weatherLayers).forEach(layer => layer.replaceChildren());
+    }
   };
 });
 ```
 
-Modules must not query into the Optical renderer, replace chamber roots or create
-permanent private `requestAnimationFrame` loops.
+Lifecycle methods are optional, but any exposed `init`, `suspend`, `resume`,
+`reset` or `destroy` property must be a function. Active modules must be destroyed
+before replacement. Circular module dependencies are rejected.
+
+Modules must not query into the Optical or Dripfeed renderers, replace chamber
+roots or create permanent private `requestAnimationFrame` loops.
 
 ## Named scene surfaces
 
@@ -53,22 +98,41 @@ permanent private `requestAnimationFrame` loops.
 - `optical`
 - `environment`
 - `environment:weather-far`
-- `environment:weather-mid`
+- `environment:weather-rear`
+- `environment:weather-middle`
 - `environment:weather-near`
 - `environment:chamber-motion`
 - `environment:effects`
+- `weather:far`
+- `weather:rear`
+- `weather:middle`
+- `weather:near`
 
-## Host verification
+`weather-mid` and `mid` remain accepted aliases for `weather-middle`, but new
+modules should publish against `far`, `rear`, `middle` and `near`.
+
+## Passive verification
 
 Use the browser console:
+
+```js
+NCNViewerHost.verify();
+```
+
+This confirms that the shared services, protected application boundaries, named
+layers, module states and active application roots are coherent without changing
+viewer state.
+
+## Lifecycle smoke test
 
 ```js
 NCNViewerHost.snapshot();
 await NCNViewerHost.suspend("manual-test");
 await NCNViewerHost.resume("manual-test");
 await NCNViewerHost.reset("manual-test");
-NCNViewerHost.snapshot();
+NCNViewerHost.verify({ throwOnFailure: true });
 ```
 
 A successful reset returns the current application to its active environment
-profile, leaves one runtime scheduler, and preserves the Optical composition.
+profile, leaves one runtime scheduler, and preserves both protected application
+compositions.
