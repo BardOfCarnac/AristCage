@@ -14,8 +14,15 @@ window.NCNIntegration = (() => {
   const director = window.NCNVisualDirector;
   const intake = window.NCNModuleIntake;
 
+  const PROFILE_MODULES = Object.freeze([
+    contract.MODULES?.WEATHER || "weather",
+    contract.MODULES?.EFFECTS || "effects",
+    contract.MODULES?.CHAMBER_MOTION || "chamber-motion"
+  ]);
+
   let servicesReady = false;
   let servicesPromise = null;
+  let profileListenersReady = false;
   let bootRunning = false;
 
   function context() {
@@ -66,6 +73,90 @@ window.NCNIntegration = (() => {
     });
   }
 
+  function observeResult(result, label) {
+    if (result && typeof result.then === "function") {
+      void result.catch(error => console.error(`[NCN integration] ${label} failed`, error));
+    }
+  }
+
+  function applyProfile(name, profile = {}, meta = {}) {
+    const key = String(name || "").trim();
+    const service = modules?.get?.(key);
+    if (!service) return false;
+
+    let result;
+    let method = null;
+    if (typeof service.applyProfile === "function") {
+      method = "applyProfile";
+      result = service.applyProfile(profile, meta);
+    } else if (typeof service.configure === "function") {
+      method = "configure";
+      result = service.configure(profile, meta);
+    } else if (typeof service.setProfile === "function") {
+      method = "setProfile";
+      result = service.setProfile(profile, meta);
+    } else if (typeof service.setWeather === "function") {
+      method = "setWeather";
+      result = service.setWeather(profile, meta);
+    } else if (key === (contract.MODULES?.WEATHER || "weather")
+      && (service.setPreset || service.setIntensity || service.setEnabled)) {
+      method = "weather-controls";
+      service.setEnabled?.(profile.enabled !== false);
+      const preset = profile.preset
+        || (profile.enabled === false ? "clear" : Number(profile.mist) > 0 ? "mist" : "clear");
+      service.setPreset?.(preset);
+      service.setIntensity?.(Number.isFinite(profile.intensity) ? profile.intensity : Number(profile.mist) || 0);
+      if (Number.isFinite(profile.wind)) service.setWind?.({ x: profile.wind, y: 0, z: 0 });
+    } else if (key === (contract.MODULES?.CHAMBER_MOTION || "chamber-motion")
+      && typeof service.setEnabled === "function") {
+      method = "setEnabled";
+      result = service.setEnabled(profile.enabled !== false);
+    }
+
+    if (!method) return false;
+    observeResult(result, `${key}.${method}`);
+    events?.emit?.("integration:profile-applied", { name: key, profile, method, meta });
+    return true;
+  }
+
+  function currentApplicationName() {
+    return window.NCNApplications?.current?.()
+      || (typeof NCN_STATE !== "undefined" ? NCN_STATE.activeApp : "redwire")
+      || "redwire";
+  }
+
+  function profileFor(name, applicationProfile) {
+    if (name === (contract.MODULES?.WEATHER || "weather")) return applicationProfile?.weather;
+    if (name === (contract.MODULES?.EFFECTS || "effects")) return applicationProfile?.effects;
+    if (name === (contract.MODULES?.CHAMBER_MOTION || "chamber-motion")) return applicationProfile?.chamberMotion;
+    return null;
+  }
+
+  function syncApplicationProfile(reason = "integration-sync", onlyName = null) {
+    const application = currentApplicationName();
+    const applicationProfile = window.NCNEnvironment?.profile?.(application);
+    if (!applicationProfile) return Object.freeze({ application, applied: [] });
+
+    const names = onlyName ? [onlyName] : PROFILE_MODULES;
+    const applied = names.filter(name => {
+      const profile = profileFor(name, applicationProfile);
+      return profile ? applyProfile(name, profile, { application, reason }) : false;
+    });
+    return Object.freeze({ application, applied: Object.freeze(applied) });
+  }
+
+  function registerProfileListeners() {
+    if (profileListenersReady) return;
+    profileListenersReady = true;
+    events?.on?.(contract.EVENTS?.APPLICATION_CHANGE || "application:change", payload => {
+      const name = payload?.detail?.name || currentApplicationName();
+      window.setTimeout(() => syncApplicationProfile(`application:${name}`), 0);
+    });
+    events?.on?.(contract.EVENTS?.HOST_RESET || "host:reset", () => {
+      window.setTimeout(() => syncApplicationProfile("host-reset"), 0);
+    });
+  }
+
   async function initialiseCoreServices() {
     if (!host?.isReady?.()) await host?.init?.();
 
@@ -91,6 +182,7 @@ window.NCNIntegration = (() => {
       await handle.init();
     }
 
+    registerProfileListeners();
     servicesReady = true;
     events?.emit?.("integration:ready", snapshot());
     return snapshot();
@@ -140,6 +232,7 @@ window.NCNIntegration = (() => {
       await handle.suspend("installed-while-suspended");
     }
 
+    if (PROFILE_MODULES.includes(key)) syncApplicationProfile("module-installed", key);
     events?.emit?.("integration:module-installed", {
       name: key,
       manifest: options.manifest || null,
@@ -194,6 +287,8 @@ window.NCNIntegration = (() => {
   const api = Object.freeze({
     ensureCoreServices,
     installModule,
+    applyProfile,
+    syncApplicationProfile,
     runBoot,
     context,
     snapshot,
