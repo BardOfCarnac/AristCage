@@ -1,116 +1,139 @@
-# NCN Effects Department — Host Publication
+# NCN Effects Department Publication
 
 ## Status
 
-This is a compatible departmental publication for the replaceable `effects` slot on `agent/prepare-module-host` / PR 86. It is not installed into the production page and does not replace the incumbent adapter by itself.
+This package is a departmental candidate for the replaceable `effects` slot in the PR 86 integration host. It is not installed by the publication itself and does not alter production script loading.
 
-The integration agent should inspect and stage it through `NCNModuleIntake`.
-
-## Publication files
-
-```text
-js/departments/effects/effects-manifest.js
-js/departments/effects/effects-public-names.js
-js/departments/effects/effects-catalogue-signal.js
-js/departments/effects/effects-catalogue-fault.js
-js/departments/effects/effects-catalogue-environment.js
-js/departments/effects/effects-module.js
-tests/effects-department-host.html
-tests/effects-department-host.js
-```
-
-Load the manifest and catalogue files before constructing the factory. The files only publish metadata, definitions and the factory; they do not install the module or start visible work.
-
-## Factory and manifest
+Factory:
 
 ```js
-const report = NCNModuleIntake.inspect(
-  "effects",
-  createNCNEffectsDepartment,
-  NCNEffectsDepartmentManifest
-);
-
-console.table(report.checks);
-console.table(report.errors);
+createNCNEffectsDepartment(context)
 ```
 
-The manifest declares:
-
-- integration API version `1`;
-- replacement slot `effects`;
-- dependency `visual-director`;
-- writable layer `environment:effects` only;
-- runtime group `effects`;
-- channels `boot`, `interface`, `article`, `environment`, `chamber`, `fault`;
-- shared-runtime animation ownership;
-- reduced-motion and deterministic-test support;
-- no protected roots.
-
-## Required interface
-
-The factory returns:
+Manifest:
 
 ```js
-{
-  init(),
-  applyProfile(profile, meta),
-  suspend(),
-  resume(),
-  reset(),
-  destroy(),
-
-  play(name, target, options),
-  cancel(handleOrId, reason),
-  clear(filter),
-  snapshot()
-}
+NCNEffectsDepartmentManifest
 ```
 
-Additional inspection helpers are `list()`, `names()`, `register()` and `subscribe()`.
+The integration agent performs intake and staged replacement.
+
+## Ownership
+
+The department owns:
+
+- the locked canonical effect registry;
+- temporary effect nodes inside `environment:effects`;
+- temporary tasks registered in shared runtime group `effects`;
+- effect handles, queues, cancellation and cleanup;
+- one temporary stylesheet containing rules for module-created children.
+
+It does not own or restyle the `environment:effects` layer itself. The host retains all layer positioning, sizing, containment and z-index. The module does not add classes, datasets or inline styles to that host-owned layer.
+
+It does not modify RedWire, Dripfeed, Optical or chamber structures. Source targets are measured and, where needed, cloned into the effects layer. They are not wrapped, classed or styled by the module.
+
+## Public lifecycle API
+
+```js
+init()
+applyProfile(profile, meta)
+suspend()
+resume()
+reset()
+destroy()
+```
+
+## Public playback API
+
+```js
+play(name, target, options)
+cancel(handleOrId, reason)
+clear(filter)
+snapshot()
+```
+
+Additional read-only helpers are `list()`, `names()` and `subscribe(listener)`. Canonical registration is private. The returned dependency service does not expose `register()`.
 
 ## Public effect names
 
-1. `glow-pulse`
-2. `flicker`
-3. `relay-scan`
-4. `heat-resolve`
-5. `signal-collapse`
-6. `displacement`
-7. `channel-separation`
-8. `static-burst`
-9. `light-flash`
-10. `blur-interference`
-11. `particle-emission`
-12. `electrical-disturbance`
-13. `signal-fault`
+- `glow-pulse`
+- `flicker`
+- `relay-scan`
+- `heat-resolve`
+- `signal-collapse`
+- `displacement`
+- `channel-separation`
+- `static-burst`
+- `light-flash`
+- `blur-interference`
+- `particle-emission`
+- `electrical-disturbance`
+- `signal-fault`
 
-Effects are registered by name, finite, cancellable and deterministic when supplied the same seed.
+The catalogue is installed while the factory constructs the module, duplicate names are rejected, and the registry is locked before the instance is returned.
 
-## Target contract
+## Request purpose and application policy
 
-`play()` accepts a DOM element or an adapter:
+Every playback request has one of three purposes:
 
-```js
-{
-  kind: "article",
-  id: "story-42",
-  getElement() {},
-  getBounds() {},
-  isValid() {}
-}
+```text
+ambient
+interaction
+required
 ```
 
-The module may read target geometry and clone the target for a temporary projection. It does not add classes, styles or wrappers to the source target. Every visible node is appended to `context.layers.effects`.
+A purpose can be passed explicitly:
+
+```js
+const handle = effects.play("signal-fault", target, {
+  purpose: "ambient",
+  channel: "fault",
+  intensity: 0.45,
+  duration: 600,
+  seed: 2045
+});
+```
+
+When omitted, purpose is inferred from the channel:
+
+- `boot` becomes `required`;
+- `interface` and `article` become `interaction`;
+- `environment`, `chamber` and `fault` become `ambient`.
+
+`applyProfile(profile, meta)` enforces the current application policy:
+
+```js
+applyProfile({
+  enabled: true,
+  ambient: false,
+  interaction: false,
+  intensity: 0.8
+}, {
+  application: "dripfeed",
+  reason: "application-switch"
+});
+```
+
+Disallowed active and queued work is cleared. New disallowed work returns an ignored handle without creating a director claim, runtime task or node. `required` work remains available while the module is enabled.
+
+Changing profile intensity attenuates active permitted effects through their live intensity source.
 
 ## Visual director
 
-Playback first requests an envelope for the selected channel, then requests a director claim. Denied or zero-authority effects resolve as `ignored` without creating nodes or runtime tasks.
+Every started effect requests both:
 
-The external caller still chooses narrative timing, priority, concurrency and requested intensity. The Effects Department only enforces the technical request.
+```js
+context.director.envelope(channel, { intensity })
+context.director.claim(channel, { intensity, priority, exclusive })
+```
+
+The effective intensity comes from the granted claim. A live effect releases and reacquires its claim when its requested intensity changes. Merge requests therefore strengthen compatible active effects only when the director grants the new authority.
+
+All claims are released on completion, cancellation, profile rejection, suspension, reset and destruction.
 
 ## Concurrency
 
-Concurrency is scoped to target and channel:
+Concurrency is scoped to target and visual channel:
 
 - `stack`
 - `replace`
@@ -118,74 +141,81 @@ Concurrency is scoped to target and channel:
 - `queue`
 - `merge`
 
-Each call returns a handle with `finished`, `cancel()` and `setIntensity()`.
+`merge` applies only to an active effect with the same public name. The existing handle is returned and its live intensity is updated. Incompatible merge requests are ignored rather than mutating another effect type.
+
+## Suspension
+
+Suspension:
+
+- hides every active module-created visual node;
+- releases active visual-director claims;
+- suspends shared-runtime tasks;
+- invokes controller suspension hooks;
+- rejects new playback without creating nodes, claims or tasks.
+
+Resume reacquires authority, restores visibility and resumes tasks without an accumulated frame jump. Effects denied by the current profile or director are cancelled cleanly rather than reappearing without authority.
 
 ## Reduced motion
 
-Reduced motion is derived from the shared runtime quality setting and never starts a private media-query listener.
+Reduced motion is taken from the host runtime quality state. The department adds no private media-query listener.
 
-Substitutions include:
-
-- static or short glow instead of repeated displacement;
-- a fixed scan band instead of a travelling scan;
-- crossfade instead of spatial collapse;
-- restrained channel tint instead of animated channel separation;
-- fewer fixed particles instead of moving emissions;
-- one electrical flash instead of a repeatedly regenerated arc;
-- a restrained signal frame instead of a composite fault sequence.
-
-The caller uses the same public effect name in both modes.
+Substitutes preserve visual identity through restrained glow, crossfade, static interference, reduced particles and restrained electrical response. The caller uses the same public effect name.
 
 ## Deterministic testing
 
-All visual randomness uses a local seeded generator. Effect implementations do not use `Math.random()`.
+All variation uses a local seeded generator. Catalogue implementations do not call `Math.random()`.
 
-Supplying the same effect, target identity, options and seed produces the same random sequence. The host test publishes a temporary `deterministic-probe` effect to compare seeded results.
+The same effect, target geometry, frame sequence, options and seed produce the same visual sequence. The deterministic Node harness compares the actual generated style outcome of repeated seeded playback.
 
 ## Cleanup guarantees
 
-Normal completion, cancellation, replacement, queue clearing, reset and destruction all:
+Every terminal path removes or releases:
 
-- release visual-director claims;
-- disable and unregister shared-runtime tasks;
-- remove temporary clones, overlays, particles, SVG paths and the owned stylesheet;
-- remove the module class and dataset marker from `environment:effects`;
-- clear module listeners;
-- release lifecycle locks owned by the department;
-- leave protected RedWire, Dripfeed and chamber structures unchanged.
+- visual-director claims;
+- shared-runtime tasks;
+- temporary overlays and clones;
+- particles and generated SVG paths;
+- the module stylesheet;
+- runtime and public subscriptions;
+- department-owned lifecycle locks.
 
-The host-scoped department context also performs defensive cleanup of registered tasks, event subscriptions, locks and director claims if installation fails or the context is released.
+`destroy()` leaves `environment:effects` empty while preserving the host layer’s own class, dataset and inline style state.
 
-`snapshot()` reports active handles, queued effects, temporary node count, runtime task count, listener count and layer ownership for inspection.
+`snapshot()` reports:
 
-## Profile behaviour
+- lifecycle state;
+- locked-registry state;
+- current profile;
+- registered public names;
+- active and queued effects;
+- purpose, intensity and seed for active handles;
+- temporary-node count;
+- runtime-task count;
+- listener count;
+- layer connectivity.
 
-`applyProfile(profile, meta)` accepts the application profile routed by PR 86.
+## Verification
 
-Supported values:
+Local deterministic verification:
 
-```js
-{
-  enabled: true,
-  ambient: true,
-  interaction: true,
-  intensity: 0.75
-}
+```bash
+node tests/effects-department-node.js
 ```
 
-The profile does not schedule effects. It only enables the department and scales later requests. Setting `enabled: false` clears active and queued work.
+The harness covers:
 
-## Staged installation
+- host-layer ownership;
+- canonical registry locking;
+- named playback and cancellation;
+- replay and queue cleanup;
+- suspension visibility and claim release;
+- playback rejection while suspended;
+- application-profile enforcement;
+- required-purpose bypass of ambient and interaction suppression;
+- live merge strengthening and active attenuation;
+- reduced-motion substitution;
+- seeded visual determinism;
+- clear and destroy cleanup;
+- untouched source and host elements.
 
-The integration agent may install it with:
-
-```js
-await NCNModuleIntake.install(
-  "effects",
-  createNCNEffectsDepartment,
-  NCNEffectsDepartmentManifest,
-  { replace: true }
-);
-```
-
-This publication deliberately stops before that staged installation.
+The integration workflow syntax-checks every publication JavaScript file and executes the deterministic cleanup harness. The integration agent still owns intake, staged installation and the protected RedWire/Dripfeed browser round trip.
