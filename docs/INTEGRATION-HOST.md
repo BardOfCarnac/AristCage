@@ -17,7 +17,7 @@ RedWire Optical renderer and Dripfeed application.
 - `NCNIntegrationContract` freezes the names departments publish against.
 - `NCNVisualDirector` arbitrates visual intensity without rendering anything.
 - `NCNModuleIntake` checks departmental ownership before installation.
-- `NCNIntegration` supplies incoming departments with the extended context.
+- `NCNIntegration` supplies incoming departments with the extended context and service registry.
 - `NCNIntegrationHarness` performs repeatable browser verification.
 
 Neither application renderer is a general-purpose environmental surface. Incoming
@@ -59,7 +59,12 @@ context.views.getReadingZone();
 context.views.getControlZones();
 context.views.getDepthPlaneDefinitions();
 context.director.envelope("environment");
+context.integration.requireService("effects");
 ```
+
+Declared dependencies are initialised before the dependant factory runs. A module
+obtains them through `context.integration.getService(name)` or
+`context.integration.requireService(name)`, never by reaching into globals.
 
 Reading and control zones use the same descriptor shape:
 
@@ -101,7 +106,9 @@ const weatherManifest = {
   layers: ["weather:far", "weather:rear", "weather:middle", "weather:near"],
   visualChannels: ["environment", "fault"],
   runtimeGroups: ["environment"],
-  capabilities: ["suspend", "resume", "reset", "destroy"],
+  capabilities: [
+    "init", "suspend", "resume", "reset", "destroy", "applyProfile"
+  ],
   owns: ["weather canvases", "particle pools"],
   protectedRoots: [],
   animationLoop: "shared-runtime",
@@ -118,6 +125,8 @@ changing the viewer. It rejects:
 - permanent private animation loops;
 - unknown visual channels;
 - missing managed lifecycle controls;
+- missing application-profile entry points for environmental departments;
+- a boot publication without `run(options)`;
 - self-dependencies;
 - incompatible contract versions.
 
@@ -144,6 +153,24 @@ dependants suspend, reset and destroy first.
 The current compatibility adapters remain named `weather`, `effects` and
 `chamber-motion`. A departmental publication replaces the matching slot rather
 than adding a competing renderer beside it.
+
+## Application profiles
+
+RedWire and Dripfeed continue to define their own environment profiles. The
+integration profile router sends the active application's policy to the installed
+`weather`, `effects` and `chamber-motion` slots through one of these supported
+entry points:
+
+```text
+applyProfile(profile, meta)
+configure(profile, meta)
+setProfile(profile, meta)
+setWeather(profile, meta)
+```
+
+Weather and chamber modules with the earlier granular APIs are adapted where
+possible. A newly installed replacement receives the current application profile
+immediately, and profiles are reapplied after application changes and host reset.
 
 ## Visual director
 
@@ -184,7 +211,8 @@ const grant = context.director.claim("fault", {
 });
 
 if (grant.granted) {
-  context.effects?.play?.("electrical-flash", target, {
+  const effects = context.integration.requireService("effects");
+  effects.play?.("electrical-flash", target, {
     intensity: grant.intensity
   });
 }
@@ -199,10 +227,11 @@ motion also lowers non-interface visual authority.
 The host reserves the module name `boot`. Until a boot department publication is
 installed, the slot is a no-op adapter.
 
-A boot module should expose the managed lifecycle methods plus:
+A boot factory receives the integration context and returns the managed lifecycle
+methods plus:
 
 ```js
-run(context, options)
+run(options)
 ```
 
 The integration coordinator provides:
