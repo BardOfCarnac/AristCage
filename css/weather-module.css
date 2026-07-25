@@ -1,0 +1,51 @@
+/*==================================================
+  NCN WEATHER MODULE LAYERS
+==================================================*/
+.ncn-environment-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ncn-environment-layer-far { z-index: 0; }
+.ncn-environment-layer-rear { z-index: 1; }
+.ncn-environment-layer-middle { z-index: 2; }
+.ncn-environment-layer-near { z-index: 3; }
+
+.ncn-weather-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  contain: strict;
+}
+
+.ncn-weather-canvas-far,
+.ncn-weather-canvas-rear {
+  opacity: .92;
+}
+
+.ncn-weather-canvas-middle { opacity: .88; }
+.ncn-weather-canvas-near { opacity: .72; }
+
+html[data-viewer-state="realigning"] .ncn-weather-canvas {
+  opacity: .22;
+}
+
+html[data-viewer-state="interacting"] .ncn-weather-canvas {
+  opacity: .58;
+}
+
+html[data-weather-emergency="clear"] .ncn-weather-canvas {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ncn-weather-canvas-middle,
+  .ncn-weather-canvas-near {
+    opacity: .35;
+  }
+}
