@@ -11,32 +11,39 @@ window.NCNEnvironment = (() => {
 
   const profiles = Object.freeze({
     redwire: Object.freeze({
-      name: "redwire",
-      chamber: "background",
-      renderer: "optical",
-      weather: Object.freeze({ enabled: true, mist: 0.42, wind: 0.16 }),
+      name: 'redwire',
+      chamber: 'background',
+      renderer: 'optical',
+      weather: Object.freeze({
+        enabled: true,
+        preset: 'mist',
+        intensity: 0.42,
+        wind: Object.freeze({ x: 0.08, y: 0, z: -0.035 }),
+        quality: 'auto',
+        seed: 2045
+      }),
       effects: Object.freeze({ ambient: true, interaction: true }),
       chamberMotion: Object.freeze({ enabled: true })
     }),
     dripfeed: Object.freeze({
-      name: "dripfeed",
-      chamber: "background",
-      renderer: "application",
-      weather: Object.freeze({ enabled: false, mist: 0, wind: 0 }),
+      name: 'dripfeed',
+      chamber: 'background',
+      renderer: 'application',
+      weather: Object.freeze({ enabled: false, preset: 'clear', intensity: 0, wind: Object.freeze({ x: 0, y: 0, z: 0 }) }),
       effects: Object.freeze({ ambient: false, interaction: false }),
       chamberMotion: Object.freeze({ enabled: false })
     })
   });
 
-  let activeProfile = "empty";
+  let activeProfile = 'empty';
   let diagnosticsObserver = null;
 
   function profile(name) {
     return profiles[name] || Object.freeze({
-      name: String(name || "empty"),
-      chamber: "background",
-      renderer: "application",
-      weather: Object.freeze({ enabled: false, mist: 0, wind: 0 }),
+      name: String(name || 'empty'),
+      chamber: 'background',
+      renderer: 'application',
+      weather: Object.freeze({ enabled: false, preset: 'clear', intensity: 0, wind: Object.freeze({ x: 0, y: 0, z: 0 }) }),
       effects: Object.freeze({ ambient: false, interaction: false }),
       chamberMotion: Object.freeze({ enabled: false })
     });
@@ -45,9 +52,7 @@ window.NCNEnvironment = (() => {
   function announceChamberGeometry() {
     const camera = window.NCNChamberCamera?.snapshot?.();
     if (!camera) return;
-    window.dispatchEvent(new CustomEvent("ncn:chamber-camera-change", {
-      detail: camera
-    }));
+    window.dispatchEvent(new CustomEvent('ncn:chamber-camera-change', { detail: camera }));
   }
 
   function ensureNeutralChamber() {
@@ -78,21 +83,21 @@ window.NCNEnvironment = (() => {
     window.NCNEffects?.setProfile?.({ ambient: false, interaction: false });
     window.OpticalProjection?.disable?.({ persist: false });
     window.HeuristicRangefinder?.disable?.({ persist: false });
-    activeProfile = "empty";
-    document.documentElement.dataset.environmentProfile = "empty";
+    activeProfile = 'empty';
+    document.documentElement.dataset.environmentProfile = 'empty';
     updateDiagnostics();
   }
 
   async function prepareApplication(nextName, options = {}) {
     ensureNeutralChamber();
     disablePresentation();
-    window.dispatchEvent(new CustomEvent("ncn:application-environment-phase", {
-      detail: { phase: "empty", previous: options.previous || null, next: nextName }
+    window.dispatchEvent(new CustomEvent('ncn:application-environment-phase', {
+      detail: { phase: 'empty', previous: options.previous || null, next: nextName }
     }));
 
     if (options.animate === false) return false;
     return window.NCNRealignment?.run?.(
-      `application:${options.previous || "unknown"}->${nextName}`,
+      `application:${options.previous || 'unknown'}->${nextName}`,
       { magnitude: Number(options.magnitude) || 1.08 }
     ) || false;
   }
@@ -101,11 +106,8 @@ window.NCNEnvironment = (() => {
     const next = profile(name);
     ensureNeutralChamber();
 
-    if (next.renderer === "optical") {
-      window.OpticalProjection?.enable?.({ persist: false });
-    } else {
-      window.OpticalProjection?.disable?.({ persist: false });
-    }
+    if (next.renderer === 'optical') window.OpticalProjection?.enable?.({ persist: false });
+    else window.OpticalProjection?.disable?.({ persist: false });
 
     window.NCNWeatherRenderer?.configure?.(next.weather);
     window.NCNChamberMotion?.configure?.(next.chamberMotion);
@@ -114,15 +116,15 @@ window.NCNEnvironment = (() => {
     activeProfile = next.name;
     document.documentElement.dataset.environmentProfile = next.name;
     lifecycle?.transition?.(lifecycle.STATES.READY, {
-      reason: options.initial ? "initial-application-profile" : "application-profile-ready",
+      reason: options.initial ? 'initial-application-profile' : 'application-profile-ready',
       application: next.name,
       force: true
     });
     window.OpticalProjection?.refresh?.();
     window.LayeredChamber?.refresh?.();
     requestAnimationFrame(announceChamberGeometry);
-    window.dispatchEvent(new CustomEvent("ncn:application-environment-phase", {
-      detail: { phase: "active", previous: options.previous || null, next: next.name }
+    window.dispatchEvent(new CustomEvent('ncn:application-environment-phase', {
+      detail: { phase: 'active', previous: options.previous || null, next: next.name }
     }));
     updateDiagnostics();
     return true;
@@ -135,7 +137,8 @@ window.NCNEnvironment = (() => {
         <div class="diagnostics-app-switch" role="group" aria-label="Environment tests">
           <button type="button" data-debug-environment="realign">Realign</button>
           <button type="button" data-debug-environment="block">Move block</button>
-          <button type="button" data-debug-environment="mist">Mist</button>
+          <button type="button" data-debug-environment="weather">Weather</button>
+          <button type="button" data-debug-environment="electrical">Electrical</button>
         </div>
         <div class="diagnostics-app-readout">
           Profile: <strong data-debug-environment-profile>EMPTY</strong> ·
@@ -145,31 +148,34 @@ window.NCNEnvironment = (() => {
   }
 
   function updateDiagnostics() {
-    const panel = document.querySelector(".diagnostics-panel");
+    const panel = document.querySelector('.diagnostics-panel');
     if (!panel) return;
-    const environment = panel.querySelector("[data-debug-environment-profile]");
-    const viewerState = panel.querySelector("[data-debug-viewer-state]");
+    const environment = panel.querySelector('[data-debug-environment-profile]');
+    const viewerState = panel.querySelector('[data-debug-viewer-state]');
     if (environment) environment.textContent = String(activeProfile).toUpperCase();
-    if (viewerState) viewerState.textContent = String(lifecycle?.current?.() || "ready").toUpperCase();
+    if (viewerState) viewerState.textContent = String(lifecycle?.current?.() || 'ready').toUpperCase();
   }
 
   function attachDiagnostics() {
-    const panel = document.querySelector(".diagnostics-panel");
-    if (!panel || panel.querySelector(".diagnostics-environment-section")) return;
-    panel.querySelector(".diagnostics-title")?.insertAdjacentHTML("afterend", diagnosticMarkup());
-    panel.querySelector('[data-debug-environment="realign"]')?.addEventListener("click", () => {
-      void window.NCNRealignment?.run?.("diagnostics", { force: true });
+    const panel = document.querySelector('.diagnostics-panel');
+    if (!panel || panel.querySelector('.diagnostics-environment-section')) return;
+    panel.querySelector('.diagnostics-title')?.insertAdjacentHTML('afterend', diagnosticMarkup());
+    panel.querySelector('[data-debug-environment="realign"]')?.addEventListener('click', () => {
+      void window.NCNRealignment?.run?.('diagnostics', { force: true });
     });
-    panel.querySelector('[data-debug-environment="block"]')?.addEventListener("click", () => {
+    panel.querySelector('[data-debug-environment="block"]')?.addEventListener('click', () => {
       window.NCNChamberMotion?.move?.({ force: true, duration: 2200 });
     });
-    panel.querySelector('[data-debug-environment="mist"]')?.addEventListener("click", () => {
-      const current = window.NCNWeatherRenderer?.snapshot?.();
-      window.NCNWeatherRenderer?.setWeather?.({
-        enabled: !current?.enabled,
-        mist: current?.enabled ? 0 : 0.42,
-        wind: 0.16
-      });
+    panel.querySelector('[data-debug-environment="weather"]')?.addEventListener('click', () => {
+      const current = window.NCNWeatherRenderer?.snapshot?.()?.desired;
+      const next = current?.preset === 'mist' ? 'rain' : current?.preset === 'rain' ? 'clear' : 'mist';
+      window.NCNWeatherRenderer?.transitionTo?.(next, { duration: 1800 });
+      window.NCNWeatherRenderer?.setIntensity?.(next === 'clear' ? 0 : next === 'rain' ? 0.58 : 0.42);
+    });
+    panel.querySelector('[data-debug-environment="electrical"]')?.addEventListener('click', () => {
+      window.NCNWeatherRenderer?.setPreset?.('electrical-weather');
+      window.NCNWeatherRenderer?.setIntensity?.(0.55);
+      window.NCNWeatherRenderer?.requestElectricalPulse?.(0.55);
     });
     updateDiagnostics();
   }
@@ -177,28 +183,23 @@ window.NCNEnvironment = (() => {
   function init() {
     ensureNeutralChamber();
     const initial = window.NCNApplications?.current?.()
-      || (typeof NCN_STATE !== "undefined" ? NCN_STATE.activeApp : "redwire");
+      || (typeof NCN_STATE !== 'undefined' ? NCN_STATE.activeApp : 'redwire');
     activateApplication(initial, { initial: true });
 
     diagnosticsObserver = new MutationObserver(attachDiagnostics);
     diagnosticsObserver.observe(document.body, { childList: true, subtree: true });
     attachDiagnostics();
 
-    window.addEventListener("ncn:lifecycle-change", updateDiagnostics);
-    window.addEventListener("ncn:application-change", event => {
+    window.addEventListener('ncn:lifecycle-change', updateDiagnostics);
+    window.addEventListener('ncn:application-change', event => {
       if (event.detail?.environmentHandled !== true) {
-        activateApplication(event.detail?.name || "redwire", {
-          previous: event.detail?.previous || null
-        });
+        activateApplication(event.detail?.name || 'redwire', { previous: event.detail?.previous || null });
       }
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
-  } else {
-    init();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  else init();
 
   return Object.freeze({
     profiles: () => Object.values(profiles).map(item => ({ ...item })),
