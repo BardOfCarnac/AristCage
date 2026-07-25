@@ -51,6 +51,15 @@ context.views.getControlZones();
 context.views.getDepthPlaneDefinitions();
 ```
 
+Reading and control zones use the same shape:
+
+```js
+{
+  element,
+  rect: { left, top, right, bottom, width, height }
+}
+```
+
 ## Registering an incoming module
 
 ```js
@@ -83,6 +92,9 @@ NCNViewerHost.registerModule("weather-v2", context => {
 Lifecycle methods are optional, but any exposed `init`, `suspend`, `resume`,
 `reset` or `destroy` property must be a function. Active modules must be destroyed
 before replacement. Circular module dependencies are rejected.
+
+Dependency order governs the whole lifecycle: dependencies initialise and resume
+first; dependants suspend, reset and destroy first.
 
 Modules must not query into the Optical or Dripfeed renderers, replace chamber
 roots or create permanent private `requestAnimationFrame` loops.
