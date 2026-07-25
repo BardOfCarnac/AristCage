@@ -9,7 +9,14 @@ window.NCNModuleIntake = (() => {
   const contract = window.NCNIntegrationContract || {};
   const history = [];
 
-  const MANAGED_CAPABILITIES = Object.freeze(["suspend", "resume", "reset", "destroy"]);
+  const MANAGED_CAPABILITIES = Object.freeze(["init", "suspend", "resume", "reset", "destroy"]);
+  const PROFILE_CAPABILITIES = Object.freeze(["applyProfile", "configure", "setProfile", "setWeather", "setEnabled"]);
+  const KNOWN_CAPABILITIES = Object.freeze([...new Set([
+    ...MANAGED_CAPABILITIES,
+    ...PROFILE_CAPABILITIES,
+    "run",
+    "snapshot"
+  ])]);
   const ALLOWED_LAYERS = Object.freeze([
     contract.SCENE?.WEATHER_FAR || "weather:far",
     contract.SCENE?.WEATHER_REAR || "weather:rear",
@@ -22,7 +29,10 @@ window.NCNModuleIntake = (() => {
   const ALLOWED_GROUPS = Object.freeze(Object.values(contract.RUNTIME_GROUPS || {}));
   const PROTECTED = new Set(contract.PROTECTED_SCENE_NAMES || []);
 
-  const uniqueStrings = input => Object.freeze([...new Set((input || []).map(value => String(value).trim()).filter(Boolean))]);
+  function uniqueStrings(input) {
+    const values = typeof input === "string" ? [input] : Array.from(input || []);
+    return Object.freeze([...new Set(values.map(value => String(value).trim()).filter(Boolean))]);
+  }
 
   function normaliseManifest(name, manifest = {}) {
     const moduleName = String(name || "").trim();
@@ -48,7 +58,7 @@ window.NCNModuleIntake = (() => {
 
   function implementationCapabilities(implementation) {
     if (!implementation || typeof implementation !== "object") return [];
-    return MANAGED_CAPABILITIES.filter(method => typeof implementation[method] === "function");
+    return KNOWN_CAPABILITIES.filter(method => typeof implementation[method] === "function");
   }
 
   function inspect(name, implementation, manifest = {}) {
@@ -108,6 +118,18 @@ window.NCNModuleIntake = (() => {
       if (!pass) errors.push(`Managed module capability is missing: ${method}.`);
     });
 
+    const target = normalised.replaces || normalised.name || normalised.department;
+    if (["weather", "effects", "chamber-motion"].includes(target)) {
+      const method = PROFILE_CAPABILITIES.find(capability => declaredCapabilities.has(capability));
+      check("application profile entry point", Boolean(method), method || "missing");
+      if (!method) errors.push(`${target} must expose an application-profile entry point.`);
+    }
+    if (target === "boot") {
+      const pass = declaredCapabilities.has("run");
+      check("boot run entry point", pass, pass ? "declared" : "missing");
+      if (!pass) errors.push("The boot module must expose run(options).");
+    }
+
     check("shared runtime", normalised.animationLoop === "shared-runtime", normalised.animationLoop);
     check("protected roots", normalised.protectedRoots.length === 0, normalised.protectedRoots.join(", "));
     check("reduced motion", normalised.reducedMotion, normalised.reducedMotion ? "declared" : "missing");
@@ -144,6 +166,7 @@ window.NCNModuleIntake = (() => {
 
   return Object.freeze({
     MANAGED_CAPABILITIES,
+    PROFILE_CAPABILITIES,
     ALLOWED_LAYERS,
     normaliseManifest,
     inspect,
