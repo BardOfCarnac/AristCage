@@ -102,6 +102,7 @@ jobs:
           const contract = fs.readFileSync('js/integration-contract.js', 'utf8');
           const intake = fs.readFileSync('js/module-intake.js', 'utf8');
           const services = fs.readFileSync('js/integration-services.js', 'utf8');
+          const context = fs.readFileSync('js/department-context.js', 'utf8');
           for (const name of ['visual-director', 'optical', 'dripfeed']) {
             if (!contract.includes(`"${name}"`)) throw new Error(`Protected module is absent from contract: ${name}`);
           }
@@ -111,5 +112,8 @@ jobs:
           if (!services.includes('Protected module slot cannot be installed')) {
             throw new Error('Integration installer does not enforce protected slots.');
           }
-          console.log('Protected integration slot guards are present.');
+          if (!context.includes('Capability-scoped façade')) {
+            throw new Error('Capability-scoped department context is absent.');
+          }
+          console.log('Protected integration slot and department-context guards are present.');
           NODE
