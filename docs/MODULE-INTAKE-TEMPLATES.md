@@ -5,6 +5,10 @@ choreography remain inside each department's module. Factories should construct
 state without starting visible work; recurring tasks, listeners and generated
 resources should become active in `init()`.
 
+Departmental publications install under one of four replaceable names: `effects`,
+`weather`, `chamber-motion` or `boot`. The protected `visual-director`, `optical`
+and `dripfeed` services are not departmental replacement slots.
+
 ## Effects
 
 ```js
