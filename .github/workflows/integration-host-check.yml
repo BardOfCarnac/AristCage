@@ -5,6 +5,7 @@ on:
     paths:
       - "index.html"
       - "js/**"
+      - "departments/weather/**"
       - "tests/effects-department-node.js"
       - "css/environment-system.css"
       - "docs/INTEGRATION-HOST.md"
@@ -49,6 +50,12 @@ jobs:
             js/departments/effects/effects-catalogue-fault.js
             js/departments/effects/effects-catalogue-environment.js
             js/departments/effects/effects-module.js
+            departments/weather/weather-manifest.js
+            departments/weather/weather-presets.js
+            departments/weather/weather-module.js
+            departments/weather/tests/weather-module.node.test.js
+            departments/weather/tests/weather-module.test.js
+            departments/weather/tests/weather-pr86-host.test.js
             tests/effects-department-node.js
           )
           for file in "${files[@]}"; do
@@ -57,6 +64,9 @@ jobs:
 
       - name: Run Effects Department deterministic cleanup harness
         run: node tests/effects-department-node.js
+
+      - name: Run Weather Department deterministic acceptance harness
+        run: node departments/weather/tests/weather-module.node.test.js
 
       - name: Check script references exist and are unique
         run: |
@@ -95,6 +105,9 @@ jobs:
             'js/departments/effects/effects-catalogue-fault.js',
             'js/departments/effects/effects-catalogue-environment.js',
             'js/departments/effects/effects-module.js',
+            'departments/weather/weather-manifest.js',
+            'departments/weather/weather-presets.js',
+            'departments/weather/weather-module.js',
             'js/optical-adapter.js',
             'js/environment-host.js',
             'js/application-switcher.js',
@@ -115,32 +128,54 @@ jobs:
           console.log('Integration load order is valid.');
           NODE
 
-      - name: Check accepted Effects staged wiring
+      - name: Check accepted Effects and Weather staged wiring
         run: |
           node <<'NODE'
           const fs = require('fs');
           const installer = fs.readFileSync('js/integration-departments.js', 'utf8');
           const harness = fs.readFileSync('js/integration-harness.js', 'utf8');
           const html = fs.readFileSync('index.html', 'utf8');
+
           for (const token of [
             'createNCNEffectsDepartment',
             'NCNEffectsDepartmentManifest',
-            'intake.install',
             'retireLegacyEffects',
+            'createNCNWeatherDepartment',
+            'NCNWeatherDepartmentManifest',
+            'retireLegacyWeather',
+            'intake.install',
             'integration:department-installed'
           ]) {
-            if (!installer.includes(token)) throw new Error(`Accepted Effects installer is missing ${token}.`);
+            if (!installer.includes(token)) throw new Error(`Accepted department installer is missing ${token}.`);
           }
-          if (!harness.includes('legacy Effects responder retired')) {
-            throw new Error('Browser harness does not verify legacy Effects retirement.');
+
+          for (const token of [
+            'legacy Effects responder retired',
+            'Effects profile follows',
+            'Weather Department installed',
+            'legacy Weather renderer retired',
+            'Weather profile follows',
+            'leaves Weather fully clear'
+          ]) {
+            if (!harness.includes(token)) throw new Error(`Browser harness is missing ${token}.`);
           }
-          if (!harness.includes('Effects profile follows')) {
-            throw new Error('Browser harness does not verify application-profile routing.');
+
+          for (const source of [
+            'departments/weather/weather-module.css',
+            'departments/weather/weather-manifest.js',
+            'departments/weather/weather-presets.js',
+            'departments/weather/weather-module.js',
+            'js/integration-departments.js'
+          ]) {
+            if (!html.includes(source)) throw new Error(`index.html does not load ${source}.`);
           }
-          if (!html.includes('js/integration-departments.js')) {
-            throw new Error('Accepted department installer is not loaded by index.html.');
+
+          const publicationsStart = installer.indexOf('name: "effects"');
+          const weatherStart = installer.indexOf('name: "weather"');
+          if (publicationsStart < 0 || weatherStart <= publicationsStart) {
+            throw new Error('Weather must be installed after Effects.');
           }
-          console.log('Accepted Effects publication is wired through staged intake.');
+          console.log('Accepted Effects and Weather publications are wired through staged intake.');
           NODE
 
       - name: Check protected integration slots
