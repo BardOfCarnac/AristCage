@@ -46,54 +46,9 @@ jobs:
           mv "$work/ncn-block-rearrangement-pr86" departments/chamber-movement
           node departments/chamber-movement/build-publication.js
 
-          cat > .github/workflows/chamber-movement.yml <<'YAML'
-          name: Chamber Movement Department
-
-          on:
-            pull_request:
-              paths:
-                - "departments/chamber-movement/**"
-                - ".github/workflows/chamber-movement.yml"
-            push:
-              branches:
-                - agent/publish-block-rearrangement-pr86
-              paths:
-                - "departments/chamber-movement/**"
-                - ".github/workflows/chamber-movement.yml"
-
-          permissions:
-            contents: read
-
-          jobs:
-            validate:
-              runs-on: ubuntu-latest
-              defaults:
-                run:
-                  working-directory: departments/chamber-movement
-              steps:
-                - uses: actions/checkout@v4
-                - uses: actions/setup-node@v4
-                  with:
-                    node-version: 20
-                - name: Verify source-part integrity
-                  run: node tests/source-integrity.js
-                - name: Rebuild browser artifact
-                  run: node build-publication.js
-                - name: Verify committed artifact matches generated source
-                  run: git diff --exit-code -- block-rearrangement.js
-                - name: Check production source syntax
-                  run: node --check block-rearrangement.js
-                - name: Check publication syntax
-                  run: node --check publication.js
-                - name: Run deterministic acceptance suite
-                  run: node tests/acceptance.js
-                - name: Run PR 86 publication contract
-                  run: node tests/publication-contract.js
-          YAML
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add departments/chamber-movement .github/workflows/chamber-movement.yml
+          git add departments/chamber-movement
           git commit -m "Apply chamber movement correction brief"
           git push origin HEAD:${{ github.head_ref || github.ref_name }}
 
