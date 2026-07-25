@@ -18,7 +18,8 @@ window.NCNModules = (() => {
   }
 
   function normaliseDependencies(input = []) {
-    const dependencies = [...new Set(Array.from(input, assertName))];
+    const values = typeof input === "string" ? [input] : Array.from(input || []);
+    const dependencies = [...new Set(values.map(assertName))];
     return Object.freeze(dependencies);
   }
 
@@ -88,6 +89,29 @@ window.NCNModules = (() => {
     });
   }
 
+  function dependencyOrder() {
+    const ordered = [];
+    const visited = new Set();
+    const visiting = new Set();
+
+    function visit(name, ancestry = []) {
+      if (visited.has(name)) return;
+      if (visiting.has(name)) {
+        throw new Error(`Circular module dependency: ${[...ancestry, name].join(" -> ")}`);
+      }
+      const record = records.get(name);
+      if (!record) throw new Error(`Unknown module dependency: ${name}`);
+      visiting.add(name);
+      record.dependencies.forEach(dependency => visit(dependency, [...ancestry, name]));
+      visiting.delete(name);
+      visited.add(name);
+      ordered.push(name);
+    }
+
+    records.forEach((_, name) => visit(name));
+    return ordered;
+  }
+
   function requireDependencies(record) {
     record.dependencies.forEach(name => {
       const dependency = records.get(name);
@@ -134,7 +158,7 @@ window.NCNModules = (() => {
   }
 
   async function initAll() {
-    for (const name of records.keys()) await init(name);
+    for (const name of dependencyOrder()) await init(name);
     return snapshot();
   }
 
@@ -172,7 +196,7 @@ window.NCNModules = (() => {
   }
 
   async function each(method, reason, reverse = false) {
-    const names = [...records.keys()];
+    const names = dependencyOrder();
     if (reverse) names.reverse();
     for (const name of names) await ({ suspend, resume, reset, destroy })[method](name, reason);
     return snapshot();
