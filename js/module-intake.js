@@ -131,10 +131,11 @@ window.NCNModuleIntake = (() => {
     if (!report.accepted) {
       throw new Error(`Module intake rejected ${name}: ${report.errors.join(" ")}`);
     }
-    const host = window.NCNViewerHost;
-    if (!host?.installModule) throw new Error("The viewer host is not ready to install modules.");
-    const result = await host.installModule(name, implementation, {
+    const integration = window.NCNIntegration;
+    if (!integration?.installModule) throw new Error("The integration services are not ready to install modules.");
+    const result = await integration.installModule(name, implementation, {
       ...options,
+      replace: options.replace === true || report.manifest.replaces === name,
       dependencies: report.manifest.dependencies,
       manifest: report.manifest
     });
