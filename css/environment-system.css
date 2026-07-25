@@ -12,24 +12,10 @@
   perspective: 900px;
 }
 
-.ncn-floor-mist {
-  display: none;
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: .92;
-  filter: blur(.7px);
-  mix-blend-mode: screen;
-}
-
-.ncn-floor-mist.is-enabled {
-  display: block;
-}
-
 .ncn-chamber-block {
   display: none;
   position: fixed;
+  z-index: 4;
   opacity: 0;
   transform-origin: var(--block-origin-x, 0%) 50%;
   transform: translate3d(0, 0, 0) rotateY(0deg);
@@ -88,14 +74,6 @@
   filter: brightness(var(--ncn-align-brightness, 1));
 }
 
-html[data-viewer-state="realigning"] .ncn-floor-mist {
-  opacity: .28;
-}
-
-html[data-viewer-state="interacting"] .ncn-floor-mist {
-  opacity: .72;
-}
-
 .rail-actions .layered-chamber-toggle,
 .rail-actions .heuristic-rangefinder-toggle,
 .rail-actions .optical-toggle {
@@ -109,7 +87,6 @@ html[data-viewer-state="interacting"] .ncn-floor-mist {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ncn-floor-mist,
   .ncn-chamber-block {
     display: none !important;
   }
