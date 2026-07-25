@@ -7,6 +7,7 @@
 
 window.NCNDepartmentContext = (() => {
   const contract = window.NCNIntegrationContract || {};
+  const resources = new WeakMap();
   const BLOCKED_SERVICE_METHODS = new Set(["init", "suspend", "resume", "reset", "destroy"]);
   const WEATHER_LAYERS = Object.freeze({
     far: contract.SCENE?.WEATHER_FAR || "weather:far",
@@ -42,6 +43,7 @@ window.NCNDepartmentContext = (() => {
     const allowedGroups = new Set(strings(manifest.runtimeGroups));
     const allowedChannels = new Set(strings(manifest.visualChannels));
     const allowedDependencies = new Set(strings(manifest.dependencies));
+    const owned = { owner: moduleName, base, tasks: [], subscriptions: [] };
 
     const runtime = Object.freeze({
       register(name, callback, options = {}) {
@@ -53,12 +55,18 @@ window.NCNDepartmentContext = (() => {
         const taskName = localName.startsWith(`${moduleName}:`)
           ? localName
           : `${moduleName}:${localName}`;
-        return base.runtime.register(taskName, callback, { ...options, group });
+        const handle = base.runtime.register(taskName, callback, { ...options, group });
+        owned.tasks.push(handle);
+        return handle;
       },
       wake: reason => base.runtime.wake(`${moduleName}:${reason || "wake"}`),
       getQuality: base.runtime.getQuality,
       snapshot: base.runtime.snapshot,
-      subscribe: base.runtime.subscribe
+      subscribe(listener) {
+        const unsubscribe = base.runtime.subscribe(listener);
+        owned.subscriptions.push(unsubscribe);
+        return unsubscribe;
+      }
     });
 
     const lifecycle = Object.freeze({
@@ -68,7 +76,11 @@ window.NCNDepartmentContext = (() => {
       snapshot: base.lifecycle.snapshot,
       allows: base.lifecycle.allows,
       isLocked: base.lifecycle.isLocked,
-      subscribe: base.lifecycle.subscribe,
+      subscribe(listener) {
+        const unsubscribe = base.lifecycle.subscribe(listener);
+        owned.subscriptions.push(unsubscribe);
+        return unsubscribe;
+      },
       acquire(name, priority = base.lifecycle.PRIORITY.ambient) {
         return base.lifecycle.acquire(name, moduleName, priority);
       },
@@ -76,8 +88,16 @@ window.NCNDepartmentContext = (() => {
     });
 
     const events = Object.freeze({
-      on: base.events.on,
-      once: base.events.once,
+      on(type, listener, options) {
+        const unsubscribe = base.events.on(type, listener, options);
+        owned.subscriptions.push(unsubscribe);
+        return unsubscribe;
+      },
+      once(type, listener) {
+        const unsubscribe = base.events.once(type, listener);
+        owned.subscriptions.push(unsubscribe);
+        return unsubscribe;
+      },
       emit: base.events.emit,
       snapshot: base.events.snapshot
     });
@@ -181,7 +201,7 @@ window.NCNDepartmentContext = (() => {
       profile: base.environment?.profile
     });
 
-    return Object.freeze({
+    const moduleContext = Object.freeze({
       owner: moduleName,
       runtime,
       lifecycle,
@@ -197,7 +217,25 @@ window.NCNDepartmentContext = (() => {
       director,
       integration
     });
+    resources.set(moduleContext, owned);
+    return moduleContext;
   }
 
-  return Object.freeze({ create });
+  async function release(moduleContext, reason = "context-release") {
+    const owned = resources.get(moduleContext);
+    if (!owned) return false;
+    resources.delete(moduleContext);
+
+    [...owned.subscriptions].reverse().forEach(unsubscribe => {
+      try { unsubscribe?.(); } catch (error) { console.error(error); }
+    });
+    [...owned.tasks].reverse().forEach(handle => {
+      try { handle?.unregister?.(); } catch (error) { console.error(error); }
+    });
+    owned.base.lifecycle?.releaseOwner?.(owned.owner);
+    window.NCNVisualDirector?.releaseOwner?.(owned.owner, reason);
+    return true;
+  }
+
+  return Object.freeze({ create, release });
 })();
