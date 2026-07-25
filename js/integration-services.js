@@ -27,6 +27,26 @@ window.NCNIntegration = (() => {
     });
   }
 
+  function adaptInstance(instance) {
+    if (!instance || typeof instance !== "object") return instance;
+    return new Proxy(instance, {
+      get(target, property) {
+        const value = Reflect.get(target, property, target);
+        if (property === "init" && typeof value === "function") {
+          return () => value.call(target, context());
+        }
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+    });
+  }
+
+  function wrapImplementation(implementation) {
+    if (typeof implementation === "function") {
+      return async () => adaptInstance(await implementation(context()));
+    }
+    return adaptInstance(implementation);
+  }
+
   function createBootAdapter() {
     const sequence = () => window.NCNBootSequence || null;
     return Object.freeze({
@@ -98,10 +118,7 @@ window.NCNIntegration = (() => {
       await modules.destroy(key, "integration-replace");
     }
 
-    const wrapped = typeof implementation === "function"
-      ? () => implementation(context())
-      : implementation;
-    const handle = host.registerModule(key, wrapped, {
+    const handle = host.registerModule(key, wrapImplementation(implementation), {
       ...options,
       replace: exists,
       autoInit: false
@@ -184,7 +201,7 @@ window.NCNIntegration = (() => {
   }
 
   if (host?.isReady?.()) start();
-  else window.addEventListener("ncn:host-ready", start, { once: true });
+  else events?.once?.("host:ready", start);
 
   return api;
 })();
