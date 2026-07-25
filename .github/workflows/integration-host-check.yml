@@ -1,0 +1,94 @@
+name: Integration Host Checks
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "js/**"
+      - "css/environment-system.css"
+      - "docs/INTEGRATION-HOST.md"
+      - "docs/MODULE-INTAKE-TEMPLATES.md"
+      - ".github/workflows/integration-host-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-load-order:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check integration JavaScript syntax
+        run: |
+          set -euo pipefail
+          files=(
+            js/viewer-runtime.js
+            js/viewer-lifecycle.js
+            js/event-bus.js
+            js/integration-contract.js
+            js/scene-registry.js
+            js/module-manager.js
+            js/visual-director.js
+            js/module-intake.js
+            js/optical-adapter.js
+            js/environment-host.js
+            js/dripfeed-adapter.js
+            js/environment-manager.js
+            js/viewer-host.js
+            js/integration-services.js
+            js/integration-harness.js
+          )
+          for file in "${files[@]}"; do
+            node --check "$file"
+          done
+
+      - name: Check script references exist and are unique
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const sources = [...html.matchAll(/<script\s+src="([^"]+)"/g)]
+            .map(match => match[1].split('?')[0]);
+          const missing = sources.filter(source => !fs.existsSync(source));
+          const duplicates = sources.filter((source, index) => sources.indexOf(source) !== index);
+          if (missing.length) throw new Error(`Missing script files: ${[...new Set(missing)].join(', ')}`);
+          if (duplicates.length) throw new Error(`Duplicate script references: ${[...new Set(duplicates)].join(', ')}`);
+          console.log(`Checked ${sources.length} script references.`);
+          NODE
+
+      - name: Check integration load order
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const sources = [...html.matchAll(/<script\s+src="([^"]+)"/g)]
+            .map(match => match[1].split('?')[0]);
+          const requiredOrder = [
+            'js/viewer-runtime.js',
+            'js/viewer-lifecycle.js',
+            'js/event-bus.js',
+            'js/integration-contract.js',
+            'js/scene-registry.js',
+            'js/module-manager.js',
+            'js/visual-director.js',
+            'js/module-intake.js',
+            'js/optical-adapter.js',
+            'js/environment-host.js',
+            'js/application-switcher.js',
+            'js/dripfeed-adapter.js',
+            'js/environment-manager.js',
+            'js/viewer-host.js',
+            'js/integration-services.js',
+            'js/integration-harness.js'
+          ];
+          let previous = -1;
+          for (const source of requiredOrder) {
+            const index = sources.indexOf(source);
+            if (index < 0) throw new Error(`Required integration script is not loaded: ${source}`);
+            if (index <= previous) throw new Error(`Integration script is out of order: ${source}`);
+            previous = index;
+          }
+          console.log('Integration load order is valid.');
+          NODE
