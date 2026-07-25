@@ -5,9 +5,11 @@ on:
     paths:
       - "index.html"
       - "js/**"
+      - "tests/effects-department-node.js"
       - "css/environment-system.css"
       - "docs/INTEGRATION-HOST.md"
       - "docs/MODULE-INTAKE-TEMPLATES.md"
+      - "docs/EFFECTS-DEPARTMENT-PUBLICATION.md"
       - ".github/workflows/integration-host-check.yml"
   workflow_dispatch:
 
@@ -40,10 +42,20 @@ jobs:
             js/viewer-host.js
             js/integration-services.js
             js/integration-harness.js
+            js/departments/effects/effects-manifest.js
+            js/departments/effects/effects-public-names.js
+            js/departments/effects/effects-catalogue-signal.js
+            js/departments/effects/effects-catalogue-fault.js
+            js/departments/effects/effects-catalogue-environment.js
+            js/departments/effects/effects-module.js
+            tests/effects-department-node.js
           )
           for file in "${files[@]}"; do
             node --check "$file"
           done
+
+      - name: Run Effects Department deterministic cleanup harness
+        run: node tests/effects-department-node.js
 
       - name: Check script references exist and are unique
         run: |
