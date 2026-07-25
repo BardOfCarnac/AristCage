@@ -2,7 +2,7 @@
 window.NCNEffectsDepartmentManifest = Object.freeze({
   apiVersion: 1,
   department: "effects",
-  version: "1.1.0-host",
+  version: "1.1.1-host",
   dependencies: ["visual-director"],
   layers: ["environment:effects"],
   visualChannels: ["boot", "interface", "article", "environment", "chamber", "fault"],
@@ -12,7 +12,7 @@ window.NCNEffectsDepartmentManifest = Object.freeze({
     "play", "cancel", "clear", "snapshot"
   ],
   owns: [
-    "effect registry",
+    "locked canonical effect registry",
     "temporary effect nodes inside environment:effects",
     "temporary shared-runtime tasks",
     "effect cancellation and cleanup"
