@@ -152,7 +152,7 @@ window.NCNViewerLifecycle = (() => {
 
   function handleVisibility() {
     if (document.hidden) {
-      if (![STATES.SLEEPING, STATES.SUSPENDED, STATES.DESTROYED].includes(state)) stateBeforeSleep = state;
+      if (![STATES.SLEEPING, STATES.DESTROYED].includes(state)) stateBeforeSleep = state;
       transition(STATES.SLEEPING, { reason: "document-hidden" });
       return;
     }
