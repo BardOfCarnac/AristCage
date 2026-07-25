@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NCN Weather Module Acceptance Tests</title>
+  <link rel="stylesheet" href="../css/weather-module.css">
+  <style>
+    body { margin: 0; background: #080003; color: #d9a093; font: 14px/1.5 ui-monospace,monospace; }
+    main { padding: 24px; }
+    .pass { color: #b9f6cc; } .fail { color: #ff9f92; }
+    .stage { position: relative; width: 800px; max-width: 100%; height: 500px; border: 1px solid #522; overflow: hidden; }
+    [data-test-layer] { position: absolute; inset: 0; pointer-events: none; }
+    #reading-zone { position: absolute; z-index: 20; left: 180px; top: 150px; width: 430px; height: 170px; border: 1px solid #f43; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Weather module acceptance tests</h1>
+    <p id="summary">Running…</p>
+    <ol id="results"></ol>
+    <div class="stage">
+      <div data-test-layer="far"></div><div data-test-layer="rear"></div>
+      <div data-test-layer="middle"></div><div data-test-layer="near"></div>
+      <div id="reading-zone"></div>
+    </div>
+  </main>
+  <script src="../js/weather-presets.js"></script>
+  <script src="../js/weather-module.js"></script>
+  <script src="weather-module-tests.js"></script>
+</body>
+</html>
