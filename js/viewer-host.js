@@ -13,11 +13,11 @@ window.NCNViewerHost = (() => {
   const scene = window.NCNScene;
   const modules = window.NCNModules;
   const optical = window.NCNOptical;
+  const dripfeed = window.NCNDripfeed;
+  const environmentHost = window.NCNEnvironmentHost;
 
   let initialised = false;
   let destroyed = false;
-  let savedWeather = null;
-  let savedMotion = null;
 
   function bridgeLegacyEvents() {
     events?.bridgeWindow?.("ncn:lifecycle-change", "lifecycle:change");
@@ -27,66 +27,201 @@ window.NCNViewerHost = (() => {
     events?.bridgeWindow?.("ncn:application-environment-phase", "environment:phase");
   }
 
+  function activeApplication() {
+    return window.NCNApplications?.current?.()
+      || (typeof NCN_STATE !== "undefined" ? NCN_STATE.activeApp : null)
+      || "redwire";
+  }
+
+  function currentView() {
+    return activeApplication() === "dripfeed" ? dripfeed : optical;
+  }
+
+  const layerContext = Object.freeze({
+    get environment() { return environmentHost?.root?.() || null; },
+    get weather() { return environmentHost?.weatherLayers?.() || Object.freeze({}); },
+    get chamberMotion() { return environmentHost?.layer?.("chamber-motion") || null; },
+    get effects() { return environmentHost?.layer?.("effects") || null; }
+  });
+
+  const settingsContext = Object.freeze({
+    get reducedMotion() { return runtime?.getQuality?.() === "reduced"; },
+    get quality() { return runtime?.getQuality?.() || "full"; }
+  });
+
+  const viewContext = Object.freeze({
+    optical,
+    dripfeed,
+    current: currentView,
+    getReadingZone: () => currentView()?.getReadingZone?.() || null,
+    getControlZones() {
+      if (activeApplication() === "dripfeed") return dripfeed?.getControlZones?.() || [];
+      return [document.querySelector(".rail"), document.querySelector("#desktop-inspector")]
+        .filter(element => element?.isConnected);
+    },
+    getDepthPlaneDefinitions: () => currentView()?.getDepthPlaneDefinitions?.() || []
+  });
+
   function context() {
     return Object.freeze({
       runtime,
       lifecycle,
       events,
       scene,
+      layers: layerContext,
+      views: viewContext,
       optical,
+      dripfeed,
       applications: window.NCNApplications,
       environment: window.NCNEnvironment,
-      settings: Object.freeze({
-        reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      })
+      settings: settingsContext
+    });
+  }
+
+  function normaliseWeatherSnapshot(snapshot) {
+    const desired = snapshot?.desired || snapshot || null;
+    if (!desired) return null;
+    return {
+      ...desired,
+      mist: Number.isFinite(desired.mist) ? desired.mist : desired.targetMist
+    };
+  }
+
+  function createWeatherAdapter() {
+    let saved = null;
+    const renderer = () => window.NCNWeatherRenderer || null;
+    return Object.freeze({
+      suspend() {
+        const api = renderer();
+        saved = normaliseWeatherSnapshot(api?.snapshot?.());
+        if (typeof api?.suspend === "function") api.suspend();
+        else api?.disable?.();
+      },
+      resume() {
+        const api = renderer();
+        if (typeof api?.resume === "function") api.resume();
+        else if (saved?.enabled) api?.configure?.(saved);
+        saved = null;
+      },
+      reset() {
+        const api = renderer();
+        if (typeof api?.reset === "function") api.reset();
+        else api?.disable?.();
+      },
+      destroy() {
+        const api = renderer();
+        if (typeof api?.destroy === "function") api.destroy();
+        else api?.disable?.();
+        saved = null;
+      },
+      snapshot: () => renderer()?.snapshot?.() || null
+    });
+  }
+
+  function createEffectsAdapter() {
+    const effects = () => window.NCNEffects || null;
+    return Object.freeze({
+      suspend() {
+        const api = effects();
+        if (typeof api?.suspend === "function") api.suspend();
+        else api?.clear?.();
+      },
+      resume() { effects()?.resume?.(); },
+      reset() {
+        const api = effects();
+        if (typeof api?.reset === "function") api.reset();
+        else api?.clear?.();
+      },
+      destroy() {
+        const api = effects();
+        if (typeof api?.destroy === "function") api.destroy();
+        else api?.clear?.();
+      }
+    });
+  }
+
+  function createChamberMotionAdapter() {
+    let saved = null;
+    const motion = () => window.NCNChamberMotion || null;
+    return Object.freeze({
+      suspend() {
+        const api = motion();
+        saved = api?.snapshot?.() || null;
+        if (typeof api?.suspend === "function") api.suspend();
+        else api?.disable?.();
+      },
+      resume() {
+        const api = motion();
+        if (typeof api?.resume === "function") api.resume();
+        else if (saved?.enabled) api?.configure?.({ enabled: true });
+        saved = null;
+      },
+      reset() {
+        const api = motion();
+        if (typeof api?.reset === "function") api.reset();
+        else api?.stop?.({ reschedule: false });
+      },
+      destroy() {
+        const api = motion();
+        if (typeof api?.destroy === "function") api.destroy();
+        else api?.disable?.();
+        saved = null;
+      },
+      snapshot: () => motion()?.snapshot?.() || null
     });
   }
 
   function registerCoreModules() {
     modules.register("optical", optical, { replace: true });
-    modules.register("effects", {
-      reset: () => window.NCNEffects?.clear?.(),
-      suspend: () => window.NCNEffects?.clear?.(),
-      resume: () => undefined,
-      destroy: () => window.NCNEffects?.clear?.()
-    }, { replace: true });
-    modules.register("weather", {
-      suspend() {
-        savedWeather = window.NCNWeatherRenderer?.snapshot?.() || null;
-        window.NCNWeatherRenderer?.disable?.();
-      },
-      resume() {
-        if (savedWeather?.enabled) window.NCNWeatherRenderer?.configure?.(savedWeather);
-        savedWeather = null;
-      },
-      reset() {
-        window.NCNWeatherRenderer?.disable?.();
-      },
-      destroy() {
-        window.NCNWeatherRenderer?.disable?.();
-      }
-    }, { replace: true });
-    modules.register("chamber-motion", {
-      suspend() {
-        savedMotion = window.NCNChamberMotion?.snapshot?.() || null;
-        window.NCNChamberMotion?.disable?.();
-      },
-      resume() {
-        if (savedMotion?.enabled) window.NCNChamberMotion?.configure?.({ enabled: true });
-        savedMotion = null;
-      },
-      reset() {
-        window.NCNChamberMotion?.stop?.({ reschedule: false });
-      },
-      destroy() {
-        window.NCNChamberMotion?.disable?.();
-      }
-    }, { replace: true });
+    modules.register("dripfeed", dripfeed, { replace: true });
+    modules.register("effects", createEffectsAdapter(), { replace: true });
+    modules.register("weather", createWeatherAdapter(), { replace: true });
+    modules.register("chamber-motion", createChamberMotionAdapter(), { replace: true });
+  }
+
+  function verify(options = {}) {
+    const checks = [];
+    const check = (name, pass, detail = "") => checks.push(Object.freeze({ name, pass: Boolean(pass), detail }));
+
+    check("shared runtime", Boolean(runtime?.register && runtime?.snapshot), "NCNViewerRuntime");
+    check("lifecycle controller", Boolean(lifecycle?.transition && lifecycle?.allows), "NCNViewerLifecycle");
+    check("event bus", Boolean(events?.on && events?.emit), "NCNEvents");
+    check("module manager", Boolean(modules?.register && modules?.initAll), "NCNModules");
+    check("scene registry", Boolean(scene?.require && scene?.snapshot), "NCNScene");
+    check("Optical boundary", Boolean(optical?.getReadingZone && optical?.suspend), "NCNOptical");
+    check("Dripfeed boundary", Boolean(dripfeed?.getReadingZone && dripfeed?.suspend), "NCNDripfeed");
+
+    for (const name of environmentHost?.LAYER_NAMES || []) {
+      check(`layer:${name}`, Boolean(environmentHost?.layer?.(name)), name);
+    }
+
+    const moduleStates = modules?.snapshot?.() || [];
+    for (const module of moduleStates) {
+      check(`module:${module.name}`, ["ready", "suspended"].includes(module.state), module.state);
+    }
+
+    const redwireRoot = document.querySelector("#redwire-root");
+    const dripfeedRoot = document.querySelector("#dripfeed-root");
+    check("protected RedWire root", Boolean(redwireRoot), "#redwire-root");
+    check("protected Dripfeed root", Boolean(dripfeedRoot), "#dripfeed-root");
+    check("one active application root", Boolean(redwireRoot && dripfeedRoot && redwireRoot.hidden !== dripfeedRoot.hidden));
+
+    const result = Object.freeze({
+      passed: checks.every(item => item.pass),
+      checks: Object.freeze(checks),
+      snapshot: snapshot()
+    });
+    events?.emit?.("host:verified", result);
+    if (!result.passed && options.throwOnFailure === true) {
+      const failed = checks.filter(item => !item.pass).map(item => item.name).join(", ");
+      throw new Error(`NCN integration host verification failed: ${failed}`);
+    }
+    return result;
   }
 
   async function init() {
     if (initialised || destroyed) return snapshot();
-    window.NCNEnvironmentHost?.ensure?.();
+    environmentHost?.ensure?.();
     scene?.bootstrap?.();
     bridgeLegacyEvents();
     modules.setContext(context());
@@ -94,7 +229,8 @@ window.NCNViewerHost = (() => {
     await modules.initAll();
     initialised = true;
     document.documentElement.dataset.viewerHost = "ready";
-    events?.emit?.("host:ready", snapshot());
+    const verification = verify();
+    events?.emit?.("host:ready", { snapshot: snapshot(), verification });
     return snapshot();
   }
 
@@ -122,16 +258,17 @@ window.NCNViewerHost = (() => {
     runtime?.suspend?.(reason);
     await modules.resetAll(reason);
     window.NCNEnvironment?.disablePresentation?.();
-    window.NCNEnvironmentHost?.ensure?.();
+    environmentHost?.ensure?.();
     scene?.bootstrap?.();
     runtime?.reset?.(reason);
-    const application = window.NCNApplications?.current?.() || "redwire";
+    const application = activeApplication();
     window.NCNEnvironment?.activateApplication?.(application, { previous: application, reset: true });
     await modules.resumeAll(reason);
     runtime?.resume?.(reason);
     lifecycle?.transition?.(lifecycle.STATES.READY, { reason, force: true });
-    events?.emit?.("host:reset", { reason, application });
-    return true;
+    const verification = verify();
+    events?.emit?.("host:reset", { reason, application, verification });
+    return verification.passed;
   }
 
   async function destroy(reason = "host-destroy") {
@@ -164,7 +301,8 @@ window.NCNViewerHost = (() => {
       scene: scene?.snapshot?.() || [],
       modules: modules?.snapshot?.() || [],
       optical: optical?.snapshot?.() || null,
-      application: window.NCNApplications?.current?.() || null
+      dripfeed: dripfeed?.snapshot?.() || null,
+      application: activeApplication()
     });
   }
 
@@ -190,6 +328,7 @@ window.NCNViewerHost = (() => {
     destroy,
     registerModule,
     context,
+    verify,
     snapshot,
     isReady: () => initialised && !destroyed
   });
