@@ -37,6 +37,39 @@
     });
   }
 
+  function retireLegacyChamberMotion() {
+    const legacy = window.NCNChamberMotion;
+    legacy?.disable?.();
+    legacy?.stop?.({ reschedule: false });
+
+    const block = document.querySelector(".ncn-chamber-block");
+    if (block) {
+      block.classList.remove("is-profile-enabled", "is-moving");
+      block.hidden = true;
+      block.style.display = "none";
+      block.dataset.ncnLegacyChamberMotionRetired = "true";
+    }
+
+    return Object.freeze({
+      snapshot: legacy?.snapshot?.() || null,
+      blockPresent: Boolean(block),
+      blockHidden: block ? block.hidden === true : true
+    });
+  }
+
+  function createChamberMotionFactory() {
+    const publication = window.NCNChamberMotionPublication;
+    const adapter = window.NCNChamberMotionAdapter;
+    if (!publication?.create || !adapter?.createPublicationInstance) return null;
+    return context => adapter.createPublicationInstance(context, publication, {
+      seed: "ncn-production-chamber-motion"
+    });
+  }
+
+  function activateChamberMotion(service) {
+    return window.NCNChamberMotionController?.bind?.(service) || null;
+  }
+
   const publications = Object.freeze([
     Object.freeze({
       name: "effects",
@@ -49,6 +82,13 @@
       factory: () => window.createNCNWeatherDepartment,
       manifest: () => window.NCNWeatherDepartmentManifest,
       retireLegacy: retireLegacyWeather
+    }),
+    Object.freeze({
+      name: "chamber-motion",
+      factory: createChamberMotionFactory,
+      manifest: () => window.NCNChamberMotionPublication?.manifest,
+      retireLegacy: retireLegacyChamberMotion,
+      activate: activateChamberMotion
     })
   ]);
 
@@ -57,6 +97,7 @@
   let readyState = "idle";
   let failure = null;
   let weatherProof = null;
+  let chamberMotionProof = null;
 
   function moduleRecord(name) {
     return (modules?.snapshot?.() || []).find(record => record.name === name) || null;
@@ -72,6 +113,23 @@
     );
   }
 
+  function completePublication(specification, service, status, manifest, report = null, result = null) {
+    const legacy = specification.retireLegacy?.(service) || null;
+    const activation = specification.activate?.(service) || null;
+    const record = Object.freeze({
+      name: specification.name,
+      status,
+      version: manifest.version,
+      report,
+      legacy,
+      activation,
+      snapshot: service?.snapshot?.() || result?.result?.snapshot || null
+    });
+    installed.set(specification.name, record);
+    if (status === "installed") events?.emit?.("integration:department-installed", record);
+    return record;
+  }
+
   async function installPublication(specification) {
     const name = specification.name;
     const factory = specification.factory();
@@ -85,16 +143,9 @@
     }
 
     if (publicationAlreadyInstalled(name, manifest)) {
-      const record = Object.freeze({
-        name,
-        status: "already-installed",
-        version: manifest.version,
-        report: null,
-        legacy: null,
-        snapshot: integration?.getService?.(name)?.snapshot?.() || null
-      });
-      installed.set(name, record);
-      return record;
+      const service = integration?.getService?.(name);
+      if (!service) throw new Error(`Installed ${name} service is unavailable.`);
+      return completePublication(specification, service, "already-installed", manifest);
     }
 
     const report = intake?.inspect?.(name, factory, manifest);
@@ -105,19 +156,7 @@
     const result = await intake.install(name, factory, manifest, { replace: true });
     const service = integration?.getService?.(name);
     if (!service) throw new Error(`Installed ${name} service is unavailable.`);
-
-    const legacy = specification.retireLegacy?.() || null;
-    const record = Object.freeze({
-      name,
-      status: "installed",
-      version: manifest.version,
-      report,
-      legacy,
-      snapshot: service.snapshot?.() || result?.result?.snapshot || null
-    });
-    installed.set(name, record);
-    events?.emit?.("integration:department-installed", record);
-    return record;
+    return completePublication(specification, service, "installed", manifest, report, result);
   }
 
   function applyWeatherProofMode() {
@@ -146,6 +185,21 @@
     return weatherProof;
   }
 
+  function applyChamberMotionProofMode() {
+    const requested = new URLSearchParams(window.location.search).get("motionTest");
+    if (!requested) return null;
+    const selected = ["single", "left", "right", "large"].includes(String(requested).toLowerCase())
+      ? String(requested).toLowerCase()
+      : "large";
+    chamberMotionProof = window.NCNChamberMotionController?.prove?.(selected) || Object.freeze({
+      mode: selected,
+      started: false,
+      reason: "controller-unavailable"
+    });
+    events?.emit?.("integration:chamber-motion-proof", chamberMotionProof);
+    return chamberMotionProof;
+  }
+
   async function start() {
     if (!integration?.ensureCoreServices || !intake?.install) {
       throw new Error("Integration services are unavailable for departmental installation.");
@@ -161,6 +215,7 @@
     }
 
     applyWeatherProofMode();
+    applyChamberMotionProofMode();
     readyState = "ready";
     document.documentElement.dataset.integratedDepartments = "ready";
     const current = snapshot();
@@ -187,6 +242,7 @@
       ready: readyState === "ready",
       failure: failure ? String(failure.message || failure) : null,
       weatherProof,
+      chamberMotionProof,
       publications: Object.freeze(publications.map(item => item.name)),
       installed: Object.freeze([...installed.values()]),
       modules: modules?.snapshot?.() || []
@@ -197,6 +253,7 @@
     ready,
     installPublication,
     applyWeatherProofMode,
+    applyChamberMotionProofMode,
     snapshot,
     isReady: () => readyState === "ready"
   });
