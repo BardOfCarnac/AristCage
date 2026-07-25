@@ -23,6 +23,11 @@ window.NCNModules = (() => {
     return Object.freeze(dependencies);
   }
 
+  function normaliseManifest(manifest) {
+    if (!manifest || typeof manifest !== "object") return null;
+    return Object.freeze({ ...manifest });
+  }
+
   function validateInstance(name, instance) {
     if (!instance || typeof instance !== "object") return {};
     for (const method of LIFECYCLE_METHODS) {
@@ -56,6 +61,7 @@ window.NCNModules = (() => {
       implementation,
       instance: null,
       dependencies,
+      manifest: normaliseManifest(options.manifest),
       state: "registered",
       error: null,
       managed: options.managed !== false
@@ -84,6 +90,7 @@ window.NCNModules = (() => {
       state: record.state,
       dependencies: record.dependencies,
       capabilities: capabilities(record),
+      manifest: record.manifest,
       managed: record.managed,
       error: record.error ? String(record.error.message || record.error) : null
     });
@@ -147,12 +154,12 @@ window.NCNModules = (() => {
       await invoke(record, "init", sharedContext);
       record.error = null;
       record.state = "ready";
-      window.NCNEvents?.emit?.("module:ready", { name: record.name });
+      window.NCNEvents?.emit?.("module:ready", { name: record.name, manifest: record.manifest });
       return record.instance;
     } catch (error) {
       record.error = error;
       record.state = "error";
-      window.NCNEvents?.emit?.("module:error", { name: record.name, error });
+      window.NCNEvents?.emit?.("module:error", { name: record.name, error, manifest: record.manifest });
       throw error;
     }
   }
@@ -191,7 +198,7 @@ window.NCNModules = (() => {
     await invoke(record, "destroy", reason);
     record.state = "destroyed";
     window.NCNScene?.unregisterOwner?.(record.name);
-    window.NCNEvents?.emit?.("module:destroyed", { name: record.name, reason });
+    window.NCNEvents?.emit?.("module:destroyed", { name: record.name, reason, manifest: record.manifest });
     return true;
   }
 
@@ -206,6 +213,10 @@ window.NCNModules = (() => {
     return records.get(assertName(name))?.instance || null;
   }
 
+  function state(name) {
+    return records.get(assertName(name))?.state || null;
+  }
+
   function snapshot() {
     return Object.freeze([...records.values()].map(recordSnapshot));
   }
@@ -217,6 +228,7 @@ window.NCNModules = (() => {
     init,
     initAll,
     get,
+    state,
     has: name => records.has(assertName(name)),
     suspend,
     resume,
