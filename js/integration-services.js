@@ -19,6 +19,12 @@ window.NCNIntegration = (() => {
     contract.MODULES?.EFFECTS || "effects",
     contract.MODULES?.CHAMBER_MOTION || "chamber-motion"
   ]);
+  const MANAGED_METHODS = Object.freeze(["init", "suspend", "resume", "reset", "destroy"]);
+  const PROFILE_METHODS = Object.freeze({
+    weather: Object.freeze(["applyProfile", "configure", "setProfile", "setWeather", "setEnabled"]),
+    effects: Object.freeze(["applyProfile", "configure", "setProfile"]),
+    "chamber-motion": Object.freeze(["applyProfile", "configure", "setProfile", "setEnabled"])
+  });
 
   let servicesReady = false;
   let servicesPromise = null;
@@ -57,11 +63,31 @@ window.NCNIntegration = (() => {
     });
   }
 
-  function wrapImplementation(implementation) {
-    if (typeof implementation === "function") {
-      return async () => adaptInstance(await implementation(context()));
+  async function prepareImplementation(implementation) {
+    const created = typeof implementation === "function"
+      ? await implementation(context())
+      : implementation;
+    return adaptInstance(created);
+  }
+
+  function validatePrepared(name, instance) {
+    const key = String(name);
+    if (!instance || typeof instance !== "object") {
+      throw new TypeError(`Module ${key} did not return an object instance.`);
     }
-    return adaptInstance(implementation);
+    for (const method of MANAGED_METHODS) {
+      if (typeof instance[method] !== "function") {
+        throw new TypeError(`Module ${key} is missing required method ${method}().`);
+      }
+    }
+    const profileMethods = PROFILE_METHODS[key];
+    if (profileMethods && !profileMethods.some(method => typeof instance[method] === "function")) {
+      throw new TypeError(`Module ${key} has no accepted application-profile entry point.`);
+    }
+    if (key === (contract.MODULES?.BOOT || "boot") && typeof instance.run !== "function") {
+      throw new TypeError("The boot module is missing run(options).");
+    }
+    return instance;
   }
 
   function createBootAdapter() {
@@ -202,12 +228,22 @@ window.NCNIntegration = (() => {
     ));
   }
 
+  async function prepareDependencies(dependencies = []) {
+    for (const dependency of dependencies) {
+      if (!modules?.has?.(dependency)) throw new Error(`Unknown module dependency: ${dependency}`);
+      await modules.init(dependency);
+    }
+  }
+
   async function installModule(name, implementation, options = {}) {
     await ensureCoreServices();
     const key = String(name || "").trim();
     if (!key) throw new TypeError("An integration module name is required.");
 
+    await prepareDependencies(options.dependencies || []);
+    const prepared = validatePrepared(key, await prepareImplementation(implementation));
     const exists = modules?.has?.(key);
+
     if (exists) {
       if (options.replace !== true) throw new Error(`Module already installed: ${key}`);
       const dependants = activeDependants(key);
@@ -217,12 +253,23 @@ window.NCNIntegration = (() => {
       await modules.destroy(key, "integration-replace");
     }
 
-    const handle = host.registerModule(key, wrapImplementation(implementation), {
+    const handle = host.registerModule(key, prepared, {
       ...options,
       replace: exists,
       autoInit: false
     });
-    const instance = options.autoInit === false ? null : await handle.init();
+
+    let instance = null;
+    try {
+      instance = options.autoInit === false ? null : await handle.init();
+    } catch (error) {
+      lifecycle?.transition?.(lifecycle.STATES.DEGRADED, {
+        reason: `module-init-error:${key}`,
+        error,
+        force: true
+      });
+      throw error;
+    }
 
     if (lifecycle?.current?.() === lifecycle?.STATES?.SUSPENDED) {
       await handle.suspend("installed-while-suspended");
