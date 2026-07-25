@@ -1,7 +1,9 @@
 # NCN Department Intake Templates
 
 These manifests describe technical ownership only. Presets, visual design and
-choreography remain inside each department's module.
+choreography remain inside each department's module. Factories should construct
+state without starting visible work; recurring tasks, listeners and generated
+resources should become active in `init()`.
 
 ## Effects
 
