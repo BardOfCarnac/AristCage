@@ -43,11 +43,11 @@
       }
       if (enabled && options.wake !== false) requestAnimationFrame(loop);
       return {
-        wake() { if (!enabled) return; requestAnimationFrame(loop); },
+        wake() { if (enabled) requestAnimationFrame(loop); },
         enable() { enabled = true; suspended = false; last = performance.now(); requestAnimationFrame(loop); },
         disable() { enabled = false; },
         suspend() { suspended = true; },
-        resume() { suspended = false; last = performance.now(); if (enabled) requestAnimationFrame(loop); },
+        resume() { enabled = true; suspended = false; last = performance.now(); requestAnimationFrame(loop); },
         reset() { last = performance.now(); },
         unregister() { runtimeTasks.delete(name); }
       };
@@ -83,6 +83,13 @@
     lifecycle: { releaseOwnedLocks() {} }
   };
 
+  const effectNodes = () => [...effectsLayer.querySelectorAll("[data-ncn-effect-node]")];
+  const originalLayerState = JSON.stringify({
+    className: effectsLayer.className,
+    style: effectsLayer.getAttribute("style"),
+    dataset: { ...effectsLayer.dataset }
+  });
+
   let module;
   try {
     report("manifest targets effects slot", NCNEffectsDepartmentManifest.replaces === "effects");
@@ -92,8 +99,15 @@
 
     module = createNCNEffectsDepartment(context);
     await module.init();
+    module.applyProfile({ enabled: true, ambient: true, interaction: true, intensity: 1 }, { application: "redwire", reason: "test" });
     const required = ["init","applyProfile","suspend","resume","reset","destroy","play","cancel","clear","snapshot"];
     report("required public interface", required.every(name => typeof module[name] === "function"));
+    report("canonical registry is locked", module.snapshot().registryLocked && typeof module.register === "undefined");
+    report("host layer geometry remains host-owned", originalLayerState === JSON.stringify({
+      className: effectsLayer.className,
+      style: effectsLayer.getAttribute("style"),
+      dataset: { ...effectsLayer.dataset }
+    }));
 
     const completed = await module.play("glow-pulse", target, { duration: 80, seed: 1 }).finished;
     await sleep(20);
@@ -120,32 +134,68 @@
     await Promise.all([queuedA.finished, queuedB.finished]);
     report("queue drains cleanly", module.snapshot().queued === 0 && module.snapshot().runtimeTasks === 0);
 
-    const suspendedEffect = module.play("relay-scan", target, { duration: 240, seed: 5 });
+    const suspendedEffect = module.play("relay-scan", target, { duration: 280, seed: 5, purpose: "required" });
     await sleep(45);
     module.suspend("test");
-    const suspendedState = module.snapshot().active[0]?.state;
-    await sleep(100);
+    const nodesAtSuspend = effectNodes();
+    const blocked = await module.play("light-flash", target, { duration: 90, purpose: "required" }).finished;
+    report("suspension hides active nodes", nodesAtSuspend.length > 0 && nodesAtSuspend.every(node => node.hidden));
+    report("suspension releases claims", claims.size === 0);
+    report("playback while suspended creates no work", blocked.reason === "suspended" && effectNodes().length === nodesAtSuspend.length);
     module.resume("test");
+    report("resume reveals active nodes", effectNodes().every(node => !node.hidden));
     const resumed = await suspendedEffect.finished;
-    report("suspend and resume preserve completion", suspendedState === "suspended" && resumed.status === "completed");
+    report("suspend and resume preserve completion", resumed.status === "completed");
+
+    const ambient = module.play("particle-emission", target, { duration: 500, purpose: "ambient", seed: 6 });
+    const interaction = module.play("glow-pulse", target, { duration: 500, purpose: "interaction", seed: 7 });
+    await sleep(35);
+    module.applyProfile({ enabled: true, ambient: false, interaction: false, intensity: 1 }, { application: "dripfeed", reason: "profile-test" });
+    const profileResults = await Promise.all([ambient.finished, interaction.finished]);
+    const ignoredAmbient = await module.play("particle-emission", target, { duration: 90, purpose: "ambient" }).finished;
+    const ignoredInteraction = await module.play("glow-pulse", target, { duration: 90, purpose: "interaction" }).finished;
+    const requiredResult = await module.play("light-flash", target, { duration: 90, purpose: "required" }).finished;
+    report("profile clears disallowed active work", profileResults.every(result => result.status === "cancelled"));
+    report("profile rejects disallowed new work", ignoredAmbient.reason === "profile-ambient-disabled" && ignoredInteraction.reason === "profile-interaction-disabled");
+    report("required work remains available", requiredResult.status === "completed");
+    module.applyProfile({ enabled: true, ambient: true, interaction: true, intensity: 1 }, { application: "redwire", reason: "restore" });
+
+    const dynamic = module.play("light-flash", target, { duration: 1800, intensity: 0.05, purpose: "required", concurrency: "merge" });
+    await sleep(40);
+    const beforeOpacity = Number(effectNodes().at(-1)?.style.opacity || 0);
+    const merged = module.play("light-flash", target, { duration: 1800, intensity: 1, purpose: "required", concurrency: "merge" });
+    await sleep(40);
+    const afterMergeOpacity = Number(effectNodes().at(-1)?.style.opacity || 0);
+    const mergedIntensity = module.snapshot().active.find(item => item.id === dynamic.id)?.intensity || 0;
+    dynamic.setIntensity(0.01, "attenuation-test");
+    await sleep(40);
+    const afterAttenuationOpacity = Number(effectNodes().at(-1)?.style.opacity || 0);
+    const attenuatedIntensity = module.snapshot().active.find(item => item.id === dynamic.id)?.intensity || 0;
+    report("merge strengthens the live effect", merged === dynamic && mergedIntensity > 0.9 && afterMergeOpacity > beforeOpacity);
+    report("active attenuation reaches the live effect", attenuatedIntensity < 0.02 && afterAttenuationOpacity < afterMergeOpacity);
+    dynamic.cancel("dynamic-test-complete");
+    await dynamic.finished;
 
     runtime.setQuality("reduced");
-    const reduced = await module.play("displacement", target, { duration: 90, seed: 6 }).finished;
+    const reduced = await module.play("displacement", target, { duration: 90, seed: 8, purpose: "required" }).finished;
     report("reduced-motion substitute completes", reduced.status === "completed" && module.snapshot().reducedMotion);
     runtime.setQuality("full");
 
-    const sequence = [];
-    module.register("deterministic-probe", {
-      channel: "interface", duration: 55, maxFps: 60,
-      create({ random }) { return { frame() { sequence.push(Number(random().toFixed(8))); } }; }
+    const seededA = module.play("static-burst", target, { duration: 500, seed: 123, channel: "seed-a", purpose: "required" });
+    const seededB = module.play("static-burst", target, { duration: 500, seed: 123, channel: "seed-b", purpose: "required" });
+    await sleep(80);
+    const seededNodes = effectNodes().filter(node => node.classList.contains("ncn-effect-static-burst"));
+    const seededStyles = seededNodes.map(node => {
+      const field = node.querySelector(".ncn-effect-static");
+      return `${field?.style.transform}|${field?.style.backgroundPosition}`;
     });
-    await module.play("deterministic-probe", target, { seed: 123, channel: "seed-a" }).finished;
-    const firstSequence = sequence.splice(0);
-    await module.play("deterministic-probe", target, { seed: 123, channel: "seed-b" }).finished;
-    report("deterministic seeded playback", JSON.stringify(firstSequence) === JSON.stringify(sequence));
+    report("deterministic seeded playback", seededStyles.length === 2 && seededStyles[0] === seededStyles[1]);
+    module.cancel(seededA, "seed-test");
+    module.cancel(seededB, "seed-test");
+    await Promise.all([seededA.finished, seededB.finished]);
 
-    const activeA = module.play("particle-emission", target, { duration: 900, channel: "environment", seed: 8 });
-    const activeB = module.play("signal-fault", target, { duration: 900, channel: "fault", seed: 9 });
+    const activeA = module.play("particle-emission", target, { duration: 900, channel: "environment", seed: 9, purpose: "required" });
+    const activeB = module.play("signal-fault", target, { duration: 900, channel: "fault", seed: 10, purpose: "required" });
     await sleep(35);
     module.clear();
     await Promise.all([activeA.finished, activeB.finished]);
@@ -158,6 +208,11 @@
     );
     report("destroy leaves effects layer empty", effectsLayer.childElementCount === 0);
     report("source target was not modified", target.parentElement === document.body);
+    report("host layer remains untouched after destroy", originalLayerState === JSON.stringify({
+      className: effectsLayer.className,
+      style: effectsLayer.getAttribute("style"),
+      dataset: { ...effectsLayer.dataset }
+    }));
   } catch (error) {
     report("unexpected test error", false, error.stack || error.message);
     try { await module?.destroy?.("test-error"); } catch {}
