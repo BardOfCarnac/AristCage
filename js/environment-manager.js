@@ -42,6 +42,17 @@ window.NCNEnvironment = (() => {
     });
   }
 
+  function routeProfile(name, next, fallback, meta = {}) {
+    const integration = window.NCNIntegration;
+    if (integration?.isReady?.() && integration.applyProfile?.(name, next, meta)) return true;
+    fallback?.();
+    return false;
+  }
+
+  function environmentService(name, fallback) {
+    return window.NCNIntegration?.getService?.(name) || fallback || null;
+  }
+
   function announceChamberGeometry() {
     const camera = window.NCNChamberCamera?.snapshot?.();
     if (!camera) return;
@@ -73,9 +84,15 @@ window.NCNEnvironment = (() => {
   }
 
   function disablePresentation() {
-    window.NCNWeatherRenderer?.disable?.();
-    window.NCNChamberMotion?.disable?.();
-    window.NCNEffects?.setProfile?.({ ambient: false, interaction: false });
+    routeProfile("weather", { enabled: false, mist: 0, wind: 0 }, () => {
+      window.NCNWeatherRenderer?.disable?.();
+    }, { application: activeProfile, reason: "disable-presentation" });
+    routeProfile("chamber-motion", { enabled: false }, () => {
+      window.NCNChamberMotion?.disable?.();
+    }, { application: activeProfile, reason: "disable-presentation" });
+    routeProfile("effects", { ambient: false, interaction: false }, () => {
+      window.NCNEffects?.setProfile?.({ ambient: false, interaction: false });
+    }, { application: activeProfile, reason: "disable-presentation" });
     window.OpticalProjection?.disable?.({ persist: false });
     window.HeuristicRangefinder?.disable?.({ persist: false });
     activeProfile = "empty";
@@ -107,14 +124,25 @@ window.NCNEnvironment = (() => {
       window.OpticalProjection?.disable?.({ persist: false });
     }
 
-    window.NCNWeatherRenderer?.configure?.(next.weather);
-    window.NCNChamberMotion?.configure?.(next.chamberMotion);
-    window.NCNEffects?.setProfile?.(next.effects);
+    const meta = {
+      application: next.name,
+      previous: options.previous || null,
+      reason: options.initial ? "initial-application-profile" : "application-profile-ready"
+    };
+    routeProfile("weather", next.weather, () => {
+      window.NCNWeatherRenderer?.configure?.(next.weather);
+    }, meta);
+    routeProfile("chamber-motion", next.chamberMotion, () => {
+      window.NCNChamberMotion?.configure?.(next.chamberMotion);
+    }, meta);
+    routeProfile("effects", next.effects, () => {
+      window.NCNEffects?.setProfile?.(next.effects);
+    }, meta);
 
     activeProfile = next.name;
     document.documentElement.dataset.environmentProfile = next.name;
     lifecycle?.transition?.(lifecycle.STATES.READY, {
-      reason: options.initial ? "initial-application-profile" : "application-profile-ready",
+      reason: meta.reason,
       application: next.name,
       force: true
     });
@@ -161,15 +189,24 @@ window.NCNEnvironment = (() => {
       void window.NCNRealignment?.run?.("diagnostics", { force: true });
     });
     panel.querySelector('[data-debug-environment="block"]')?.addEventListener("click", () => {
-      window.NCNChamberMotion?.move?.({ force: true, duration: 2200 });
+      const motion = environmentService("chamber-motion", window.NCNChamberMotion);
+      if (typeof motion?.move === "function") motion.move({ force: true, duration: 2200 });
+      else motion?.trigger?.({ pattern: "extract-rotate-settle", intensity: 0.55, force: true });
     });
     panel.querySelector('[data-debug-environment="mist"]')?.addEventListener("click", () => {
-      const current = window.NCNWeatherRenderer?.snapshot?.();
-      window.NCNWeatherRenderer?.setWeather?.({
-        enabled: !current?.enabled,
-        mist: current?.enabled ? 0 : 0.42,
-        wind: 0.16
-      });
+      const weather = environmentService("weather", window.NCNWeatherRenderer);
+      const current = weather?.snapshot?.() || {};
+      const desired = current.desired || current;
+      const next = {
+        enabled: !desired.enabled,
+        mist: desired.enabled ? 0 : 0.42,
+        intensity: desired.enabled ? 0 : 0.42,
+        wind: 0.16,
+        preset: desired.enabled ? "clear" : "mist"
+      };
+      if (!window.NCNIntegration?.applyProfile?.("weather", next, { reason: "diagnostics" })) {
+        window.NCNWeatherRenderer?.setWeather?.(next);
+      }
     });
     updateDiagnostics();
   }
