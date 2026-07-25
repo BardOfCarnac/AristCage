@@ -127,6 +127,7 @@ window.NCNViewerHost = (() => {
     runtime?.reset?.(reason);
     const application = window.NCNApplications?.current?.() || "redwire";
     window.NCNEnvironment?.activateApplication?.(application, { previous: application, reset: true });
+    await modules.resumeAll(reason);
     runtime?.resume?.(reason);
     lifecycle?.transition?.(lifecycle.STATES.READY, { reason, force: true });
     events?.emit?.("host:reset", { reason, application });
@@ -148,7 +149,9 @@ window.NCNViewerHost = (() => {
   function registerModule(name, implementation, options = {}) {
     if (destroyed) throw new Error("Cannot register modules on a destroyed viewer host.");
     const handle = modules.register(name, implementation, options);
-    if (initialised && options.autoInit !== false) void handle.init();
+    if (initialised && options.autoInit !== false) {
+      void handle.init().catch(error => console.error(`[NCN host] failed to initialise module ${name}`, error));
+    }
     return handle;
   }
 
