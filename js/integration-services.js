@@ -22,7 +22,6 @@ window.NCNIntegration = (() => {
 
   let servicesReady = false;
   let servicesPromise = null;
-  let profileListenersReady = false;
   let bootRunning = false;
 
   function getService(name, options = {}) {
@@ -155,18 +154,6 @@ window.NCNIntegration = (() => {
     return Object.freeze({ application, applied: Object.freeze(applied) });
   }
 
-  function registerProfileListeners() {
-    if (profileListenersReady) return;
-    profileListenersReady = true;
-    events?.on?.(contract.EVENTS?.APPLICATION_CHANGE || "application:change", payload => {
-      const name = payload?.detail?.name || currentApplicationName();
-      window.setTimeout(() => syncApplicationProfile(`application:${name}`), 0);
-    });
-    events?.on?.(contract.EVENTS?.HOST_RESET || "host:reset", () => {
-      window.setTimeout(() => syncApplicationProfile("host-reset"), 0);
-    });
-  }
-
   async function initialiseCoreServices() {
     if (!host?.isReady?.()) await host?.init?.();
 
@@ -192,7 +179,6 @@ window.NCNIntegration = (() => {
       await handle.init();
     }
 
-    registerProfileListeners();
     servicesReady = true;
     events?.emit?.("integration:ready", snapshot());
     return snapshot();
