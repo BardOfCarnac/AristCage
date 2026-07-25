@@ -13,6 +13,7 @@ window.NCNIntegration = (() => {
   const events = window.NCNEvents;
   const director = window.NCNVisualDirector;
   const intake = window.NCNModuleIntake;
+  const departmentContexts = window.NCNDepartmentContext;
 
   const PROFILE_MODULES = Object.freeze([
     contract.MODULES?.WEATHER || "weather",
@@ -31,6 +32,19 @@ window.NCNIntegration = (() => {
     contract.MODULES?.OPTICAL || "optical",
     contract.MODULES?.DRIPFEED || "dripfeed"
   ]);
+  const BOOT_SLOT_MANIFEST = Object.freeze({
+    name: contract.MODULES?.BOOT || "boot",
+    department: "boot",
+    dependencies: [
+      contract.MODULES?.VISUAL_DIRECTOR || "visual-director",
+      contract.MODULES?.EFFECTS || "effects",
+      contract.MODULES?.WEATHER || "weather",
+      contract.MODULES?.CHAMBER_MOTION || "chamber-motion"
+    ],
+    runtimeGroups: [contract.RUNTIME_GROUPS?.BOOT || "boot"],
+    visualChannels: Object.values(contract.VISUAL_CHANNELS || {}),
+    layers: []
+  });
 
   let servicesReady = false;
   let servicesPromise = null;
@@ -46,34 +60,38 @@ window.NCNIntegration = (() => {
     return service;
   }
 
-  function context() {
+  function context(owner = "integration", manifest = {}) {
+    if (departmentContexts?.create) return departmentContexts.create(owner, manifest);
     return Object.freeze({
       ...(host?.context?.() || {}),
       contract,
       director,
-      intake,
-      integration: api
+      integration: Object.freeze({
+        getService,
+        requireService: name => getService(name, { required: true })
+      })
     });
   }
 
-  function adaptInstance(instance) {
+  function adaptInstance(instance, moduleContext) {
     if (!instance || typeof instance !== "object") return instance;
     return new Proxy(instance, {
       get(target, property) {
         const value = Reflect.get(target, property, target);
         if (property === "init" && typeof value === "function") {
-          return () => value.call(target, context());
+          return () => value.call(target, moduleContext);
         }
         return typeof value === "function" ? value.bind(target) : value;
       }
     });
   }
 
-  async function prepareImplementation(implementation) {
+  async function prepareImplementation(implementation, name, manifest = {}) {
+    const moduleContext = context(name, manifest);
     const created = typeof implementation === "function"
-      ? await implementation(context())
+      ? await implementation(moduleContext)
       : implementation;
-    return adaptInstance(created);
+    return adaptInstance(created, moduleContext);
   }
 
   function validatePrepared(name, instance) {
@@ -98,8 +116,9 @@ window.NCNIntegration = (() => {
 
   function createBootAdapter() {
     const sequence = () => window.NCNBootSequence || null;
+    const bootContext = () => context(contract.MODULES?.BOOT || "boot", BOOT_SLOT_MANIFEST);
     return Object.freeze({
-      init() { return sequence()?.init?.(context()); },
+      init() { return sequence()?.init?.(bootContext()); },
       suspend(reason) { return sequence()?.suspend?.(reason); },
       resume(reason) { return sequence()?.resume?.(reason); },
       reset(reason) { return sequence()?.reset?.(reason); },
@@ -107,7 +126,7 @@ window.NCNIntegration = (() => {
       run(options) {
         const implementation = sequence();
         return typeof implementation?.run === "function"
-          ? implementation.run(context(), options)
+          ? implementation.run(bootContext(), options)
           : Promise.resolve(false);
       },
       snapshot: () => sequence()?.snapshot?.() || Object.freeze({ installed: false })
@@ -250,8 +269,13 @@ window.NCNIntegration = (() => {
     if (!key) throw new TypeError("An integration module name is required.");
     if (PROTECTED_MODULES.has(key)) throw new Error(`Protected module slot cannot be installed: ${key}`);
 
-    await prepareDependencies(options.dependencies || []);
-    const prepared = validatePrepared(key, await prepareImplementation(implementation));
+    const manifest = Object.freeze({
+      ...(options.manifest || {}),
+      name: key,
+      dependencies: Object.freeze([...(options.dependencies || options.manifest?.dependencies || [])])
+    });
+    await prepareDependencies(manifest.dependencies);
+    const prepared = validatePrepared(key, await prepareImplementation(implementation, key, manifest));
     const exists = modules?.has?.(key);
 
     if (exists) {
@@ -266,6 +290,8 @@ window.NCNIntegration = (() => {
 
     const handle = host.registerModule(key, prepared, {
       ...options,
+      dependencies: manifest.dependencies,
+      manifest,
       replace: exists,
       autoInit: false
     });
@@ -289,7 +315,7 @@ window.NCNIntegration = (() => {
     if (PROFILE_MODULES.includes(key)) syncApplicationProfile("module-installed", key);
     events?.emit?.("integration:module-installed", {
       name: key,
-      manifest: options.manifest || null,
+      manifest,
       snapshot: handle.snapshot()
     });
     return Object.freeze({ handle, instance, snapshot: handle.snapshot() });
