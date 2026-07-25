@@ -27,6 +27,10 @@ window.NCNIntegrationHarness = (() => {
     return modules?.get?.("weather") || null;
   }
 
+  function chamberMotionService() {
+    return modules?.get?.("chamber-motion") || null;
+  }
+
   function weatherParticleTotal(snapshot) {
     const particles = snapshot?.particles || {};
     return Number(particles.mist || 0) + Number(particles.dust || 0) + Number(particles.rain || 0);
@@ -53,11 +57,27 @@ window.NCNIntegrationHarness = (() => {
     });
   }
 
+  function expectedChamberMotionProfile(application) {
+    const profile = window.NCNEnvironment?.profile?.(application)?.chamberMotion || {};
+    return Object.freeze({
+      enabled: profile.enabled !== false,
+      maxActive: Number(profile.maxActive) || null,
+      clusterSize: Array.isArray(profile.clusterSize) ? [...profile.clusterSize] : null
+    });
+  }
+
   function weatherMatchesProfile(snapshot, expected) {
     if (!snapshot || !expected) return false;
     if (snapshot.enabled !== expected.enabled) return false;
     if (snapshot.targetPreset !== expected.preset && snapshot.preset !== expected.preset) return false;
     return Math.abs(Number(snapshot.targetIntensity || 0) - expected.targetIntensity) < 0.001;
+  }
+
+  function chamberMotionMatchesProfile(snapshot, expected) {
+    if (!snapshot || !expected || snapshot.enabled !== expected.enabled) return false;
+    if (expected.maxActive && Number(snapshot.profile?.maxActive) !== expected.maxActive) return false;
+    if (expected.clusterSize && JSON.stringify(snapshot.profile?.clusterSize) !== JSON.stringify(expected.clusterSize)) return false;
+    return true;
   }
 
   function passive() {
@@ -122,6 +142,44 @@ window.NCNIntegrationHarness = (() => {
       ))
     ), { snapshot: legacyWeather, canvas: legacyWeatherCanvas }));
 
+    const motion = chamberMotionService();
+    const motionSnapshot = motion?.snapshot?.() || null;
+    const motionRecord = moduleSnapshot.find(item => item.name === "chamber-motion") || null;
+    const expectedMotion = expectedChamberMotionProfile(currentApplication);
+    checks.push(result("Chamber Movement Department installed", Boolean(
+      motion
+      && motionRecord?.manifest?.department === "chamber-motion"
+      && motionSnapshot?.initialised === true
+      && motionSnapshot?.destroyed === false
+      && motionSnapshot?.adapter?.canvasConnected === true
+    ), { record: motionRecord, snapshot: motionSnapshot }));
+    checks.push(result("Chamber Movement service interface", ["applyProfile", "trigger", "cancel", "settle", "snapshot"]
+      .every(method => typeof motion?.[method] === "function"), motionSnapshot));
+    checks.push(result(`Chamber Movement profile follows ${currentApplication}`,
+      chamberMotionMatchesProfile(motionSnapshot, expectedMotion), { expected: expectedMotion, actual: motionSnapshot }));
+    checks.push(result("Chamber Movement controller bound",
+      window.NCNChamberMotionController?.snapshot?.().bound === true,
+      window.NCNChamberMotionController?.snapshot?.()));
+
+    const legacyMotion = window.NCNChamberMotion?.snapshot?.() || null;
+    const legacyBlock = document.querySelector(".ncn-chamber-block");
+    checks.push(result("legacy Chamber Movement responder retired", Boolean(
+      legacyMotion?.enabled === false
+      && (!legacyBlock || (
+        legacyBlock.hidden === true
+        && legacyBlock.dataset.ncnLegacyChamberMotionRetired === "true"
+      ))
+    ), { snapshot: legacyMotion, block: legacyBlock }));
+
+    if (!expectedMotion.enabled) {
+      checks.push(result(`${currentApplication} leaves Chamber Movement fully clear`, Boolean(
+        motionSnapshot?.activeSequenceCount === 0
+        && motionSnapshot?.reservedRouteCount === 0
+        && motionSnapshot?.adapter?.activePoseCount === 0
+        && motionSnapshot?.adapter?.canvasVisible === false
+      ), motionSnapshot));
+    }
+
     return Object.freeze({
       passed: checks.every(check => check.pass),
       checks: Object.freeze(checks),
@@ -139,6 +197,7 @@ window.NCNIntegrationHarness = (() => {
     await host.suspend("integration-harness");
     const suspended = host.snapshot();
     const suspendedWeather = weatherService()?.snapshot?.() || null;
+    const suspendedMotion = chamberMotionService()?.snapshot?.() || null;
     checks.push(result("runtime suspended", suspended.runtime?.suspended === true, suspended.runtime));
     checks.push(result("managed modules suspended", suspended.modules
       .filter(item => item.managed)
@@ -146,22 +205,28 @@ window.NCNIntegrationHarness = (() => {
     checks.push(result("Effects suspended", effectsService()?.snapshot?.().suspended === true, effectsService()?.snapshot?.()));
     checks.push(result("Weather suspended and hidden", suspendedWeather?.suspended === true
       && suspendedWeather?.resources?.visibleCanvases === 0, suspendedWeather));
+    checks.push(result("Chamber Movement suspended and hidden", suspendedMotion?.suspended === true
+      && suspendedMotion?.adapter?.canvasVisible === false, suspendedMotion));
 
     await host.resume("integration-harness");
     const resumed = host.snapshot();
     const resumedWeather = weatherService()?.snapshot?.() || null;
+    const resumedMotion = chamberMotionService()?.snapshot?.() || null;
     checks.push(result("runtime resumed", resumed.runtime?.suspended === false, resumed.runtime));
     checks.push(result("managed modules resumed", resumed.modules
       .filter(item => item.managed)
       .every(item => item.state === "ready"), resumed.modules));
     checks.push(result("Effects resumed", effectsService()?.snapshot?.().suspended === false, effectsService()?.snapshot?.()));
     checks.push(result("Weather resumed", resumedWeather?.suspended === false, resumedWeather));
+    checks.push(result("Chamber Movement resumed", resumedMotion?.suspended === false, resumedMotion));
 
     await host.reset("integration-harness");
     const reset = host.snapshot();
     const verification = host.verify();
     const resetWeather = weatherService()?.snapshot?.() || null;
+    const resetMotion = chamberMotionService()?.snapshot?.() || null;
     const expectedWeather = expectedWeatherProfile(initialApplication);
+    const expectedMotion = expectedChamberMotionProfile(initialApplication);
     checks.push(result("host verifies after reset", verification.passed, verification));
     checks.push(result("application restored", reset.application === initialApplication, reset.application));
     checks.push(result("runtime task count stable", reset.runtime?.taskCount === initialTaskCount, {
@@ -175,6 +240,16 @@ window.NCNIntegrationHarness = (() => {
       actual: resetWeather
     }));
     checks.push(result("Weather has no effect residue after reset", resetWeather?.resources?.effectHandles === 0, resetWeather));
+    checks.push(result("Chamber Movement profile restored after reset", chamberMotionMatchesProfile(resetMotion, expectedMotion), {
+      expected: expectedMotion,
+      actual: resetMotion
+    }));
+    checks.push(result("Chamber Movement clean after reset", Boolean(
+      resetMotion?.activeSequenceCount === 0
+      && resetMotion?.reservedRouteCount === 0
+      && resetMotion?.adapter?.activePoseCount === 0
+      && resetMotion?.adapter?.canvasVisible === false
+    ), resetMotion));
 
     if (options.settle !== false) await wait(Number(options.settleDelay) || 120);
     return Object.freeze({ passed: checks.every(check => check.pass), checks: Object.freeze(checks), before, after: reset });
@@ -207,12 +282,54 @@ window.NCNIntegrationHarness = (() => {
     return Object.freeze({ passed: checks.every(check => check.pass), checks: Object.freeze(checks), after });
   }
 
+  async function chamberMotionCycle(options = {}) {
+    await departments?.ready?.();
+    const checks = [];
+    const motion = chamberMotionService();
+    const application = applications?.current?.() || "redwire";
+    checks.push(result("Chamber Movement publication available", Boolean(motion?.trigger && motion?.snapshot), motion?.snapshot?.()));
+    if (!motion?.trigger) return Object.freeze({ passed: false, checks: Object.freeze(checks) });
+    if (application !== "redwire") {
+      checks.push(result("Chamber Movement cycle skipped outside RedWire", true, application));
+      return Object.freeze({ passed: true, checks: Object.freeze(checks), skipped: true });
+    }
+
+    const before = motion.snapshot();
+    const movement = motion.trigger({
+      region: "left-wall",
+      clusterSize: [1, 1],
+      intensity: 0.5,
+      duration: Number(options.motionDuration) || 420
+    });
+    await wait(50);
+    const active = motion.snapshot();
+    checks.push(result("Chamber Movement enters active geometry", active.activeSequenceCount === 1
+      && active.adapter?.activePoseCount > 0
+      && active.adapter?.canvasVisible === true, active));
+    const completed = await movement;
+    await wait(40);
+    const after = motion.snapshot();
+    checks.push(result("Chamber Movement sequence completes", ["complete", "settled"].includes(completed?.status), completed));
+    checks.push(result("Chamber Movement renderer drew frames", Number(after.adapter?.drawCount || 0) > Number(before.adapter?.drawCount || 0), {
+      before: before.adapter,
+      after: after.adapter
+    }));
+    checks.push(result("Chamber Movement leaves no residue", Boolean(
+      after.activeSequenceCount === 0
+      && after.reservedRouteCount === 0
+      && after.adapter?.activePoseCount === 0
+      && after.adapter?.canvasVisible === false
+    ), after));
+
+    return Object.freeze({ passed: checks.every(check => check.pass), checks: Object.freeze(checks), before, active, after });
+  }
+
   async function applicationCycle(options = {}) {
     await departments?.ready?.();
     const checks = [];
     const initial = applications?.current?.() || "redwire";
     const other = initial === "redwire" ? "dripfeed" : "redwire";
-    const delay = Number(options.settleDelay) || 420;
+    const delay = Number(options.settleDelay) || 560;
 
     const switched = await applications?.switchTo?.(other, {
       animate: options.animate !== false,
@@ -222,8 +339,10 @@ window.NCNIntegrationHarness = (() => {
     const firstVerification = host.verify();
     const firstEffects = effectsService()?.snapshot?.() || null;
     const firstWeather = weatherService()?.snapshot?.() || null;
+    const firstMotion = chamberMotionService()?.snapshot?.() || null;
     const expectedFirstEffects = expectedEffectsProfile(other);
     const expectedFirstWeather = expectedWeatherProfile(other);
+    const expectedFirstMotion = expectedChamberMotionProfile(other);
     checks.push(result(`switch to ${other}`, switched !== false && applications.current() === other, applications.current()));
     checks.push(result("host verifies after first switch", firstVerification.passed, firstVerification));
     checks.push(result(`Effects profile follows ${other}`, firstEffects?.profile?.ambient === expectedFirstEffects.ambient
@@ -232,10 +351,22 @@ window.NCNIntegrationHarness = (() => {
       expected: expectedFirstWeather,
       actual: firstWeather
     }));
+    checks.push(result(`Chamber Movement profile follows ${other}`, chamberMotionMatchesProfile(firstMotion, expectedFirstMotion), {
+      expected: expectedFirstMotion,
+      actual: firstMotion
+    }));
     if (!expectedFirstWeather.enabled) {
       checks.push(result(`${other} leaves Weather fully clear`, weatherParticleTotal(firstWeather) === 0
         && firstWeather?.resources?.visibleCanvases === 0
         && firstWeather?.resources?.effectHandles === 0, firstWeather));
+    }
+    if (!expectedFirstMotion.enabled) {
+      checks.push(result(`${other} leaves Chamber Movement fully clear`, Boolean(
+        firstMotion?.activeSequenceCount === 0
+        && firstMotion?.reservedRouteCount === 0
+        && firstMotion?.adapter?.activePoseCount === 0
+        && firstMotion?.adapter?.canvasVisible === false
+      ), firstMotion));
     }
 
     const returned = await applications?.switchTo?.(initial, {
@@ -246,8 +377,10 @@ window.NCNIntegrationHarness = (() => {
     const returnVerification = host.verify();
     const returnedEffects = effectsService()?.snapshot?.() || null;
     const returnedWeather = weatherService()?.snapshot?.() || null;
+    const returnedMotion = chamberMotionService()?.snapshot?.() || null;
     const expectedReturnEffects = expectedEffectsProfile(initial);
     const expectedReturnWeather = expectedWeatherProfile(initial);
+    const expectedReturnMotion = expectedChamberMotionProfile(initial);
     checks.push(result(`return to ${initial}`, returned !== false && applications.current() === initial, applications.current()));
     checks.push(result("host verifies after return", returnVerification.passed, returnVerification));
     checks.push(result(`Effects profile returns to ${initial}`, returnedEffects?.profile?.ambient === expectedReturnEffects.ambient
@@ -256,8 +389,17 @@ window.NCNIntegrationHarness = (() => {
       expected: expectedReturnWeather,
       actual: returnedWeather
     }));
+    checks.push(result(`Chamber Movement profile returns to ${initial}`, chamberMotionMatchesProfile(returnedMotion, expectedReturnMotion), {
+      expected: expectedReturnMotion,
+      actual: returnedMotion
+    }));
     checks.push(result("Effects clean after application cycle", returnedEffects?.temporaryNodes === 0 && returnedEffects?.runtimeTasks === 0, returnedEffects));
     checks.push(result("Weather owns exactly four canvases after application cycle", returnedWeather?.resources?.canvases === 4, returnedWeather));
+    checks.push(result("Chamber Movement owns one clean adapter canvas after application cycle", Boolean(
+      returnedMotion?.adapter?.canvasConnected === true
+      && returnedMotion?.adapter?.activePoseCount === 0
+      && returnedMotion?.adapter?.canvasVisible === false
+    ), returnedMotion));
 
     return Object.freeze({ passed: checks.every(check => check.pass), checks: Object.freeze(checks), initial });
   }
@@ -266,6 +408,7 @@ window.NCNIntegrationHarness = (() => {
     await departments?.ready?.();
     const reports = [passive()];
     if (options.effects !== false) reports.push(await effectsCycle(options));
+    if (options.chamberMotion !== false) reports.push(await chamberMotionCycle(options));
     if (options.lifecycle !== false) reports.push(await lifecycleCycle(options));
     if (options.applications === true) reports.push(await applicationCycle(options));
     const report = Object.freeze({
@@ -281,6 +424,7 @@ window.NCNIntegrationHarness = (() => {
     passive,
     lifecycleCycle,
     effectsCycle,
+    chamberMotionCycle,
     applicationCycle,
     run,
     inspectCandidate: (name, implementation, manifest) => intake?.inspect?.(name, implementation, manifest)
