@@ -154,7 +154,8 @@ window.NCNViewerHost = (() => {
         const api = effects();
         if (typeof api?.destroy === "function") api.destroy();
         else api?.clear?.();
-      }
+      },
+      snapshot: () => effects()?.snapshot?.() || null
     });
   }
 
@@ -322,6 +323,9 @@ window.NCNViewerHost = (() => {
       modules: modules?.snapshot?.() || [],
       optical: optical?.snapshot?.() || null,
       dripfeed: dripfeed?.snapshot?.() || null,
+      weather: modules?.get?.("weather")?.snapshot?.() || null,
+      effects: modules?.get?.("effects")?.snapshot?.() || null,
+      chamberMotion: modules?.get?.("chamber-motion")?.snapshot?.() || null,
       application: activeApplication()
     });
   }
