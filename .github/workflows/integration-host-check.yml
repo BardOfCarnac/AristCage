@@ -94,3 +94,22 @@ jobs:
           }
           console.log('Integration load order is valid.');
           NODE
+
+      - name: Check protected integration slots
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const contract = fs.readFileSync('js/integration-contract.js', 'utf8');
+          const intake = fs.readFileSync('js/module-intake.js', 'utf8');
+          const services = fs.readFileSync('js/integration-services.js', 'utf8');
+          for (const name of ['visual-director', 'optical', 'dripfeed']) {
+            if (!contract.includes(`"${name}"`)) throw new Error(`Protected module is absent from contract: ${name}`);
+          }
+          if (!intake.includes('Protected module slots cannot be installed')) {
+            throw new Error('Module intake does not enforce protected slots.');
+          }
+          if (!services.includes('Protected module slot cannot be installed')) {
+            throw new Error('Integration installer does not enforce protected slots.');
+          }
+          console.log('Protected integration slot guards are present.');
+          NODE
