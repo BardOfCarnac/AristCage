@@ -6,8 +6,10 @@ on:
       - "index.html"
       - "js/**"
       - "departments/weather/**"
+      - "departments/chamber-movement/**"
       - "tests/effects-department-node.js"
       - "css/environment-system.css"
+      - "css/chamber-motion-adapter.css"
       - "docs/INTEGRATION-HOST.md"
       - "docs/MODULE-INTAKE-TEMPLATES.md"
       - "docs/EFFECTS-DEPARTMENT-PUBLICATION.md"
@@ -38,6 +40,7 @@ jobs:
             js/department-context.js
             js/optical-adapter.js
             js/environment-host.js
+            js/chamber-motion-adapter.js
             js/dripfeed-adapter.js
             js/environment-manager.js
             js/viewer-host.js
@@ -56,6 +59,11 @@ jobs:
             departments/weather/tests/weather-module.node.test.js
             departments/weather/tests/weather-module.test.js
             departments/weather/tests/weather-pr86-host.test.js
+            departments/chamber-movement/block-rearrangement.js
+            departments/chamber-movement/publication.js
+            departments/chamber-movement/tests/acceptance.js
+            departments/chamber-movement/tests/publication-contract.js
+            departments/chamber-movement/tests/source-integrity.js
             tests/effects-department-node.js
           )
           for file in "${files[@]}"; do
@@ -67,6 +75,12 @@ jobs:
 
       - name: Run Weather Department deterministic acceptance harness
         run: node departments/weather/tests/weather-module.node.test.js
+
+      - name: Run Chamber Movement deterministic acceptance harness
+        run: |
+          node departments/chamber-movement/tests/source-integrity.js
+          node departments/chamber-movement/tests/acceptance.js
+          node departments/chamber-movement/tests/publication-contract.js
 
       - name: Check script references exist and are unique
         run: |
@@ -108,8 +122,11 @@ jobs:
             'departments/weather/weather-manifest.js',
             'departments/weather/weather-presets.js',
             'departments/weather/weather-module.js',
+            'departments/chamber-movement/block-rearrangement.js',
+            'departments/chamber-movement/publication.js',
             'js/optical-adapter.js',
             'js/environment-host.js',
+            'js/chamber-motion-adapter.js',
             'js/application-switcher.js',
             'js/dripfeed-adapter.js',
             'js/environment-manager.js',
@@ -128,12 +145,13 @@ jobs:
           console.log('Integration load order is valid.');
           NODE
 
-      - name: Check accepted Effects and Weather staged wiring
+      - name: Check accepted Effects, Weather and Chamber Movement staged wiring
         run: |
           node <<'NODE'
           const fs = require('fs');
           const installer = fs.readFileSync('js/integration-departments.js', 'utf8');
           const harness = fs.readFileSync('js/integration-harness.js', 'utf8');
+          const adapter = fs.readFileSync('js/chamber-motion-adapter.js', 'utf8');
           const html = fs.readFileSync('index.html', 'utf8');
 
           for (const token of [
@@ -143,10 +161,27 @@ jobs:
             'createNCNWeatherDepartment',
             'NCNWeatherDepartmentManifest',
             'retireLegacyWeather',
+            'NCNChamberMotionPublication',
+            'NCNChamberMotionAdapter',
+            'retireLegacyChamberMotion',
+            'activateChamberMotion',
             'intake.install',
             'integration:department-installed'
           ]) {
             if (!installer.includes(token)) throw new Error(`Accepted department installer is missing ${token}.`);
+          }
+
+          for (const token of [
+            'production-chamber-motion-adapter',
+            'getBlocks',
+            'subscribeGeometryChange',
+            'createPublicationInstance',
+            'ncn:panel-change',
+            'motionTest'
+          ]) {
+            if (!adapter.includes(token) && !installer.includes(token)) {
+              throw new Error(`Chamber Movement integration is missing ${token}.`);
+            }
           }
 
           for (const token of [
@@ -155,7 +190,11 @@ jobs:
             'Weather Department installed',
             'legacy Weather renderer retired',
             'Weather profile follows',
-            'leaves Weather fully clear'
+            'leaves Weather fully clear',
+            'Chamber Movement Department installed',
+            'legacy Chamber Movement responder retired',
+            'Chamber Movement profile follows',
+            'leaves Chamber Movement fully clear'
           ]) {
             if (!harness.includes(token)) throw new Error(`Browser harness is missing ${token}.`);
           }
@@ -165,17 +204,22 @@ jobs:
             'departments/weather/weather-manifest.js',
             'departments/weather/weather-presets.js',
             'departments/weather/weather-module.js',
+            'departments/chamber-movement/block-rearrangement.js',
+            'departments/chamber-movement/publication.js',
+            'css/chamber-motion-adapter.css',
+            'js/chamber-motion-adapter.js',
             'js/integration-departments.js'
           ]) {
             if (!html.includes(source)) throw new Error(`index.html does not load ${source}.`);
           }
 
-          const publicationsStart = installer.indexOf('name: "effects"');
+          const effectsStart = installer.indexOf('name: "effects"');
           const weatherStart = installer.indexOf('name: "weather"');
-          if (publicationsStart < 0 || weatherStart <= publicationsStart) {
-            throw new Error('Weather must be installed after Effects.');
+          const motionStart = installer.indexOf('name: "chamber-motion"');
+          if (effectsStart < 0 || weatherStart <= effectsStart || motionStart <= weatherStart) {
+            throw new Error('Accepted departments must install Effects → Weather → Chamber Movement.');
           }
-          console.log('Accepted Effects and Weather publications are wired through staged intake.');
+          console.log('Accepted Effects, Weather and Chamber Movement publications are wired through staged intake.');
           NODE
 
       - name: Check protected integration slots
