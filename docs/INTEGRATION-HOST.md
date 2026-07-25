@@ -96,6 +96,11 @@ before replacement. Circular module dependencies are rejected.
 Dependency order governs the whole lifecycle: dependencies initialise and resume
 first; dependants suspend, reset and destroy first.
 
+The host keeps stable compatibility adapters named `weather`, `effects` and
+`chamber-motion`. A published department module may replace the corresponding
+global implementation (`NCNWeatherRenderer`, `NCNEffects` or `NCNChamberMotion`)
+without rewriting host lifecycle code, provided it exposes the agreed methods.
+
 Modules must not query into the Optical or Dripfeed renderers, replace chamber
 roots or create permanent private `requestAnimationFrame` loops.
 
