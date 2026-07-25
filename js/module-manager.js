@@ -6,6 +6,7 @@
 ==================================================*/
 
 window.NCNModules = (() => {
+  const LIFECYCLE_METHODS = Object.freeze(["init", "suspend", "resume", "reset", "destroy"]);
   const records = new Map();
   let sharedContext = null;
 
@@ -16,6 +17,21 @@ window.NCNModules = (() => {
     return name.trim();
   }
 
+  function normaliseDependencies(input = []) {
+    const dependencies = [...new Set(Array.from(input, assertName))];
+    return Object.freeze(dependencies);
+  }
+
+  function validateInstance(name, instance) {
+    if (!instance || typeof instance !== "object") return {};
+    for (const method of LIFECYCLE_METHODS) {
+      if (instance[method] !== undefined && typeof instance[method] !== "function") {
+        throw new TypeError(`Module ${name} exposes non-function ${method}`);
+      }
+    }
+    return instance;
+  }
+
   function setContext(context) {
     sharedContext = Object.freeze({ ...(context || {}) });
     return sharedContext;
@@ -23,20 +39,29 @@ window.NCNModules = (() => {
 
   function register(name, implementation, options = {}) {
     const key = assertName(name);
-    if (records.has(key) && options.replace !== true) {
+    const existing = records.get(key);
+    if (existing && options.replace !== true) {
       throw new Error(`Module already registered: ${key}`);
     }
+    if (existing && !["registered", "error", "destroyed"].includes(existing.state)) {
+      throw new Error(`Active module must be destroyed before replacement: ${key}`);
+    }
+
+    const dependencies = normaliseDependencies(options.dependencies || []);
+    if (dependencies.includes(key)) throw new Error(`Module cannot depend on itself: ${key}`);
 
     const record = {
       name: key,
       implementation,
       instance: null,
-      dependencies: Object.freeze([...(options.dependencies || [])]),
+      dependencies,
       state: "registered",
       error: null,
       managed: options.managed !== false
     };
     records.set(key, record);
+    window.NCNScene?.unregisterOwner?.(key);
+
     return Object.freeze({
       init: () => init(key),
       suspend: reason => suspend(key, reason),
@@ -47,11 +72,17 @@ window.NCNModules = (() => {
     });
   }
 
+  function capabilities(record) {
+    const target = record.instance || record.implementation;
+    return Object.freeze(LIFECYCLE_METHODS.filter(method => typeof target?.[method] === "function"));
+  }
+
   function recordSnapshot(record) {
     return Object.freeze({
       name: record.name,
       state: record.state,
       dependencies: record.dependencies,
+      capabilities: capabilities(record),
       managed: record.managed,
       error: record.error ? String(record.error.message || record.error) : null
     });
@@ -71,21 +102,26 @@ window.NCNModules = (() => {
     return record.instance[method](...args);
   }
 
-  async function init(name) {
-    const record = records.get(assertName(name));
-    if (!record) throw new Error(`Unknown module: ${name}`);
+  async function init(name, ancestry = []) {
+    const key = assertName(name);
+    const record = records.get(key);
+    if (!record) throw new Error(`Unknown module: ${key}`);
     if (["ready", "suspended"].includes(record.state)) return record.instance;
-    if (record.state === "destroyed") throw new Error(`Destroyed module cannot be reinitialised: ${name}`);
+    if (record.state === "destroyed") throw new Error(`Destroyed module cannot be reinitialised: ${key}`);
+    if (ancestry.includes(key) || record.state === "initialising") {
+      throw new Error(`Circular module dependency: ${[...ancestry, key].join(" -> ")}`);
+    }
 
     try {
-      for (const dependency of record.dependencies) await init(dependency);
-      requireDependencies(record);
       record.state = "initialising";
-      record.instance = typeof record.implementation === "function"
+      for (const dependency of record.dependencies) await init(dependency, [...ancestry, key]);
+      requireDependencies(record);
+      const created = typeof record.implementation === "function"
         ? await record.implementation(sharedContext)
         : record.implementation;
-      if (!record.instance || typeof record.instance !== "object") record.instance = {};
+      record.instance = validateInstance(key, created);
       await invoke(record, "init", sharedContext);
+      record.error = null;
       record.state = "ready";
       window.NCNEvents?.emit?.("module:ready", { name: record.name });
       return record.instance;
@@ -131,6 +167,7 @@ window.NCNModules = (() => {
     await invoke(record, "destroy", reason);
     record.state = "destroyed";
     window.NCNScene?.unregisterOwner?.(record.name);
+    window.NCNEvents?.emit?.("module:destroyed", { name: record.name, reason });
     return true;
   }
 
@@ -150,11 +187,13 @@ window.NCNModules = (() => {
   }
 
   return Object.freeze({
+    LIFECYCLE_METHODS,
     setContext,
     register,
     init,
     initAll,
     get,
+    has: name => records.has(assertName(name)),
     suspend,
     resume,
     reset,
