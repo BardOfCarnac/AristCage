@@ -1,0 +1,122 @@
+/*
+  Manual PR-86 host-contract harness. This stages a candidate directly through a
+  capability-scoped department context, but never installs it or replaces the
+  incumbent weather slot.
+*/
+window.NCNWeatherPR86HostTests = (() => {
+  "use strict";
+
+  const wait = delay => new Promise(resolve => window.setTimeout(resolve, delay));
+  const assert = (condition, message) => { if (!condition) throw new Error(message); };
+
+  function visibleApplicationRoots() {
+    return [document.querySelector("#redwire-root"), document.querySelector("#dripfeed-root")]
+      .filter(Boolean)
+      .filter(root => !root.hidden).length;
+  }
+
+  async function run(options = {}) {
+    const manifest = window.NCNWeatherDepartmentManifest;
+    const factory = window.NCNWeatherDepartment?.createWeather;
+    const report = window.NCNIntegrationHarness?.inspectCandidate?.("weather", factory, manifest);
+    assert(report?.accepted, `Weather intake failed: ${(report?.errors || []).join(" ")}`);
+
+    const incumbent = window.NCNIntegration?.getService?.("weather");
+    const initialApplication = window.NCNApplications?.current?.() || "redwire";
+    const initialQuality = window.NCNViewerRuntime?.getQuality?.() || "full";
+    const redwireRoot = document.querySelector("#redwire-root");
+    const dripfeedRoot = document.querySelector("#dripfeed-root");
+    const context = window.NCNDepartmentContext.create("weather-review", manifest);
+    const beforeLayerChildren = Object.values(context.layers.weather)
+      .map(layer => layer.childElementCount);
+    const candidate = factory(context);
+    const checks = [];
+    const check = (name, pass, detail = null) => {
+      checks.push(Object.freeze({ name, pass: Boolean(pass), detail }));
+      assert(pass, name);
+    };
+
+    try {
+      await candidate.init();
+      check("incumbent slot untouched after candidate init",
+        window.NCNIntegration.getService("weather") === incumbent);
+      check("protected root identities retained",
+        document.querySelector("#redwire-root") === redwireRoot
+        && document.querySelector("#dripfeed-root") === dripfeedRoot);
+      check("weather canvases remain outside protected roots",
+        [...document.querySelectorAll(".ncn-department-weather-canvas")]
+          .every(canvas => !redwireRoot?.contains(canvas) && !dripfeedRoot?.contains(canvas)));
+
+      candidate.setQuality("auto");
+      window.NCNViewerRuntime.setQuality("reduced");
+      candidate.applyProfile({ enabled: true, preset: "mist", intensity: 0.42, seed: 2045 }, { seed: 2045 });
+      await wait(options.settleDelay || 160);
+      check("initial/repeated reduced quality follows host", candidate.snapshot().quality === "reduced", candidate.snapshot());
+
+      window.NCNViewerRuntime.setQuality("full");
+      candidate.setIntensity(0.43);
+      await wait(options.settleDelay || 160);
+      check("quality returns from reduced to full-derived tier", candidate.snapshot().quality !== "reduced", candidate.snapshot());
+
+      const effect = candidate.requestAtmosphericEffect("light-flash", "rear", {
+        purpose: "ambient",
+        channel: "environment",
+        intensity: 0.08,
+        duration: 120
+      });
+      check("accepted Effects name resolves without catalogue error", effect !== undefined);
+
+      candidate.suspend("host-contract-test");
+      const spawnAtSuspend = candidate.snapshot().particles.spawned;
+      check("suspension hides weather canvases", candidate.snapshot().resources.visibleCanvases === 0);
+      await wait(120);
+      check("suspension stops spawning", candidate.snapshot().particles.spawned === spawnAtSuspend);
+      candidate.resume("host-contract-test");
+      check("resume restores weather canvases", candidate.snapshot().resources.visibleCanvases === 4);
+
+      if (window.NCNApplications?.switchTo) {
+        await window.NCNApplications.switchTo("dripfeed", { animate: false, reason: "weather-host-test" });
+        candidate.applyProfile({ enabled: false, preset: "clear", intensity: 0 }, {
+          application: "dripfeed",
+          reason: "weather-host-test"
+        });
+        await wait(80);
+        check("Dripfeed profile clears candidate weather", candidate.snapshot().enabled === false);
+        check("one application root remains visible in Dripfeed", visibleApplicationRoots() === 1);
+        check("incumbent slot untouched in Dripfeed", window.NCNIntegration.getService("weather") === incumbent);
+
+        await window.NCNApplications.switchTo("redwire", { animate: false, reason: "weather-host-test-return" });
+        candidate.applyProfile({ enabled: true, preset: "mist", intensity: 0.42, seed: 2045 }, {
+          application: "redwire",
+          reason: "weather-host-test-return"
+        });
+        await wait(80);
+        check("RedWire weather profile restores", candidate.snapshot().enabled === true);
+        check("one application root remains visible after return", visibleApplicationRoots() === 1);
+      }
+
+      check("protected root identities retained after application round trip",
+        document.querySelector("#redwire-root") === redwireRoot
+        && document.querySelector("#dripfeed-root") === dripfeedRoot);
+      return Object.freeze({ passed: checks.every(item => item.pass), checks: Object.freeze(checks), snapshot: candidate.snapshot() });
+    } finally {
+      candidate.destroy("host-contract-test");
+      await window.NCNDepartmentContext.release(context, "weather-host-test-complete");
+      window.NCNViewerRuntime?.setQuality?.(initialQuality);
+      if (window.NCNApplications?.current?.() !== initialApplication) {
+        await window.NCNApplications?.switchTo?.(initialApplication, {
+          animate: false,
+          reason: "weather-host-test-restore"
+        });
+      }
+      const afterLayerChildren = Object.values(context.layers.weather || {})
+        .map(layer => layer.childElementCount);
+      assert(beforeLayerChildren.every((count, index) => count === afterLayerChildren[index]),
+        "Weather candidate left layer residue after destruction.");
+      assert(window.NCNIntegration?.getService?.("weather") === incumbent,
+        "Weather host test replaced the incumbent slot.");
+    }
+  }
+
+  return Object.freeze({ run });
+})();
