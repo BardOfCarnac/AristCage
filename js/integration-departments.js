@@ -12,11 +12,43 @@
   const events = window.NCNEvents;
   const modules = window.NCNModules;
 
+  function retireLegacyEffects() {
+    const legacy = window.NCNEffects;
+    legacy?.setProfile?.({ ambient: false, interaction: false });
+    legacy?.clear?.();
+    return legacy?.snapshot?.() || null;
+  }
+
+  function retireLegacyWeather() {
+    const legacy = window.NCNWeatherRenderer;
+    legacy?.disable?.();
+
+    const canvas = document.querySelector(".ncn-floor-mist");
+    if (canvas) {
+      canvas.classList.remove("is-enabled");
+      canvas.hidden = true;
+      canvas.dataset.ncnLegacyWeatherRetired = "true";
+    }
+
+    return Object.freeze({
+      snapshot: legacy?.snapshot?.() || null,
+      canvasPresent: Boolean(canvas),
+      canvasHidden: canvas ? canvas.hidden === true : true
+    });
+  }
+
   const publications = Object.freeze([
     Object.freeze({
       name: "effects",
       factory: () => window.createNCNEffectsDepartment,
-      manifest: () => window.NCNEffectsDepartmentManifest
+      manifest: () => window.NCNEffectsDepartmentManifest,
+      retireLegacy: retireLegacyEffects
+    }),
+    Object.freeze({
+      name: "weather",
+      factory: () => window.createNCNWeatherDepartment,
+      manifest: () => window.NCNWeatherDepartmentManifest,
+      retireLegacy: retireLegacyWeather
     })
   ]);
 
@@ -39,13 +71,6 @@
     );
   }
 
-  function retireLegacyEffects() {
-    const legacy = window.NCNEffects;
-    legacy?.setProfile?.({ ambient: false, interaction: false });
-    legacy?.clear?.();
-    return legacy?.snapshot?.() || null;
-  }
-
   async function installPublication(specification) {
     const name = specification.name;
     const factory = specification.factory();
@@ -64,6 +89,7 @@
         status: "already-installed",
         version: manifest.version,
         report: null,
+        legacy: null,
         snapshot: integration?.getService?.(name)?.snapshot?.() || null
       });
       installed.set(name, record);
@@ -79,9 +105,7 @@
     const service = integration?.getService?.(name);
     if (!service) throw new Error(`Installed ${name} service is unavailable.`);
 
-    let legacy = null;
-    if (name === "effects") legacy = retireLegacyEffects();
-
+    const legacy = specification.retireLegacy?.() || null;
     const record = Object.freeze({
       name,
       status: "installed",
