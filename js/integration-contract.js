@@ -18,6 +18,19 @@ window.NCNIntegrationContract = (() => {
     DRIPFEED: "dripfeed"
   });
 
+  const REPLACEABLE_MODULES = Object.freeze([
+    MODULES.BOOT,
+    MODULES.EFFECTS,
+    MODULES.WEATHER,
+    MODULES.CHAMBER_MOTION
+  ]);
+
+  const PROTECTED_MODULES = Object.freeze([
+    MODULES.VISUAL_DIRECTOR,
+    MODULES.OPTICAL,
+    MODULES.DRIPFEED
+  ]);
+
   const RUNTIME_GROUPS = Object.freeze({
     BOOT: "boot",
     INTERFACE: "interface",
@@ -88,6 +101,8 @@ window.NCNIntegrationContract = (() => {
   return Object.freeze({
     API_VERSION,
     MODULES,
+    REPLACEABLE_MODULES,
+    PROTECTED_MODULES,
     RUNTIME_GROUPS,
     VISUAL_CHANNELS,
     SCENE,
