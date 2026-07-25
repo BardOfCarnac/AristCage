@@ -1,0 +1,15 @@
+/* Integration-owned renderer for accepted chamber movement. */
+.ncn-chamber-motion-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  contain: strict;
+}
+
+.ncn-chamber-motion-canvas[hidden],
+.ncn-chamber-block[data-ncn-legacy-chamber-motion-retired="true"] {
+  display: none !important;
+}
