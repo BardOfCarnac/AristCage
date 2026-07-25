@@ -7,6 +7,9 @@
   height: 100%;
   pointer-events: none;
   contain: strict;
+  opacity: .94;
+  filter: blur(.35px);
+  mix-blend-mode: screen;
 }
 
 .ncn-department-weather-canvas[hidden] {
@@ -16,5 +19,6 @@
 @media (prefers-reduced-motion: reduce) {
   .ncn-department-weather-canvas {
     image-rendering: auto;
+    filter: none;
   }
 }
