@@ -56,6 +56,10 @@ window.NCNOptical = (() => {
     });
   }
 
+  function getDepthPlaneDefinitions() {
+    return renderer()?.getPlaneDefinitions?.() || [];
+  }
+
   function suspend() {
     if (suspended) return;
     restoreAfterSuspend = isActive();
@@ -89,7 +93,8 @@ window.NCNOptical = (() => {
     deactivate,
     refresh,
     getReadingZone,
-    getPlaneDefinitions: () => renderer()?.getPlaneDefinitions?.() || [],
+    getPlaneDefinitions: getDepthPlaneDefinitions,
+    getDepthPlaneDefinitions,
     getCameraSnapshot: () => renderer()?.getCameraSnapshot?.() || null,
     suspend,
     resume,
