@@ -25,6 +25,12 @@ window.NCNIntegration = (() => {
     effects: Object.freeze(["applyProfile", "configure", "setProfile"]),
     "chamber-motion": Object.freeze(["applyProfile", "configure", "setProfile", "setEnabled"])
   });
+  const REPLACEABLE_MODULES = new Set(contract.REPLACEABLE_MODULES || ["boot", "effects", "weather", "chamber-motion"]);
+  const PROTECTED_MODULES = new Set(contract.PROTECTED_MODULES || ["visual-director", "optical", "dripfeed"]);
+  const PROTECTED_DEPENDENCIES = new Set([
+    contract.MODULES?.OPTICAL || "optical",
+    contract.MODULES?.DRIPFEED || "dripfeed"
+  ]);
 
   let servicesReady = false;
   let servicesPromise = null;
@@ -230,6 +236,9 @@ window.NCNIntegration = (() => {
 
   async function prepareDependencies(dependencies = []) {
     for (const dependency of dependencies) {
+      if (PROTECTED_DEPENDENCIES.has(dependency)) {
+        throw new Error(`Direct dependency on ${dependency} is forbidden; use context.views instead.`);
+      }
       if (!modules?.has?.(dependency)) throw new Error(`Unknown module dependency: ${dependency}`);
       await modules.init(dependency);
     }
@@ -239,12 +248,14 @@ window.NCNIntegration = (() => {
     await ensureCoreServices();
     const key = String(name || "").trim();
     if (!key) throw new TypeError("An integration module name is required.");
+    if (PROTECTED_MODULES.has(key)) throw new Error(`Protected module slot cannot be installed: ${key}`);
 
     await prepareDependencies(options.dependencies || []);
     const prepared = validatePrepared(key, await prepareImplementation(implementation));
     const exists = modules?.has?.(key);
 
     if (exists) {
+      if (!REPLACEABLE_MODULES.has(key)) throw new Error(`Module slot is not replaceable: ${key}`);
       if (options.replace !== true) throw new Error(`Module already installed: ${key}`);
       const dependants = activeDependants(key);
       if (dependants.length) {
