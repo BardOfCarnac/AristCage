@@ -21,6 +21,7 @@ window.NCNWeatherRenderer = (() => {
     seed: 2045
   };
   let feedObserver = null;
+  let runtimeUnsubscribe = null;
   let zoneFrame = 0;
 
   function camera() {
@@ -71,6 +72,12 @@ window.NCNWeatherRenderer = (() => {
     });
     initPromise = weather.init().then(() => {
       attachReadingObserver();
+      if (!runtimeUnsubscribe && runtime.subscribe) {
+        runtimeUnsubscribe = runtime.subscribe(event => {
+          if (event.type !== 'quality-change' || desired.quality !== 'auto') return;
+          weather?.setQuality?.(event.runtime.quality === 'reduced' ? 'reduced' : 'medium');
+        });
+      }
       return weather;
     });
     return initPromise;
@@ -107,7 +114,7 @@ window.NCNWeatherRenderer = (() => {
 
   function applyDesired() {
     return ensureWeather().then(instance => {
-      instance.setSeed(desired.seed);
+      if (instance.snapshot().seed !== desired.seed) instance.setSeed(desired.seed);
       if (desired.quality && desired.quality !== 'auto') instance.setQuality(desired.quality);
       instance.setWind(desired.wind);
       instance.setIntensity(desired.intensity);
@@ -191,6 +198,7 @@ window.NCNWeatherRenderer = (() => {
 
   function configure(profile = {}) {
     desired = mapLegacyProfile(profile);
+    if (!desired.enabled && !weather) return desired;
     void applyDesired();
     return desired;
   }
@@ -225,6 +233,8 @@ window.NCNWeatherRenderer = (() => {
     zoneFrame = 0;
     feedObserver?.disconnect();
     feedObserver = null;
+    runtimeUnsubscribe?.();
+    runtimeUnsubscribe = null;
     window.removeEventListener('scroll', scheduleZoneSync);
     window.removeEventListener('resize', scheduleZoneSync);
     window.removeEventListener('ncn:chamber-camera-change', scheduleZoneSync);
