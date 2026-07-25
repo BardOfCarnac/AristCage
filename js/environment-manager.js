@@ -22,7 +22,16 @@ window.NCNEnvironment = (() => {
         wind: 0.16
       }),
       effects: Object.freeze({ ambient: true, interaction: true }),
-      chamberMotion: Object.freeze({ enabled: true })
+      chamberMotion: Object.freeze({
+        enabled: true,
+        intensity: 0.62,
+        quality: "full",
+        maxActive: 2,
+        clusterSize: Object.freeze([2, 6]),
+        durationRange: Object.freeze([5600, 8200]),
+        maxFps: 30,
+        effects: Object.freeze({})
+      })
     }),
     dripfeed: Object.freeze({
       name: "dripfeed",
@@ -99,7 +108,7 @@ window.NCNEnvironment = (() => {
     }, { application: activeProfile, reason: "disable-presentation" });
     routeProfile("chamber-motion", { enabled: false }, () => {
       window.NCNChamberMotion?.disable?.();
-    }, { application: activeProfile, reason: "disable-presentation" });
+    }, { application: activeProfile, reason: "disable-presentation", cancel: true });
     routeProfile("effects", { ambient: false, interaction: false }, () => {
       window.NCNEffects?.setProfile?.({ ambient: false, interaction: false });
     }, { application: activeProfile, reason: "disable-presentation" });
@@ -144,7 +153,7 @@ window.NCNEnvironment = (() => {
     }, meta);
     routeProfile("chamber-motion", next.chamberMotion, () => {
       window.NCNChamberMotion?.configure?.(next.chamberMotion);
-    }, meta);
+    }, { ...meta, cancel: next.chamberMotion.enabled === false });
     routeProfile("effects", next.effects, () => {
       window.NCNEffects?.setProfile?.(next.effects);
     }, meta);
@@ -205,7 +214,13 @@ window.NCNEnvironment = (() => {
         ["move", "trigger"]
       );
       if (typeof motion?.move === "function") motion.move({ force: true, duration: 2200 });
-      else motion?.trigger?.({ pattern: "extract-rotate-settle", intensity: 0.55, force: true });
+      else motion?.trigger?.({
+        pattern: "extract-rotate-settle",
+        region: "side-walls",
+        clusterSize: [3, 6],
+        intensity: 0.68,
+        duration: 5600
+      });
     });
     panel.querySelector('[data-debug-environment="mist"]')?.addEventListener("click", () => {
       const weather = environmentService("weather", window.NCNWeatherRenderer, ["snapshot"]);
