@@ -15,6 +15,10 @@ window.NCNWeatherPR86HostTests = (() => {
       .filter(root => !root.hidden).length;
   }
 
+  function activeParticles(snapshot) {
+    return snapshot.particles.mist + snapshot.particles.dust + snapshot.particles.rain;
+  }
+
   async function run(options = {}) {
     const manifest = window.NCNWeatherDepartmentManifest;
     const factory = window.NCNWeatherDepartment?.createWeather;
@@ -52,6 +56,7 @@ window.NCNWeatherPR86HostTests = (() => {
       candidate.applyProfile({ enabled: true, preset: "mist", intensity: 0.42, seed: 2045 }, { seed: 2045 });
       await wait(options.settleDelay || 160);
       check("initial/repeated reduced quality follows host", candidate.snapshot().quality === "reduced", candidate.snapshot());
+      check("RedWire weather is visibly active", candidate.snapshot().resources.visibleCanvases === 4);
 
       window.NCNViewerRuntime.setQuality("full");
       candidate.setIntensity(0.43);
@@ -59,8 +64,8 @@ window.NCNWeatherPR86HostTests = (() => {
       check("quality returns from reduced to full-derived tier", candidate.snapshot().quality !== "reduced", candidate.snapshot());
 
       const effect = candidate.requestAtmosphericEffect("light-flash", "rear", {
-        purpose: "ambient",
-        channel: "environment",
+        purpose: "required",
+        channel: "boot",
         intensity: 0.08,
         duration: 120
       });
@@ -81,7 +86,13 @@ window.NCNWeatherPR86HostTests = (() => {
           reason: "weather-host-test"
         });
         await wait(80);
-        check("Dripfeed profile clears candidate weather", candidate.snapshot().enabled === false);
+        const disabled = candidate.snapshot();
+        check("Dripfeed profile disables candidate weather", disabled.enabled === false, disabled);
+        check("Dripfeed profile deactivates all particles", activeParticles(disabled) === 0, disabled);
+        check("Dripfeed profile leaves no visible weather canvases", disabled.resources.visibleCanvases === 0, disabled);
+        check("Dripfeed profile releases Weather effect handles", disabled.resources.effectHandles === 0, disabled);
+        check("Dripfeed profile clears Weather intensity and transition",
+          disabled.intensity === 0 && disabled.targetIntensity === 0 && disabled.transition === null, disabled);
         check("one application root remains visible in Dripfeed", visibleApplicationRoots() === 1);
         check("incumbent slot untouched in Dripfeed", window.NCNIntegration.getService("weather") === incumbent);
 
@@ -91,7 +102,9 @@ window.NCNWeatherPR86HostTests = (() => {
           reason: "weather-host-test-return"
         });
         await wait(80);
-        check("RedWire weather profile restores", candidate.snapshot().enabled === true);
+        const restored = candidate.snapshot();
+        check("RedWire weather profile restores", restored.enabled === true, restored);
+        check("RedWire weather canvases restore", restored.resources.visibleCanvases === 4, restored);
         check("one application root remains visible after return", visibleApplicationRoots() === 1);
       }
 
