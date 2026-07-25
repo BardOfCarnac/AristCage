@@ -12,6 +12,20 @@
   perspective: 900px;
 }
 
+.ncn-environment-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform-style: preserve-3d;
+}
+
+.ncn-environment-layer--weather-far { z-index: 10; }
+.ncn-environment-layer--weather-mid { z-index: 20; }
+.ncn-environment-layer--chamber-motion { z-index: 30; }
+.ncn-environment-layer--weather-near { z-index: 40; }
+.ncn-environment-layer--effects { z-index: 50; }
+
 .ncn-floor-mist {
   display: none;
   position: absolute;
