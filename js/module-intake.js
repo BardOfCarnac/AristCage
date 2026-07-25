@@ -31,7 +31,13 @@ window.NCNModuleIntake = (() => {
   ]);
   const ALLOWED_CHANNELS = Object.freeze(Object.values(contract.VISUAL_CHANNELS || {}));
   const ALLOWED_GROUPS = Object.freeze(Object.values(contract.RUNTIME_GROUPS || {}));
-  const PROTECTED = new Set(contract.PROTECTED_SCENE_NAMES || []);
+  const REPLACEABLE_MODULES = new Set(contract.REPLACEABLE_MODULES || ["boot", "effects", "weather", "chamber-motion"]);
+  const PROTECTED_MODULES = new Set(contract.PROTECTED_MODULES || ["visual-director", "optical", "dripfeed"]);
+  const PROTECTED_DEPENDENCIES = new Set([
+    contract.MODULES?.OPTICAL || "optical",
+    contract.MODULES?.DRIPFEED || "dripfeed"
+  ]);
+  const PROTECTED_SCENES = new Set(contract.PROTECTED_SCENE_NAMES || []);
 
   function uniqueStrings(input) {
     const values = typeof input === "string" ? [input] : Array.from(input || []);
@@ -84,12 +90,26 @@ window.NCNModuleIntake = (() => {
     check("contract version", versionMatches, String(normalised.apiVersion));
     if (!versionMatches) errors.push(`Unsupported integration API version: ${normalised.apiVersion}.`);
 
+    const target = normalised.replaces || normalised.name || normalised.department;
+    if (PROTECTED_MODULES.has(normalised.name) || PROTECTED_MODULES.has(target)) {
+      errors.push(`Protected module slots cannot be installed or replaced through departmental intake: ${target}.`);
+    }
+    if (normalised.replaces && normalised.replaces !== normalised.name) {
+      errors.push(`Install the publication using its replacement slot name: ${normalised.replaces}.`);
+    }
+    if (normalised.replaces && !REPLACEABLE_MODULES.has(normalised.replaces)) {
+      errors.push(`Module slot is not replaceable: ${normalised.replaces}.`);
+    }
+
     normalised.dependencies.forEach(dependency => {
       if (dependency === normalised.name) errors.push("A module cannot depend on itself.");
+      if (PROTECTED_DEPENDENCIES.has(dependency)) {
+        errors.push(`Direct dependency on ${dependency} is forbidden; use context.views instead.`);
+      }
     });
 
     normalised.layers.forEach(layer => {
-      if (PROTECTED.has(layer)) errors.push(`Protected scene ownership is forbidden: ${layer}.`);
+      if (PROTECTED_SCENES.has(layer)) errors.push(`Protected scene ownership is forbidden: ${layer}.`);
       else if (!ALLOWED_LAYERS.includes(layer)) warnings.push(`Unrecognised declared layer: ${layer}.`);
     });
 
@@ -122,7 +142,6 @@ window.NCNModuleIntake = (() => {
       if (!pass) errors.push(`Managed module capability is missing: ${method}.`);
     });
 
-    const target = normalised.replaces || normalised.name || normalised.department;
     const profileMethods = PROFILE_CAPABILITIES[target];
     if (profileMethods) {
       const method = profileMethods.find(capability => declaredCapabilities.has(capability));
@@ -135,6 +154,8 @@ window.NCNModuleIntake = (() => {
       if (!pass) errors.push("The boot module must expose run(options).");
     }
 
+    check("replaceable slot", !normalised.replaces || REPLACEABLE_MODULES.has(target), target);
+    check("protected module boundary", !PROTECTED_MODULES.has(target), target);
     check("shared runtime", normalised.animationLoop === "shared-runtime", normalised.animationLoop);
     check("protected roots", normalised.protectedRoots.length === 0, normalised.protectedRoots.join(", "));
     check("reduced motion", normalised.reducedMotion, normalised.reducedMotion ? "declared" : "missing");
