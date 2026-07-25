@@ -49,8 +49,12 @@ window.NCNEnvironment = (() => {
     return false;
   }
 
-  function environmentService(name, fallback) {
-    return window.NCNIntegration?.getService?.(name) || fallback || null;
+  function environmentService(name, fallback, capabilities = []) {
+    const candidate = window.NCNIntegration?.getService?.(name);
+    if (candidate && (!capabilities.length || capabilities.some(method => typeof candidate[method] === "function"))) {
+      return candidate;
+    }
+    return fallback || null;
   }
 
   function announceChamberGeometry() {
@@ -189,12 +193,16 @@ window.NCNEnvironment = (() => {
       void window.NCNRealignment?.run?.("diagnostics", { force: true });
     });
     panel.querySelector('[data-debug-environment="block"]')?.addEventListener("click", () => {
-      const motion = environmentService("chamber-motion", window.NCNChamberMotion);
+      const motion = environmentService(
+        "chamber-motion",
+        window.NCNChamberMotion,
+        ["move", "trigger"]
+      );
       if (typeof motion?.move === "function") motion.move({ force: true, duration: 2200 });
       else motion?.trigger?.({ pattern: "extract-rotate-settle", intensity: 0.55, force: true });
     });
     panel.querySelector('[data-debug-environment="mist"]')?.addEventListener("click", () => {
-      const weather = environmentService("weather", window.NCNWeatherRenderer);
+      const weather = environmentService("weather", window.NCNWeatherRenderer, ["snapshot"]);
       const current = weather?.snapshot?.() || {};
       const desired = current.desired || current;
       const next = {
