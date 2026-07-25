@@ -81,6 +81,15 @@ window.NCNIntegration = (() => {
         if (property === "init" && typeof value === "function") {
           return () => value.call(target, moduleContext);
         }
+        if (property === "destroy" && typeof value === "function") {
+          return async (...args) => {
+            try {
+              return await value.call(target, ...args);
+            } finally {
+              await departmentContexts?.release?.(moduleContext, args[0] || "module-destroy");
+            }
+          };
+        }
         return typeof value === "function" ? value.bind(target) : value;
       }
     });
@@ -88,10 +97,18 @@ window.NCNIntegration = (() => {
 
   async function prepareImplementation(implementation, name, manifest = {}) {
     const moduleContext = context(name, manifest);
-    const created = typeof implementation === "function"
-      ? await implementation(moduleContext)
-      : implementation;
-    return adaptInstance(created, moduleContext);
+    try {
+      const created = typeof implementation === "function"
+        ? await implementation(moduleContext)
+        : implementation;
+      return Object.freeze({
+        instance: adaptInstance(created, moduleContext),
+        moduleContext
+      });
+    } catch (error) {
+      await departmentContexts?.release?.(moduleContext, "factory-error");
+      throw error;
+    }
   }
 
   function validatePrepared(name, instance) {
@@ -116,17 +133,23 @@ window.NCNIntegration = (() => {
 
   function createBootAdapter() {
     const sequence = () => window.NCNBootSequence || null;
-    const bootContext = () => context(contract.MODULES?.BOOT || "boot", BOOT_SLOT_MANIFEST);
+    const moduleContext = context(contract.MODULES?.BOOT || "boot", BOOT_SLOT_MANIFEST);
     return Object.freeze({
-      init() { return sequence()?.init?.(bootContext()); },
+      init() { return sequence()?.init?.(moduleContext); },
       suspend(reason) { return sequence()?.suspend?.(reason); },
       resume(reason) { return sequence()?.resume?.(reason); },
       reset(reason) { return sequence()?.reset?.(reason); },
-      destroy(reason) { return sequence()?.destroy?.(reason); },
+      async destroy(reason) {
+        try {
+          return await sequence()?.destroy?.(reason);
+        } finally {
+          await departmentContexts?.release?.(moduleContext, reason || "boot-slot-destroy");
+        }
+      },
       run(options) {
         const implementation = sequence();
         return typeof implementation?.run === "function"
-          ? implementation.run(bootContext(), options)
+          ? implementation.run(moduleContext, options)
           : Promise.resolve(false);
       },
       snapshot: () => sequence()?.snapshot?.() || Object.freeze({ installed: false })
@@ -274,10 +297,7 @@ window.NCNIntegration = (() => {
       name: key,
       dependencies: Object.freeze([...(options.dependencies || options.manifest?.dependencies || [])])
     });
-    await prepareDependencies(manifest.dependencies);
-    const prepared = validatePrepared(key, await prepareImplementation(implementation, key, manifest));
     const exists = modules?.has?.(key);
-
     if (exists) {
       if (!REPLACEABLE_MODULES.has(key)) throw new Error(`Module slot is not replaceable: ${key}`);
       if (options.replace !== true) throw new Error(`Module already installed: ${key}`);
@@ -285,21 +305,46 @@ window.NCNIntegration = (() => {
       if (dependants.length) {
         throw new Error(`Cannot replace ${key} while active dependants remain: ${dependants.map(item => item.name).join(", ")}`);
       }
-      await modules.destroy(key, "integration-replace");
     }
 
-    const handle = host.registerModule(key, prepared, {
-      ...options,
-      dependencies: manifest.dependencies,
-      manifest,
-      replace: exists,
-      autoInit: false
-    });
+    await prepareDependencies(manifest.dependencies);
+    const candidate = await prepareImplementation(implementation, key, manifest);
+    let prepared;
+    try {
+      prepared = validatePrepared(key, candidate.instance);
+    } catch (error) {
+      await departmentContexts?.release?.(candidate.moduleContext, "candidate-rejected");
+      throw error;
+    }
+
+    if (exists) {
+      try {
+        await modules.destroy(key, "integration-replace");
+      } catch (error) {
+        await departmentContexts?.release?.(candidate.moduleContext, "incumbent-destroy-error");
+        throw error;
+      }
+    }
+
+    let handle;
+    try {
+      handle = host.registerModule(key, prepared, {
+        ...options,
+        dependencies: manifest.dependencies,
+        manifest,
+        replace: exists,
+        autoInit: false
+      });
+    } catch (error) {
+      await departmentContexts?.release?.(candidate.moduleContext, "registration-error");
+      throw error;
+    }
 
     let instance = null;
     try {
       instance = options.autoInit === false ? null : await handle.init();
     } catch (error) {
+      await handle.destroy("module-init-failed");
       lifecycle?.transition?.(lifecycle.STATES.DEGRADED, {
         reason: `module-init-error:${key}`,
         error,
@@ -308,7 +353,7 @@ window.NCNIntegration = (() => {
       throw error;
     }
 
-    if (lifecycle?.current?.() === lifecycle?.STATES?.SUSPENDED) {
+    if (lifecycle?.current?.() === lifecycle?.STATES.SUSPENDED) {
       await handle.suspend("installed-while-suspended");
     }
 
@@ -338,7 +383,7 @@ window.NCNIntegration = (() => {
       const boot = getService(contract.MODULES?.BOOT || "boot", { required: true });
       const result = typeof boot?.run === "function" ? await boot.run(options) : false;
       events?.emit?.(contract.EVENTS?.BOOT_COMPLETE || "boot:complete", { result });
-      if (lifecycle?.current?.() === lifecycle?.STATES?.BOOTING) {
+      if (lifecycle?.current?.() === lifecycle?.STATES.BOOTING) {
         lifecycle.transition(lifecycle.STATES.READY, { reason: "boot-complete", force: true });
       }
       return result;
