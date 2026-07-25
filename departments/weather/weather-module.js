@@ -1,16 +1,16 @@
 /*==================================================
   NCN WEATHER DEPARTMENT · PR-86 PUBLICATION
 
-  Factory-only publication for the replaceable weather slot. Construction is
-  inert: canvases, dependency handles and recurring work begin only in init().
-  The module renders only into the four supplied weather layers and registers
-  exactly one task with the shared runtime.
+  Publication-only factory for the replaceable weather slot. Construction is inert:
+  canvases, dependency handles and recurring work begin only in init(). The module
+  renders only into the four supplied weather layers and owns no private loop.
 ==================================================*/
 window.NCNWeatherDepartment = (() => {
   "use strict";
 
   const PRESETS = window.NCNWeatherPresets || Object.freeze({ clear: Object.freeze({}) });
   const LAYER_KEYS = Object.freeze(["far", "rear", "middle", "near"]);
+  const PARTICLE_TYPES = Object.freeze(["mist", "dust", "rain"]);
   const QUALITY = Object.freeze({
     reduced: Object.freeze({ mist: 10, dust: 8, rain: 0, fps: 8, dpr: 1 }),
     low: Object.freeze({ mist: 18, dust: 24, rain: 48, fps: 12, dpr: 1 }),
@@ -28,7 +28,7 @@ window.NCNWeatherDepartment = (() => {
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
   const clamp01 = value => clamp(value, 0, 1);
-  const mix = (a, b, t) => a + (b - a) * t;
+  const mix = (a, b, amount) => a + (b - a) * amount;
   const mod = (value, divisor) => ((value % divisor) + divisor) % divisor;
 
   function hashSeed(value) {
@@ -103,7 +103,7 @@ window.NCNWeatherDepartment = (() => {
       targetPreset: "clear",
       seed: 2045,
       qualityOverride: null,
-      resolvedQuality: "reduced",
+      resolvedQuality: null,
       currentIntensity: 0,
       targetIntensity: 0,
       wind: { x: 0.18, y: 0, z: 0 },
@@ -118,7 +118,9 @@ window.NCNWeatherDepartment = (() => {
       lastEnvelope: null,
       effectRequests: 0,
       lastZones: { reading: false, controls: 0 },
-      geometry: { frames: 0, cameraReads: 0, layerMeasurements: 0, zoneReads: 0 }
+      geometry: { frames: 0, cameraReads: 0, layerMeasurements: 0, zoneReads: 0 },
+      qualityChanges: 0,
+      fpsUpdates: 0
     };
 
     let random = seededRandom(state.seed);
@@ -152,10 +154,6 @@ window.NCNWeatherDepartment = (() => {
       if (frame?.reducedMotion || context.settings?.reducedMotion || runtimeQuality === "reduced") return "reduced";
       const cores = Number(globalThis.navigator?.hardwareConcurrency) || 4;
       return cores <= 4 ? "low" : cores <= 8 ? "medium" : "high";
-    }
-
-    function qualityProfile(frame = null) {
-      return QUALITY[effectiveQuality(frame)] || QUALITY.medium;
     }
 
     function suppliedLayers() {
@@ -199,7 +197,7 @@ window.NCNWeatherDepartment = (() => {
         canvases.set(key, canvas);
         contexts.set(key, drawingContext);
       });
-      setCanvasVisibility(!state.suspended);
+      setCanvasVisibility(false);
     }
 
     function measureLayer(key) {
@@ -207,13 +205,11 @@ window.NCNWeatherDepartment = (() => {
       const parent = canvas?.parentElement || canvas?.parentNode;
       const rect = parent?.getBoundingClientRect?.() || canvas?.getBoundingClientRect?.();
       state.geometry.layerMeasurements += 1;
-      const width = Math.max(1, Number(rect?.width) || Number(globalThis.innerWidth) || 1);
-      const height = Math.max(1, Number(rect?.height) || Number(globalThis.innerHeight) || 1);
       return {
         left: Number(rect?.left) || 0,
         top: Number(rect?.top) || 0,
-        width,
-        height
+        width: Math.max(1, Number(rect?.width) || Number(globalThis.innerWidth) || 1),
+        height: Math.max(1, Number(rect?.height) || Number(globalThis.innerHeight) || 1)
       };
     }
 
@@ -225,19 +221,18 @@ window.NCNWeatherDepartment = (() => {
         if (!canvas || !drawingContext) return;
         const rect = measureLayer(key);
         const previous = layerRects.get(key);
-        const dpr = profile.dpr;
         const changed = force || !previous
           || Math.abs(previous.width - rect.width) > 0.5
           || Math.abs(previous.height - rect.height) > 0.5
-          || previous.dpr !== dpr;
+          || previous.dpr !== profile.dpr;
         if (changed) {
-          canvas.width = Math.max(1, Math.round(rect.width * dpr));
-          canvas.height = Math.max(1, Math.round(rect.height * dpr));
+          canvas.width = Math.max(1, Math.round(rect.width * profile.dpr));
+          canvas.height = Math.max(1, Math.round(rect.height * profile.dpr));
           canvas.style.width = `${rect.width}px`;
           canvas.style.height = `${rect.height}px`;
-          drawingContext.setTransform?.(dpr, 0, 0, dpr, 0, 0);
+          drawingContext.setTransform?.(profile.dpr, 0, 0, profile.dpr, 0, 0);
         }
-        const saved = { ...rect, dpr };
+        const saved = { ...rect, dpr: profile.dpr };
         layerRects.set(key, saved);
         frameRects.set(key, saved);
       });
@@ -273,15 +268,14 @@ window.NCNWeatherDepartment = (() => {
       }).filter(Boolean);
     }
 
-    function collectFrameScene(frame = null, force = false) {
-      const quality = qualityProfile(frame);
-      const rects = resizeAndCollectLayers(quality, force);
+    function collectFrameScene(profile, force = false) {
+      const rects = resizeAndCollectLayers(profile, force);
       const { camera, bounds } = cameraAndBounds();
       const reading = readingDescriptor();
       const controls = controlDescriptors();
       state.geometry.frames += 1;
       state.lastZones = { reading: Boolean(reading), controls: controls.length };
-      return Object.freeze({ quality, rects, camera, bounds, reading, controls });
+      return Object.freeze({ quality: profile, rects, camera, bounds, reading, controls });
     }
 
     function makePool(type, count) {
@@ -293,15 +287,22 @@ window.NCNWeatherDepartment = (() => {
       }
     }
 
-    function ensurePools(frame = null) {
+    function applyQuality(frame = null, force = false, notifyRuntime = true) {
       const resolved = effectiveQuality(frame);
+      const changed = force || state.resolvedQuality !== resolved;
       const profile = QUALITY[resolved] || QUALITY.medium;
+      if (!changed) return { resolved, profile, changed: false };
+
       state.resolvedQuality = resolved;
+      state.qualityChanges += 1;
       makePool("mist", profile.mist);
       makePool("dust", profile.dust);
       makePool("rain", profile.rain);
-      runtimeHandle?.setMaxFps?.(profile.fps);
-      return profile;
+      if (notifyRuntime && runtimeHandle) {
+        runtimeHandle.setMaxFps?.(profile.fps);
+        state.fpsUpdates += 1;
+      }
+      return { resolved, profile, changed: true };
     }
 
     function depthLayer(z, limits) {
@@ -335,27 +336,33 @@ window.NCNWeatherDepartment = (() => {
       particle.phase = randomBetween(0, Math.PI * 2);
       particle.velocity = randomBetween(0.72, 1.24);
       particle.layer = depthLayer(particle.z, limits);
-      return particle;
     }
 
     function activeCount(type) {
       return particles[type].reduce((sum, particle) => sum + (particle.active ? 1 : 0), 0);
     }
 
+    function deactivateAllParticles(resetSequence = false) {
+      PARTICLE_TYPES.forEach(type => particles[type].forEach(particle => { particle.active = false; }));
+      if (resetSequence) {
+        state.spawnSerial = 0;
+        random = seededRandom(state.seed);
+      }
+    }
+
     function deactivateSurplus(type, target) {
       let count = activeCount(type);
       if (count <= target) return;
       for (let index = particles[type].length - 1; index >= 0 && count > target; index -= 1) {
-        if (!particles[type][index].active) continue;
-        particles[type][index].life = Math.min(particles[type][index].life, particles[type][index].age + 0.28);
+        const particle = particles[type][index];
+        if (!particle.active) continue;
+        particle.life = Math.min(particle.life, particle.age + 0.28);
         count -= 1;
       }
     }
 
     function spawnToward(type, target, maximumPerStep, limits) {
-      let required = Math.max(0, target - activeCount(type));
-      if (!required) return;
-      required = Math.min(required, maximumPerStep);
+      let required = Math.min(Math.max(0, target - activeCount(type)), maximumPerStep);
       for (const particle of particles[type]) {
         if (!required) break;
         if (particle.active) continue;
@@ -391,7 +398,6 @@ window.NCNWeatherDepartment = (() => {
         particle.active = false;
         return;
       }
-
       const wind = state.wind;
       const turbulence = state.config.turbulence;
       const wave = Math.sin(particle.phase + particle.age * (0.6 + turbulence * 1.8));
@@ -409,7 +415,6 @@ window.NCNWeatherDepartment = (() => {
         particle.y += (wind.y * 0.12 + Math.cos(particle.phase + particle.age * 0.42) * 0.018) * deltaSeconds;
         particle.z += (wind.z + state.config.depthFlow) * 0.12 * deltaSeconds;
       }
-
       if (particle.x > limits.halfWidth * 1.25) particle.x = -limits.halfWidth * 1.25;
       if (particle.x < -limits.halfWidth * 1.25) particle.x = limits.halfWidth * 1.25;
       particle.z = limits.near + mod(particle.z - limits.near, limits.far - limits.near);
@@ -431,23 +436,20 @@ window.NCNWeatherDepartment = (() => {
 
     function cutout(ctx, rect, attenuation, layer) {
       if (!ctx || !rect || attenuation <= 0 || !layer) return;
-      const local = {
-        left: rect.left - layer.left,
-        top: rect.top - layer.top,
-        width: rect.width,
-        height: rect.height
-      };
       const padding = 12;
-      const alpha = clamp01(attenuation);
+      const left = rect.left - layer.left - padding;
+      const top = rect.top - layer.top - padding;
+      const width = rect.width + padding * 2;
+      const height = rect.height + padding * 2;
       ctx.save();
       ctx.globalCompositeOperation = "destination-out";
-      ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+      ctx.fillStyle = `rgba(0,0,0,${clamp01(attenuation)})`;
       if (typeof ctx.roundRect === "function") {
         ctx.beginPath();
-        ctx.roundRect(local.left - padding, local.top - padding, local.width + padding * 2, local.height + padding * 2, 16);
+        ctx.roundRect(left, top, width, height, 16);
         ctx.fill();
       } else {
-        ctx.fillRect(local.left - padding, local.top - padding, local.width + padding * 2, local.height + padding * 2);
+        ctx.fillRect(left, top, width, height);
       }
       ctx.restore();
     }
@@ -469,8 +471,7 @@ window.NCNWeatherDepartment = (() => {
 
     function particleOpacity(particle) {
       const life = clamp01(particle.age / Math.max(0.001, particle.life));
-      const fade = Math.min(1, life * 5, (1 - life) * 5);
-      return particle.alpha * Math.max(0, fade);
+      return particle.alpha * Math.max(0, Math.min(1, life * 5, (1 - life) * 5));
     }
 
     function drawParticle(ctx, particle, intensity, scene) {
@@ -488,8 +489,7 @@ window.NCNWeatherDepartment = (() => {
       }
       if (particle.type === "dust") {
         ctx.fillStyle = `rgba(255,112,70,${opacity * 0.56})`;
-        const size = particle.size;
-        ctx.fillRect(point.x, point.y, size, size);
+        ctx.fillRect(point.x, point.y, particle.size, particle.size);
         return;
       }
       const radius = Math.max(8, particle.size * 52 / Math.max(2.5, particle.z));
@@ -513,10 +513,9 @@ window.NCNWeatherDepartment = (() => {
     function render(intensity, scene) {
       clearCanvases();
       LAYER_KEYS.forEach(key => renderHaze(key, contexts.get(key), intensity, scene));
-      ["mist", "dust", "rain"].forEach(type => {
+      PARTICLE_TYPES.forEach(type => {
         particles[type].forEach(particle => {
-          if (!particle.active) return;
-          drawParticle(contexts.get(particle.layer), particle, intensity, scene);
+          if (particle.active) drawParticle(contexts.get(particle.layer), particle, intensity, scene);
         });
       });
       LAYER_KEYS.forEach(key => {
@@ -536,22 +535,23 @@ window.NCNWeatherDepartment = (() => {
 
     function requestEffect(name, layerKey = null, options = {}) {
       ensureAlive();
-      if (!effects) return false;
+      if (!effects || !state.enabled || state.suspended) return false;
       const { key, definition } = effectDefinition(name);
       const selectedLayer = layerKey || definition.layer;
       const layer = context.layers?.weather?.[selectedLayer] || null;
       if (!layer) throw new Error(`Weather effect layer is unavailable: weather:${selectedLayer}`);
       if (typeof effects.play !== "function") throw new Error("The accepted Effects dependency does not expose play().");
 
-      const channel = options.channel || definition.channel;
-      const purpose = options.purpose || definition.purpose;
       const requestedIntensity = clamp01(options.intensity ?? 0.25);
-      const envelope = context.director?.envelope?.(channel, { intensity: requestedIntensity });
+      const envelope = context.director?.envelope?.(definition.channel, { intensity: requestedIntensity });
       if (envelope && envelope.allowed === false) return false;
+      const safeOptions = { ...options };
+      delete safeOptions.channel;
+      delete safeOptions.purpose;
       const result = effects.play(key, layer, {
-        ...options,
-        channel,
-        purpose,
+        ...safeOptions,
+        channel: definition.channel,
+        purpose: definition.purpose,
         seed: Number.isFinite(Number(options.seed))
           ? Number(options.seed)
           : hashSeed(`${state.seed}:${key}:${state.effectRequests + 1}`),
@@ -574,9 +574,8 @@ window.NCNWeatherDepartment = (() => {
 
     function runtimeStep(frame) {
       if (!state.initialised || state.destroyed || state.suspended || !state.enabled) return false;
-      const profile = ensurePools(frame);
-      const scene = collectFrameScene(frame);
-
+      const quality = applyQuality(frame);
+      const scene = collectFrameScene(quality.profile, quality.changed);
       const rawDelta = resumeGuard ? 0 : Number(frame?.delta) || 0;
       resumeGuard = false;
       const delta = clamp(rawDelta, 0, 64);
@@ -584,11 +583,7 @@ window.NCNWeatherDepartment = (() => {
       state.lastDelta = delta;
       state.frameCount += 1;
       updateTransition(delta);
-      state.currentIntensity = mix(
-        state.currentIntensity,
-        state.targetIntensity,
-        Math.min(1, delta / 260)
-      );
+      state.currentIntensity = mix(state.currentIntensity, state.targetIntensity, Math.min(1, delta / 260));
 
       const requested = state.currentIntensity * state.transitionAttenuation;
       const envelope = context.director?.envelope?.("environment", { intensity: requested })
@@ -596,7 +591,7 @@ window.NCNWeatherDepartment = (() => {
       state.lastEnvelope = envelope;
       const readingScale = scene.reading || context.views?.isReading?.() ? 0.58 : 1;
       const intensity = envelope.allowed ? clamp01(envelope.intensity * readingScale) : 0;
-      const counts = targetCounts(intensity, profile);
+      const counts = targetCounts(intensity, quality.profile);
 
       if (intensity > 0.002) {
         spawnToward("mist", counts.mist, 3, scene.bounds);
@@ -606,15 +601,13 @@ window.NCNWeatherDepartment = (() => {
       deactivateSurplus("mist", counts.mist);
       deactivateSurplus("dust", counts.dust);
       deactivateSurplus("rain", counts.rain);
-
-      ["mist", "dust", "rain"].forEach(type => {
+      PARTICLE_TYPES.forEach(type => {
         particles[type].forEach(particle => updateParticle(particle, deltaSeconds, scene.bounds));
       });
       render(intensity, scene);
 
       const active = activeCount("mist") + activeCount("dust") + activeCount("rain");
-      const settling = Boolean(state.transition)
-        || Math.abs(state.currentIntensity - state.targetIntensity) > 0.002;
+      const settling = Boolean(state.transition) || Math.abs(state.currentIntensity - state.targetIntensity) > 0.002;
       return active > 0 || settling || state.targetIntensity > 0.002;
     }
 
@@ -623,19 +616,22 @@ window.NCNWeatherDepartment = (() => {
       if (state.initialised) return snapshot();
       effects = context.integration?.requireService?.("effects") || null;
       mountCanvases();
-      const profile = ensurePools();
-      collectFrameScene(null, true);
+      const quality = applyQuality(null, true, false);
+      collectFrameScene(quality.profile, true);
       clearCanvases();
       runtimeHandle = context.runtime?.register?.("render", runtimeStep, {
         group: "environment",
         priority: 20,
-        maxFps: profile.fps,
+        maxFps: quality.profile.fps,
         enabled: false,
         wake: false
       });
       if (!runtimeHandle) throw new Error("Shared runtime registration failed for weather.");
       state.initialised = true;
-      if (state.enabled && !state.suspended) runtimeHandle.enable?.("weather:init");
+      if (state.enabled && !state.suspended) {
+        setCanvasVisibility(true);
+        runtimeHandle.enable?.("weather:init");
+      }
       return snapshot();
     }
 
@@ -657,20 +653,36 @@ window.NCNWeatherDepartment = (() => {
       return state.targetIntensity;
     }
 
+    function clearDisabledState(reason = "weather-disabled") {
+      state.preset = "clear";
+      state.targetPreset = "clear";
+      state.config = clonePreset(PRESETS.clear);
+      state.transition = null;
+      state.currentIntensity = 0;
+      state.targetIntensity = 0;
+      state.lastEnvelope = null;
+      state.lastZones = { reading: false, controls: 0 };
+      deactivateAllParticles(true);
+      releaseEffects(reason);
+      clearCanvases();
+      setCanvasVisibility(false);
+    }
+
     function setEnabled(enabled) {
       ensureAlive();
-      state.enabled = Boolean(enabled);
-      if (!state.initialised) return state.enabled;
-      if (state.enabled && !state.suspended) {
+      const next = Boolean(enabled);
+      state.enabled = next;
+      if (!state.initialised) {
+        if (!next) clearDisabledState();
+        return state.enabled;
+      }
+      if (next && !state.suspended) {
         setCanvasVisibility(true);
         resumeGuard = true;
         runtimeHandle?.enable?.("weather:enabled");
       } else {
         runtimeHandle?.disable?.();
-        if (!state.enabled) {
-          state.targetIntensity = 0;
-          clearCanvases();
-        }
+        if (!next) clearDisabledState();
       }
       return state.enabled;
     }
@@ -688,12 +700,11 @@ window.NCNWeatherDepartment = (() => {
         duration,
         elapsed: 0
       };
-      if (options.effect === true) {
+      if (options.effect === true && state.enabled && !state.suspended) {
         const effectName = selected.key === "electrical-weather" ? "electrical-disturbance" : "light-flash";
         requestEffect(effectName, null, {
           intensity: clamp01(options.effectIntensity ?? 0.22),
-          duration: Math.min(duration, 900),
-          purpose: "ambient"
+          duration: Math.min(duration, 900)
         });
       }
       if (state.initialised && state.enabled && !state.suspended) runtimeHandle?.wake?.("weather:transition");
@@ -709,7 +720,7 @@ window.NCNWeatherDepartment = (() => {
         state.wind.y = clamp(value.y, -1, 1);
         state.wind.z = clamp(value.z, -1, 1);
       }
-      if (!state.suspended) runtimeHandle?.wake?.("weather:wind");
+      if (state.enabled && !state.suspended) runtimeHandle?.wake?.("weather:wind");
       return Object.freeze({ ...state.wind });
     }
 
@@ -719,13 +730,14 @@ window.NCNWeatherDepartment = (() => {
       if (!["auto", "reduced", "low", "medium", "high"].includes(key)) {
         throw new RangeError(`Unknown weather quality: ${value}`);
       }
-      state.qualityOverride = key === "auto" ? null : key;
-      if (state.initialised) {
-        const profile = ensurePools();
-        collectFrameScene(null, true);
-        runtimeHandle?.setMaxFps?.(profile.fps);
-        if (!state.suspended) runtimeHandle?.wake?.("weather:quality");
-      } else {
+      const override = key === "auto" ? null : key;
+      const changed = state.qualityOverride !== override;
+      state.qualityOverride = override;
+      if (state.initialised && changed) {
+        const quality = applyQuality(null, true, true);
+        collectFrameScene(quality.profile, true);
+        if (state.enabled && !state.suspended) runtimeHandle?.wake?.("weather:quality");
+      } else if (!state.initialised) {
         state.resolvedQuality = effectiveQuality();
       }
       return key;
@@ -736,8 +748,8 @@ window.NCNWeatherDepartment = (() => {
       state.seed = hashSeed(value);
       random = seededRandom(state.seed);
       state.spawnSerial = 0;
-      ["mist", "dust", "rain"].forEach(type => particles[type].forEach(particle => { particle.active = false; }));
-      if (!state.suspended) runtimeHandle?.wake?.("weather:seed");
+      deactivateAllParticles(false);
+      if (state.enabled && !state.suspended) runtimeHandle?.wake?.("weather:seed");
       return state.seed;
     }
 
@@ -756,26 +768,32 @@ window.NCNWeatherDepartment = (() => {
       if (profile.wind !== undefined) {
         setWind(typeof profile.wind === "number" ? { x: profile.wind, y: 0, z: 0 } : profile.wind);
       }
-      if (Number.isFinite(Number(profile.readingAttenuation))) {
-        state.readingAttenuation = clamp01(profile.readingAttenuation);
-      }
-      if (Number.isFinite(Number(profile.controlAttenuation))) {
-        state.controlAttenuation = clamp01(profile.controlAttenuation);
-      }
-      if (Number.isFinite(Number(profile.transitionAttenuation))) {
-        state.transitionAttenuation = clamp01(profile.transitionAttenuation);
+      if (Number.isFinite(Number(profile.readingAttenuation))) state.readingAttenuation = clamp01(profile.readingAttenuation);
+      if (Number.isFinite(Number(profile.controlAttenuation))) state.controlAttenuation = clamp01(profile.controlAttenuation);
+      if (Number.isFinite(Number(profile.transitionAttenuation))) state.transitionAttenuation = clamp01(profile.transitionAttenuation);
+
+      if (!enabled) {
+        setEnabled(false);
+        return snapshot();
       }
 
-      setEnabled(enabled);
       const duration = Number(profile.transition?.duration ?? profile.duration ?? 0);
       if (duration > 0) transitionTo(preset, {
         duration,
-        effect: meta.requestEffect === true,
+        effect: false,
         effectIntensity: meta.effectIntensity
       });
       else setPreset(preset);
-      setIntensity(enabled ? intensity : 0);
+      setIntensity(intensity);
+      setEnabled(true);
 
+      if (meta.requestEffect === true && duration > 0) {
+        const effectName = preset === "electrical-weather" ? "electrical-disturbance" : "light-flash";
+        requestEffect(effectName, null, {
+          intensity: clamp01(meta.effectIntensity ?? 0.22),
+          duration: Math.min(duration, 900)
+        });
+      }
       if (meta.effect?.name) {
         requestEffect(meta.effect.name, meta.effect.layer || null, meta.effect.options || {});
       }
@@ -795,34 +813,24 @@ window.NCNWeatherDepartment = (() => {
       if (!state.initialised || state.destroyed || !state.suspended) return false;
       state.suspended = false;
       resumeGuard = true;
-      setCanvasVisibility(true);
-      collectFrameScene(null, true);
-      clearCanvases();
-      if (state.enabled) runtimeHandle?.resume?.("weather:resume");
+      if (state.enabled) {
+        setCanvasVisibility(true);
+        const profile = QUALITY[state.resolvedQuality] || QUALITY.medium;
+        collectFrameScene(profile, true);
+        clearCanvases();
+        runtimeHandle?.resume?.("weather:resume");
+      }
       return true;
     }
 
     function reset() {
       if (state.destroyed) return false;
-      releaseEffects("weather-reset");
       state.enabled = false;
       state.suspended = false;
-      state.preset = "clear";
-      state.targetPreset = "clear";
-      state.config = clonePreset(PRESETS.clear);
-      state.transition = null;
-      state.currentIntensity = 0;
-      state.targetIntensity = 0;
       state.transitionAttenuation = 1;
-      state.spawnSerial = 0;
       state.frameCount = 0;
       state.lastDelta = 0;
-      state.lastEnvelope = null;
-      state.lastZones = { reading: false, controls: 0 };
-      random = seededRandom(state.seed);
-      ["mist", "dust", "rain"].forEach(type => particles[type].forEach(particle => { particle.active = false; }));
-      clearCanvases();
-      setCanvasVisibility(true);
+      clearDisabledState("weather-reset");
       runtimeHandle?.disable?.();
       return true;
     }
@@ -847,7 +855,7 @@ window.NCNWeatherDepartment = (() => {
 
     function particleFingerprint() {
       let hash = 2166136261;
-      ["mist", "dust", "rain"].forEach(type => {
+      PARTICLE_TYPES.forEach(type => {
         particles[type].forEach(particle => {
           if (!particle.active) return;
           const token = `${type}:${particle.x.toFixed(4)}:${particle.y.toFixed(4)}:${particle.z.toFixed(4)}:${particle.age.toFixed(4)}`;
@@ -872,7 +880,7 @@ window.NCNWeatherDepartment = (() => {
         intensity: state.currentIntensity,
         targetIntensity: state.targetIntensity,
         wind: Object.freeze({ ...state.wind }),
-        quality: state.resolvedQuality,
+        quality: state.resolvedQuality || effectiveQuality(),
         qualityOverride: state.qualityOverride || "auto",
         seed: state.seed,
         transition: state.transition ? Object.freeze({
@@ -905,6 +913,10 @@ window.NCNWeatherDepartment = (() => {
           allowed: state.lastEnvelope.allowed,
           intensity: state.lastEnvelope.intensity
         }) : null,
+        diagnostics: Object.freeze({
+          qualityChanges: state.qualityChanges,
+          fpsUpdates: state.fpsUpdates
+        }),
         lastDelta: state.lastDelta,
         frameCount: state.frameCount,
         effectRequests: state.effectRequests,
