@@ -4,23 +4,28 @@ The production viewer exposes a stable receiving shell for boot, weather,
 effects and chamber-rearrangement modules while preserving the established
 RedWire Optical renderer and Dripfeed application.
 
-## Ownership
+## Architecture
 
 - `NCNViewerLifecycle` decides which machine state is active.
-- `NCNViewerRuntime` schedules recurring visual work and owns the shared frame loop.
+- `NCNViewerRuntime` owns the shared visual scheduler.
 - `NCNEvents` carries module-to-module messages.
-- `NCNScene` provides named DOM and projection surfaces.
-- `NCNOptical` protects the established Optical renderer behind a narrow adapter.
-- `NCNDripfeed` protects the established tile wall and reader behind a narrow adapter.
-- `NCNModules` owns module initialisation, suspension, reset and destruction.
-- `NCNViewerHost` composes these services into the context supplied to modules.
+- `NCNScene` provides named terminal-owned surfaces.
+- `NCNOptical` protects the established Optical renderer.
+- `NCNDripfeed` protects the established tile wall and reader.
+- `NCNModules` owns dependency-aware lifecycle ordering.
+- `NCNViewerHost` owns terminal reset, suspend, resume and destruction.
+- `NCNIntegrationContract` freezes the names departments publish against.
+- `NCNVisualDirector` arbitrates visual intensity without rendering anything.
+- `NCNModuleIntake` checks departmental ownership before installation.
+- `NCNIntegration` supplies incoming departments with the extended context.
+- `NCNIntegrationHarness` performs repeatable browser verification.
 
 Neither application renderer is a general-purpose environmental surface. Incoming
-modules must use terminal-owned environment layers and the view adapters.
+modules must use terminal-owned layers and the protected view adapters.
 
-## Module context
+## Department context
 
-A factory registered through `NCNViewerHost.registerModule()` receives:
+A factory installed through `NCNModuleIntake.install()` receives:
 
 ```js
 {
@@ -34,7 +39,11 @@ A factory registered through `NCNViewerHost.registerModule()` receives:
   dripfeed,
   applications,
   environment,
-  settings
+  settings,
+  contract,
+  director,
+  intake,
+  integration
 }
 ```
 
@@ -49,9 +58,10 @@ context.layers.effects;
 context.views.getReadingZone();
 context.views.getControlZones();
 context.views.getDepthPlaneDefinitions();
+context.director.envelope("environment");
 ```
 
-Reading and control zones use the same shape:
+Reading and control zones use the same descriptor shape:
 
 ```js
 {
@@ -60,51 +70,154 @@ Reading and control zones use the same shape:
 }
 ```
 
-## Registering an incoming module
+## Versioned names
+
+Departments should use constants from `NCNIntegrationContract` rather than adding
+new strings for equivalent concepts.
 
 ```js
-NCNViewerHost.registerModule("weather-v2", context => {
-  const weatherLayers = context.layers.weather;
-  const task = context.runtime.register("weather-v2:update", update, {
-    group: "environment",
-    maxFps: 20,
-    enabled: false
-  });
-
-  function update(frame) {
-    // Return true while another frame is required.
-    return false;
-  }
-
-  return {
-    init() {},
-    suspend() { task.suspend(); },
-    resume() { task.resume(); },
-    reset() { task.reset(); },
-    destroy() {
-      task.unregister();
-      Object.values(weatherLayers).forEach(layer => layer.replaceChildren());
-    }
-  };
-});
+const {
+  MODULES,
+  RUNTIME_GROUPS,
+  VISUAL_CHANNELS,
+  SCENE,
+  EVENTS
+} = context.contract;
 ```
 
-Lifecycle methods are optional, but any exposed `init`, `suspend`, `resume`,
-`reset` or `destroy` property must be a function. Active modules must be destroyed
-before replacement. Circular module dependencies are rejected.
+The initial API version is `1`.
 
-Dependency order governs the whole lifecycle: dependencies initialise and resume
-first; dependants suspend, reset and destroy first.
+## Module manifest
 
-The host keeps stable compatibility adapters named `weather`, `effects` and
-`chamber-motion`. A published department module may replace the corresponding
-global implementation (`NCNWeatherRenderer`, `NCNEffects` or `NCNChamberMotion`)
-without rewriting host lifecycle code, provided it exposes the agreed methods.
+Every departmental publication should arrive with a manifest. This is separate
+from its visual settings; it describes technical ownership.
 
-Modules must not query into the Optical or Dripfeed renderers, replace chamber
-roots or create permanent private `requestAnimationFrame` loops.
+```js
+const weatherManifest = {
+  apiVersion: 1,
+  department: "weather",
+  version: "1.0.0",
+  dependencies: ["effects", "visual-director"],
+  layers: ["weather:far", "weather:rear", "weather:middle", "weather:near"],
+  visualChannels: ["environment", "fault"],
+  runtimeGroups: ["environment"],
+  capabilities: ["suspend", "resume", "reset", "destroy"],
+  owns: ["weather canvases", "particle pools"],
+  protectedRoots: [],
+  animationLoop: "shared-runtime",
+  replaces: "weather",
+  reducedMotion: true,
+  deterministicTesting: true
+};
+```
+
+`NCNModuleIntake.inspect(name, implementation, manifest)` returns a report without
+changing the viewer. It rejects:
+
+- protected application or chamber-root ownership;
+- permanent private animation loops;
+- unknown visual channels;
+- missing managed lifecycle controls;
+- self-dependencies;
+- incompatible contract versions.
+
+Warnings identify undeclared reduced-motion or deterministic test behaviour and
+unrecognised layers or runtime groups.
+
+## Installing an accepted module
+
+```js
+const report = NCNModuleIntake.inspect("weather", createWeather, weatherManifest);
+
+if (report.accepted) {
+  await NCNModuleIntake.install("weather", createWeather, weatherManifest, {
+    replace: true
+  });
+}
+```
+
+The integration façade supplies the extended context to both factories and object
+modules. Active dependants prevent unsafe service replacement. Dependency order
+still governs the full lifecycle: dependencies initialise and resume first;
+dependants suspend, reset and destroy first.
+
+The current compatibility adapters remain named `weather`, `effects` and
+`chamber-motion`. A departmental publication replaces the matching slot rather
+than adding a competing renderer beside it.
+
+## Visual director
+
+The director does not schedule weather or play effects. It supplies a current
+intensity envelope and optional short-lived claims.
+
+Modes:
+
+- `calm`
+- `booting`
+- `ambient`
+- `reading`
+- `disturbed`
+- `fault`
+- `critical`
+
+Channels:
+
+- `boot`
+- `interface`
+- `article`
+- `environment`
+- `chamber`
+- `fault`
+
+Example:
+
+```js
+const envelope = context.director.envelope("environment", { intensity: 0.8 });
+if (!envelope.allowed) return;
+
+const grant = context.director.claim("fault", {
+  owner: "weather",
+  priority: context.lifecycle.PRIORITY.fault,
+  intensity: 0.35,
+  exclusive: true,
+  duration: 450
+});
+
+if (grant.granted) {
+  context.effects?.play?.("electrical-flash", target, {
+    intensity: grant.intensity
+  });
+}
+```
+
+Reading automatically lowers environmental, chamber and fault authority. Boot,
+realignment, suspension and degraded states receive separate envelopes. Reduced
+motion also lowers non-interface visual authority.
+
+## Boot slot
+
+The host reserves the module name `boot`. Until a boot department publication is
+installed, the slot is a no-op adapter.
+
+A boot module should expose the managed lifecycle methods plus:
+
+```js
+run(context, options)
+```
+
+The integration coordinator provides:
+
+```js
+await NCNIntegration.runBoot({ reason: "cold-start" });
+```
+
+This acquires the boot visual mode, transitions the machine lifecycle, runs the
+installed sequence, releases its authority and reports completion or degradation.
+It does not invent the boot choreography.
 
 ## Named scene surfaces
+
+Protected surfaces:
 
 - `viewer`
 - `interface`
@@ -113,44 +226,59 @@ roots or create permanent private `requestAnimationFrame` loops.
 - `application:dripfeed`
 - `chamber`
 - `optical`
-- `environment`
-- `environment:weather-far`
-- `environment:weather-rear`
-- `environment:weather-middle`
-- `environment:weather-near`
-- `environment:chamber-motion`
-- `environment:effects`
+
+Writable departmental surfaces:
+
 - `weather:far`
 - `weather:rear`
 - `weather:middle`
 - `weather:near`
+- `environment:chamber-motion`
+- `environment:effects`
 
-`weather-mid` and `mid` remain accepted aliases for `weather-middle`, but new
-modules should publish against `far`, `rear`, `middle` and `near`.
+The underlying environment names also remain registered. `weather-mid` and `mid`
+are compatibility aliases for `weather-middle`, but new modules should use
+`far`, `rear`, `middle` and `near`.
 
 ## Passive verification
 
-Use the browser console:
-
 ```js
-NCNViewerHost.verify();
-NCNViewerHost.snapshot();
+NCNViewerHost.verify({ throwOnFailure: true });
+NCNIntegrationHarness.passive();
+NCNIntegration.snapshot();
 ```
 
-The verification confirms that the shared services, protected application
-boundaries, named layers, module states and active application roots are coherent
-without changing viewer state. The snapshot includes the active weather, effects
-and chamber-motion adapter snapshots where the implementations provide them.
+These checks do not change viewer state.
 
 ## Lifecycle smoke test
 
 ```js
-await NCNViewerHost.suspend("manual-test");
-await NCNViewerHost.resume("manual-test");
-await NCNViewerHost.reset("manual-test");
-NCNViewerHost.verify({ throwOnFailure: true });
+await NCNIntegrationHarness.lifecycleCycle();
 ```
 
-A successful reset returns the current application to its active environment
-profile, leaves one runtime scheduler, and preserves both protected application
-compositions.
+This verifies suspension, resumption, reset, active-application restoration and
+runtime task-count stability.
+
+## Application switching test
+
+```js
+await NCNIntegrationHarness.applicationCycle({ animate: true });
+```
+
+This switches to the other protected application and back, checking host coherence
+at each point. Visual comparison against the protected references remains a human
+acceptance test.
+
+## Complete manual run
+
+```js
+await NCNIntegrationHarness.run({
+  lifecycle: true,
+  applications: true,
+  animate: true
+});
+```
+
+A successful run leaves one shared runtime, one active application root, connected
+terminal layers, ready managed modules and no change to the protected RedWire or
+Dripfeed composition.
