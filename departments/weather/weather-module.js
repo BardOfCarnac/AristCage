@@ -1,10 +1,9 @@
 /*==================================================
   NCN WEATHER DEPARTMENT · PR-86 PUBLICATION
 
-  The accepted Weather Department contract with the approved Terminal FX mist-bank
-  presentation ported intact: smooth 192×96 radial sprites, broad deterministic
-  floor banks, slow lateral/depth drift, additive light and chamber-depth placement.
-  All continuous work remains owned by the shared runtime.
+  The accepted Weather Department contract with the approved Floor Mist / Chamber
+  Test 01 bank renderer ported into the shared host. The continuous floor veil,
+  generic red haze and front-energy line from the experiment are deliberately absent.
 ==================================================*/
 window.NCNWeatherDepartment = (() => {
   "use strict";
@@ -12,10 +11,22 @@ window.NCNWeatherDepartment = (() => {
   const PRESETS = window.NCNWeatherPresets || Object.freeze({ clear: Object.freeze({}) });
   const LAYER_KEYS = Object.freeze(["far", "rear", "middle", "near"]);
   const TYPES = Object.freeze(["mist", "dust", "rain"]);
+  const APPROVED_MIST = Object.freeze({
+    density: 0.62,
+    height: 0.34,
+    opacity: 0.58,
+    drift: 0.18,
+    depthFlow: -0.12,
+    turbulence: 0.42,
+    softness: 0.66,
+    baselineIntensity: 0.42,
+    bankCount: 36,
+    seed: 2045
+  });
   const QUALITY = Object.freeze({
     reduced: Object.freeze({ mist: 10, dust: 8, rain: 0, fps: 8, dpr: 1 }),
     low: Object.freeze({ mist: 18, dust: 24, rain: 48, fps: 12, dpr: 1 }),
-    medium: Object.freeze({ mist: 32, dust: 40, rain: 96, fps: 20, dpr: 1.2 }),
+    medium: Object.freeze({ mist: 36, dust: 40, rain: 96, fps: 30, dpr: 1.2 }),
     high: Object.freeze({ mist: 48, dust: 64, rain: 144, fps: 30, dpr: 1.5 })
   });
   const PRESET_KEYS = Object.freeze([
@@ -30,11 +41,10 @@ window.NCNWeatherDepartment = (() => {
   const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, Number(value) || 0));
   const clamp01 = value => clamp(value, 0, 1);
   const mix = (a, b, amount) => a + (b - a) * amount;
-  const mod = (value, divisor) => ((value % divisor) + divisor) % divisor;
 
   function hashSeed(value) {
     let hash = 2166136261;
-    for (const character of String(value ?? 2045)) {
+    for (const character of String(value ?? APPROVED_MIST.seed)) {
       hash ^= character.charCodeAt(0);
       hash = Math.imul(hash, 16777619);
     }
@@ -98,19 +108,19 @@ window.NCNWeatherDepartment = (() => {
       destroyed: false,
       preset: "clear",
       targetPreset: "clear",
-      seed: 2045,
+      seed: APPROVED_MIST.seed,
       qualityOverride: null,
       resolvedQuality: null,
       currentIntensity: 0,
       targetIntensity: 0,
-      wind: { x: 0.18, y: 0, z: 0 },
+      wind: { x: 0, y: 0, z: 0 },
       readingAttenuation: 0.84,
       controlAttenuation: 0.68,
       transitionAttenuation: 1,
       transition: null,
       config: clonePreset(PRESETS.clear),
       spawnSerial: 0,
-      elapsed: 0,
+      elapsedMs: 0,
       frameCount: 0,
       lastDelta: 0,
       lastEnvelope: null,
@@ -126,7 +136,6 @@ window.NCNWeatherDepartment = (() => {
     let runtimeHandle = null;
     let resumeGuard = true;
     let particles = { mist: [], dust: [], rain: [] };
-    let mistSprites = [];
     const canvases = new Map();
     const contexts = new Map();
     const layerRects = new Map();
@@ -170,7 +179,11 @@ window.NCNWeatherDepartment = (() => {
         canvas.className = `ncn-department-weather-canvas ncn-department-weather-${key}`;
         canvas.setAttribute?.("aria-hidden", "true");
         Object.assign(canvas.style || {}, {
-          position: "absolute", inset: "0", width: "100%", height: "100%", pointerEvents: "none"
+          position: "absolute",
+          inset: "0",
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none"
         });
         layer.append?.(canvas);
         const drawingContext = canvas.getContext?.("2d", { alpha: true });
@@ -222,11 +235,10 @@ window.NCNWeatherDepartment = (() => {
       return {
         camera,
         bounds: Object.freeze({
-          halfWidth: Number(camera?.finalHalfWidth || camera?.halfWidth) || 4.5,
-          halfHeight: Number(camera?.halfHeight) || 3.2,
+          halfWidth: Number(camera?.finalHalfWidth || camera?.halfWidth) || 4.2,
+          halfHeight: Number(camera?.halfHeight) || 2.55,
           near: Number(camera?.near) || 2.5,
-          far: Number(camera?.far) || 10.5,
-          focalLength: Number(camera?.focalLength) || Math.min(Number(globalThis.innerWidth) || 800, Number(globalThis.innerHeight) || 600) * 0.84
+          far: Number(camera?.far) || 10.5
         })
       };
     }
@@ -237,8 +249,7 @@ window.NCNWeatherDepartment = (() => {
       state.geometry.zoneReads += 1;
       const readingRect = normaliseRect(context.views?.getReadingZone?.());
       state.geometry.zoneReads += 1;
-      const controls = Array.from(context.views?.getControlZones?.() || [])
-        .map(zone => normaliseRect(zone)).filter(Boolean);
+      const controls = Array.from(context.views?.getControlZones?.() || []).map(zone => normaliseRect(zone)).filter(Boolean);
       state.geometry.frames += 1;
       state.lastZones = { reading: Boolean(readingRect), controls: controls.length };
       return Object.freeze({
@@ -250,72 +261,52 @@ window.NCNWeatherDepartment = (() => {
       });
     }
 
-    function clearMistSprites() {
-      mistSprites.forEach(sprite => sprite.remove?.());
-      mistSprites = [];
+    function randomBetween(minimum, maximum) {
+      return mix(minimum, maximum, random());
     }
 
-    function makeMistSprite(kind) {
-      const sprite = document.createElement("canvas");
-      sprite.width = 192;
-      sprite.height = 96;
-      const spriteContext = sprite.getContext?.("2d", { alpha: true });
-      if (!spriteContext) return sprite;
-      const gradient = spriteContext.createRadialGradient?.(96, 52, 2, 96, 52, 88);
-      if (!gradient) return sprite;
-      const blue = kind === 2;
-      const hot = kind === 1;
-      gradient.addColorStop?.(0, blue ? "rgba(214,242,255,.78)" : hot ? "rgba(255,151,92,.68)" : "rgba(255,62,44,.60)");
-      gradient.addColorStop?.(0.3, blue ? "rgba(100,190,255,.42)" : hot ? "rgba(255,82,44,.44)" : "rgba(220,18,29,.40)");
-      gradient.addColorStop?.(0.68, blue ? "rgba(64,130,255,.12)" : "rgba(112,3,13,.15)");
-      gradient.addColorStop?.(1, "rgba(24,0,5,0)");
-      spriteContext.fillStyle = gradient;
-      spriteContext.fillRect(0, 0, 192, 96);
-      return sprite;
+    function resetMistBank(bank, bounds, initial = false) {
+      bank.x = randomBetween(-bounds.halfWidth * 1.25, bounds.halfWidth * 1.25);
+      bank.z = randomBetween(bounds.near + 0.2, bounds.far - 0.25);
+      bank.width = randomBetween(0.90, 2.40);
+      bank.depth = randomBetween(0.60, 2.00);
+      bank.lift = randomBetween(0.02, 0.28);
+      bank.alpha = randomBetween(0.55, 1.0);
+      bank.phase = randomBetween(0, Math.PI * 2);
+      bank.phase2 = randomBetween(0, Math.PI * 2);
+      bank.speed = randomBetween(0.72, 1.28);
+      bank.puffs = Math.round(randomBetween(3, 5));
+      bank.bias = randomBetween(-0.4, 0.4);
+      bank.age = 0;
+      if (!initial) {
+        const depthFlow = APPROVED_MIST.depthFlow + state.wind.z;
+        const drift = APPROVED_MIST.drift + state.wind.x;
+        if (depthFlow < -0.02) bank.z = bounds.far - randomBetween(0, 0.6);
+        else if (depthFlow > 0.02) bank.z = bounds.near + randomBetween(0.15, 0.65);
+        if (drift > 0.02) bank.x = -bounds.halfWidth - bank.width;
+        else if (drift < -0.02) bank.x = bounds.halfWidth + bank.width;
+      }
     }
 
-    function buildMistSprites() {
-      clearMistSprites();
-      mistSprites = [makeMistSprite(0), makeMistSprite(1), makeMistSprite(2)];
-    }
-
-    function makePool(type, count) {
+    function makePool(type, count, bounds = null) {
       const pool = particles[type];
-      while (pool.length < count) pool.push({ active: false, type });
+      while (pool.length < count) {
+        const particle = { active: false, type };
+        if (type === "mist" && bounds) resetMistBank(particle, bounds, true);
+        pool.push(particle);
+      }
       pool.slice(count).forEach(item => { item.active = false; });
       pool.length = count;
-      if (type === "mist") configureMistBanks();
     }
 
-    function configureMistBanks() {
-      const layout = seededRandom(`${state.seed}:mist-layout`);
-      particles.mist.forEach((bank, index) => {
-        Object.assign(bank, {
-          active: false,
-          type: "mist",
-          lane: index % 5,
-          start: mix(-1.2, 1.2, layout()),
-          phase: layout() * 90,
-          baseZ: mix(2.75, 10.2, layout()),
-          width: mix(0.8, 2.3, layout()),
-          liftFactor: layout(),
-          alpha: mix(0.35, 1, layout()),
-          speedFactor: mix(0.24, 0.42, layout()),
-          depthFactor: mix(0.22, 0.50, layout()),
-          wobble: layout() * Math.PI * 2,
-          age: 0
-        });
-      });
-    }
-
-    function applyQuality(frame = null, force = false, notifyRuntime = true) {
+    function applyQuality(frame = null, force = false, notifyRuntime = true, bounds = null) {
       const resolved = effectiveQuality(frame);
       const changed = force || state.resolvedQuality !== resolved;
       const profile = QUALITY[resolved] || QUALITY.medium;
       if (!changed) return { resolved, profile, changed: false };
       state.resolvedQuality = resolved;
       state.qualityChanges += 1;
-      makePool("mist", profile.mist);
+      makePool("mist", profile.mist, bounds || { halfWidth: 4.2, halfHeight: 2.55, near: 2.5, far: 10.5 });
       makePool("dust", profile.dust);
       makePool("rain", profile.rain);
       if (notifyRuntime && runtimeHandle) {
@@ -325,7 +316,14 @@ window.NCNWeatherDepartment = (() => {
       return { resolved, profile, changed: true };
     }
 
-    function depthLayer(z, bounds) {
+    function mistLayer(z) {
+      if (z >= 8.5) return "far";
+      if (z >= 6.5) return "rear";
+      if (z >= 4.35) return "middle";
+      return "near";
+    }
+
+    function particleLayer(z, bounds) {
       const amount = clamp01((z - bounds.near) / Math.max(0.001, bounds.far - bounds.near));
       if (amount >= 0.75) return "far";
       if (amount >= 0.5) return "rear";
@@ -333,7 +331,9 @@ window.NCNWeatherDepartment = (() => {
       return "near";
     }
 
-    function randomBetween(minimum, maximum) { return mix(minimum, maximum, random()); }
+    function activeCount(type) {
+      return particles[type].reduce((sum, particle) => sum + (particle.active ? 1 : 0), 0);
+    }
 
     function activateParticle(particle, type, bounds) {
       state.spawnSerial += 1;
@@ -350,20 +350,7 @@ window.NCNWeatherDepartment = (() => {
       particle.alpha = randomBetween(0.45, 1);
       particle.phase = randomBetween(0, Math.PI * 2);
       particle.velocity = randomBetween(0.72, 1.24);
-      particle.layer = depthLayer(particle.z, bounds);
-    }
-
-    function activeCount(type) {
-      return particles[type].reduce((sum, particle) => sum + (particle.active ? 1 : 0), 0);
-    }
-
-    function deactivateAll(resetSequence = false) {
-      TYPES.forEach(type => particles[type].forEach(particle => { particle.active = false; particle.age = 0; }));
-      if (resetSequence) {
-        state.spawnSerial = 0;
-        state.elapsed = 0;
-        random = seededRandom(state.seed);
-      }
+      particle.layer = particleLayer(particle.z, bounds);
     }
 
     function spawnToward(type, target, maximumPerStep, bounds) {
@@ -387,12 +374,35 @@ window.NCNWeatherDepartment = (() => {
       }
     }
 
+    function deactivateAll(resetSequence = false) {
+      TYPES.forEach(type => particles[type].forEach(particle => { particle.active = false; particle.age = 0; }));
+      if (resetSequence) {
+        state.spawnSerial = 0;
+        state.elapsedMs = 0;
+        random = seededRandom(state.seed);
+      }
+    }
+
+    function mistSettings(intensity) {
+      const presetBaseline = Number(PRESETS.mist?.mist) || 0.48;
+      const presetRatio = presetBaseline > 0 ? clamp(state.config.mist / presetBaseline, 0, 2) : 0;
+      const intensityRatio = clamp(intensity / APPROVED_MIST.baselineIntensity, 0, 1.5);
+      return Object.freeze({
+        density: clamp(APPROVED_MIST.density * presetRatio, 0, 1),
+        height: APPROVED_MIST.height,
+        opacity: clamp(APPROVED_MIST.opacity * intensityRatio, 0, 1),
+        drift: APPROVED_MIST.drift + state.wind.x,
+        depthFlow: APPROVED_MIST.depthFlow + state.wind.z,
+        turbulence: APPROVED_MIST.turbulence,
+        softness: APPROVED_MIST.softness
+      });
+    }
+
     function targetCounts(intensity, profile) {
-      const mistCount = intensity > 0.002 && state.config.mist > 0.002
-        ? Math.max(1, Math.round(profile.mist * (0.55 + state.config.mist * 0.45)))
-        : 0;
+      const settings = mistSettings(intensity);
+      const originalCount = Math.round(12 + settings.density * 38);
       return {
-        mist: mistCount,
+        mist: intensity > 0.002 && settings.density > 0.03 ? Math.min(profile.mist, originalCount) : 0,
         dust: Math.round(profile.dust * clamp01(state.config.dust * intensity)),
         rain: Math.round(profile.rain * clamp01(state.config.rain * intensity))
       };
@@ -410,10 +420,24 @@ window.NCNWeatherDepartment = (() => {
       }
     }
 
+    function updateMistBank(bank, deltaSeconds, bounds, settings) {
+      if (!bank.active) return;
+      bank.age += deltaSeconds;
+      const wave = Math.sin(state.elapsedMs * 0.00034 * bank.speed + bank.phase);
+      const wave2 = Math.sin(state.elapsedMs * 0.00021 + bank.phase2);
+      const sideSpeed = settings.drift * 0.22;
+      const depthSpeed = settings.depthFlow * 0.28;
+      bank.x += (sideSpeed * bank.speed + wave * 0.035 * settings.turbulence + bank.bias * 0.006) * deltaSeconds;
+      bank.z += (depthSpeed * bank.speed + wave2 * 0.025 * settings.turbulence) * deltaSeconds;
+      const xLimit = bounds.halfWidth + bank.width * 1.4;
+      if (bank.x > xLimit || bank.x < -xLimit || bank.z < bounds.near + 0.08 || bank.z > bounds.far + 0.2) {
+        resetMistBank(bank, bounds, false);
+      }
+    }
+
     function updateParticle(particle, deltaSeconds, bounds) {
       if (!particle.active) return;
       particle.age += deltaSeconds;
-      if (particle.type === "mist") return;
       if (particle.age >= particle.life) { particle.active = false; return; }
       const wave = Math.sin(particle.phase + particle.age * (0.6 + state.config.turbulence * 1.8));
       if (particle.type === "rain") {
@@ -428,8 +452,9 @@ window.NCNWeatherDepartment = (() => {
       }
       if (particle.x > bounds.halfWidth * 1.25) particle.x = -bounds.halfWidth * 1.25;
       if (particle.x < -bounds.halfWidth * 1.25) particle.x = bounds.halfWidth * 1.25;
-      particle.z = bounds.near + mod(particle.z - bounds.near, bounds.far - bounds.near);
-      particle.layer = depthLayer(particle.z, bounds);
+      if (particle.z < bounds.near) particle.z = bounds.far;
+      if (particle.z > bounds.far) particle.z = bounds.near;
+      particle.layer = particleLayer(particle.z, bounds);
     }
 
     function project(x, y, z, layerKey, scene) {
@@ -444,75 +469,73 @@ window.NCNWeatherDepartment = (() => {
       };
     }
 
-    function cutout(drawingContext, rect, attenuation, layer) {
-      if (!drawingContext || !rect || !layer || attenuation <= 0) return;
-      const padding = 12;
-      drawingContext.save();
-      drawingContext.globalCompositeOperation = "destination-out";
-      drawingContext.fillStyle = `rgba(0,0,0,${clamp01(attenuation)})`;
-      const left = rect.left - layer.left - padding;
-      const top = rect.top - layer.top - padding;
-      const width = rect.width + padding * 2;
-      const height = rect.height + padding * 2;
-      if (typeof drawingContext.roundRect === "function") {
-        drawingContext.beginPath();
-        drawingContext.roundRect(left, top, width, height, 16);
-        drawingContext.fill();
-      } else drawingContext.fillRect(left, top, width, height);
-      drawingContext.restore();
+    function passColour(alpha) {
+      return `rgba(206, 188, 188, ${alpha})`;
     }
 
-    function renderHaze(key, drawingContext, intensity, scene) {
-      const layer = scene.rects.get(key);
-      if (!layer || !drawingContext || intensity <= 0) return;
-      const mistSuppression = 1 - clamp01(state.config.mist * 0.92);
-      const depthScale = { far: 1, rear: 0.72, middle: 0.46, near: 0.22 }[key];
-      const alpha = state.config.haze * intensity * depthScale * 0.13 * mistSuppression;
-      if (alpha <= 0.001) return;
-      const gradient = drawingContext.createLinearGradient?.(0, 0, 0, layer.height);
-      if (!gradient) return;
-      gradient.addColorStop?.(0, "rgba(150,12,14,0)");
-      gradient.addColorStop?.(0.46, `rgba(224,34,26,${alpha * 0.45})`);
-      gradient.addColorStop?.(1, `rgba(255,86,48,${alpha})`);
-      drawingContext.fillStyle = gradient;
-      drawingContext.fillRect(0, 0, layer.width, layer.height);
+    function redColour(alpha) {
+      return `rgba(255, 38, 35, ${alpha})`;
     }
 
-    function bankDepth(bank) {
-      return 2.75 + mod(bank.baseZ - 2.75 + state.elapsed * state.config.depthFlow * bank.depthFactor, 7.45);
-    }
+    function drawMistBank(targetContext, bank, settings, scene) {
+      const pass = mistLayer(bank.z);
+      const floorY = -scene.bounds.halfHeight;
+      const baseAlpha = settings.opacity * settings.density * bank.alpha;
+      if (baseAlpha < 0.002) return;
+      const depthVisibility = clamp(scene.bounds.near / bank.z, 0.20, 1);
+      const pulse = 0.80 + Math.sin(state.elapsedMs * 0.00027 * bank.speed + bank.phase) * 0.16;
+      const localAlpha = baseAlpha * pulse * mix(0.52, 1.0, depthVisibility);
 
-    function drawMistBank(drawingContext, bank, intensity, scene) {
-      const z = bankDepth(bank);
-      const layerKey = depthLayer(z, scene.bounds);
-      if (contexts.get(layerKey) !== drawingContext) return;
-      const height = clamp(0.12 + state.config.moisture * 0.45 + state.config.turbulence * 0.14, 0.10, 0.78);
-      const density = clamp(0.15 + state.config.moisture * 0.66 + state.config.mist * 0.24, 0.12, 0.94);
-      const opacity = clamp(0.30 + state.config.moisture * 0.46 + state.config.haze * 0.10, 0.28, 0.88);
-      const energy = clamp(0.34 + state.config.electrical * 0.31 + state.config.moisture * 0.10, 0.32, 0.78);
-      const driftMagnitude = Math.abs(state.config.drift + state.wind.x * 0.35);
-      const driftDirection = state.config.drift + state.wind.x * 0.35 < 0 ? -1 : 1;
-      const speed = (0.022 + driftMagnitude * bank.speedFactor) * driftDirection;
-      const span = scene.bounds.halfWidth * 2 + bank.width * 2;
-      const x = -scene.bounds.halfWidth - bank.width + mod((bank.start + state.elapsed * speed + bank.phase) * span, span);
-      const laneOffset = (bank.lane - 2) * height * 0.10;
-      const wave = Math.sin(state.elapsed * (0.16 + state.config.turbulence * 0.18) + bank.wobble)
-        * bank.width * 0.12 * state.config.turbulence;
-      const lift = mix(0.04, height, bank.liftFactor);
-      const y = -scene.bounds.halfHeight + lift + laneOffset
-        + Math.sin(state.elapsed * 0.11 + bank.wobble) * height * 0.08;
-      const point = project(x + wave, y, z, layerKey, scene);
-      const scale = scene.bounds.near / z;
-      const drawWidth = Math.max(26, bank.width * scene.bounds.focalLength / z * 1.8);
-      const drawHeight = Math.max(12, drawWidth * (0.22 + height * 0.26));
-      const alpha = opacity * density * bank.alpha * (0.28 + scale * 0.68) * (0.72 + energy * 0.55) * intensity;
-      const sprite = state.config.electrical > 0.45 ? mistSprites[1] : mistSprites[0];
-      if (!sprite || typeof drawingContext.drawImage !== "function") return;
-      drawingContext.save();
-      drawingContext.globalCompositeOperation = "lighter";
-      drawingContext.globalAlpha = clamp01(alpha);
-      drawingContext.drawImage(sprite, point.x - drawWidth / 2, point.y - drawHeight / 2, drawWidth, drawHeight);
-      drawingContext.restore();
+      for (let index = 0; index < bank.puffs; index += 1) {
+        const normal = bank.puffs === 1 ? 0.5 : index / (bank.puffs - 1);
+        const wobble = Math.sin(state.elapsedMs * 0.00033 * bank.speed + bank.phase + index * 1.7);
+        const x = bank.x + (normal - 0.5) * bank.width * 1.35 + wobble * bank.width * 0.12 * settings.turbulence;
+        const z = bank.z + Math.sin(bank.phase2 + index * 2.1) * bank.depth * 0.28;
+        const lift = bank.lift + settings.height * (0.18 + 0.26 * Math.sin(bank.phase + index * 1.3) ** 2);
+        const centre = project(x, floorY + lift, z, pass, scene);
+        const left = project(x - bank.width * (0.30 + 0.09 * index), floorY + lift, z, pass, scene);
+        const right = project(x + bank.width * (0.30 + 0.09 * index), floorY + lift, z, pass, scene);
+        const upper = project(x, floorY + lift + settings.height * (0.40 + 0.25 * bank.alpha), z, pass, scene);
+        const depthA = project(x, floorY + lift * 0.6, clamp(z - bank.depth * 0.32, scene.bounds.near + 0.05, scene.bounds.far), pass, scene);
+        const depthB = project(x, floorY + lift * 0.6, clamp(z + bank.depth * 0.32, scene.bounds.near + 0.05, scene.bounds.far), pass, scene);
+        const radiusX = Math.max(4, Math.abs(right.x - left.x) * 0.60);
+        const verticalHeight = Math.abs(upper.y - centre.y);
+        const floorDepthHeight = Math.abs(depthA.y - depthB.y) * 0.42;
+        const radiusY = Math.max(2.5, verticalHeight + floorDepthHeight);
+        const alpha = localAlpha * (0.22 + 0.14 * Math.sin(index * 2.4 + bank.phase) ** 2);
+
+        targetContext.save();
+        targetContext.translate?.(centre.x, centre.y);
+        targetContext.scale?.(radiusX, radiusY);
+        const gradient = targetContext.createRadialGradient?.(0, 0, 0.08, 0, 0, 1);
+        if (gradient) {
+          const softMid = mix(0.30, 0.54, settings.softness);
+          const softEdge = mix(0.62, 0.88, settings.softness);
+          gradient.addColorStop?.(0, passColour(alpha));
+          gradient.addColorStop?.(softMid, passColour(alpha * 0.72));
+          gradient.addColorStop?.(softEdge, passColour(alpha * 0.22));
+          gradient.addColorStop?.(1, passColour(0));
+          targetContext.fillStyle = gradient;
+          targetContext.beginPath?.();
+          targetContext.arc?.(0, 0, 1, 0, Math.PI * 2);
+          targetContext.fill?.();
+        }
+
+        if (index === 0) {
+          targetContext.globalCompositeOperation = "lighter";
+          const red = targetContext.createRadialGradient?.(0, 0.38, 0.05, 0, 0.38, 1);
+          if (red) {
+            red.addColorStop?.(0, redColour(alpha * 0.18));
+            red.addColorStop?.(0.50, redColour(alpha * 0.07));
+            red.addColorStop?.(1, redColour(0));
+            targetContext.fillStyle = red;
+            targetContext.beginPath?.();
+            targetContext.arc?.(0, 0.38, 1, 0, Math.PI * 2);
+            targetContext.fill?.();
+          }
+        }
+        targetContext.restore();
+      }
     }
 
     function particleOpacity(particle) {
@@ -520,48 +543,61 @@ window.NCNWeatherDepartment = (() => {
       return particle.alpha * Math.max(0, Math.min(1, progress * 5, (1 - progress) * 5));
     }
 
-    function drawParticle(drawingContext, particle, intensity, scene) {
-      if (particle.type === "mist") return drawMistBank(drawingContext, particle, intensity, scene);
+    function drawParticle(targetContext, particle, intensity, scene) {
       const point = project(particle.x, particle.y, particle.z, particle.layer, scene);
       const opacity = particleOpacity(particle) * intensity;
       if (opacity <= 0.002) return;
       if (particle.type === "rain") {
-        drawingContext.strokeStyle = `rgba(255,126,88,${opacity * 0.42})`;
-        drawingContext.lineWidth = Math.max(0.6, particle.size * 0.08);
-        drawingContext.beginPath();
-        drawingContext.moveTo(point.x, point.y);
-        drawingContext.lineTo(point.x - state.wind.x * particle.size * 0.16, point.y + particle.size);
-        drawingContext.stroke();
+        targetContext.strokeStyle = `rgba(255,126,88,${opacity * 0.42})`;
+        targetContext.lineWidth = Math.max(0.6, particle.size * 0.08);
+        targetContext.beginPath?.();
+        targetContext.moveTo?.(point.x, point.y);
+        targetContext.lineTo?.(point.x - state.wind.x * particle.size * 0.16, point.y + particle.size);
+        targetContext.stroke?.();
       } else {
-        drawingContext.fillStyle = `rgba(255,112,70,${opacity * 0.56})`;
-        drawingContext.fillRect(point.x, point.y, particle.size, particle.size);
+        targetContext.fillStyle = `rgba(255,112,70,${opacity * 0.56})`;
+        targetContext.fillRect?.(point.x, point.y, particle.size, particle.size);
       }
+    }
+
+    function cutout(targetContext, rect, attenuation, layer) {
+      if (!targetContext || !rect || !layer || attenuation <= 0) return;
+      const padding = 12;
+      targetContext.save();
+      targetContext.globalCompositeOperation = "destination-out";
+      targetContext.fillStyle = `rgba(0,0,0,${clamp01(attenuation)})`;
+      const left = rect.left - layer.left - padding;
+      const top = rect.top - layer.top - padding;
+      const width = rect.width + padding * 2;
+      const height = rect.height + padding * 2;
+      if (typeof targetContext.roundRect === "function") {
+        targetContext.beginPath();
+        targetContext.roundRect(left, top, width, height, 16);
+        targetContext.fill();
+      } else targetContext.fillRect(left, top, width, height);
+      targetContext.restore();
     }
 
     function clearCanvases() {
       LAYER_KEYS.forEach(key => {
-        const drawingContext = contexts.get(key);
+        const targetContext = contexts.get(key);
         const rect = layerRects.get(key);
-        if (drawingContext && rect) drawingContext.clearRect(0, 0, rect.width, rect.height);
+        if (targetContext && rect) targetContext.clearRect(0, 0, rect.width, rect.height);
       });
     }
 
-    function render(intensity, scene) {
+    function render(intensity, scene, settings) {
       clearCanvases();
-      LAYER_KEYS.forEach(key => renderHaze(key, contexts.get(key), intensity, scene));
-      particles.mist.forEach(bank => {
-        if (!bank.active) return;
-        const layer = depthLayer(bankDepth(bank), scene.bounds);
-        drawMistBank(contexts.get(layer), bank, intensity, scene);
-      });
+      const sortedBanks = particles.mist.filter(bank => bank.active).sort((a, b) => b.z - a.z);
+      sortedBanks.forEach(bank => drawMistBank(contexts.get(mistLayer(bank.z)), bank, settings, scene));
       ["dust", "rain"].forEach(type => particles[type].forEach(particle => {
         if (particle.active) drawParticle(contexts.get(particle.layer), particle, intensity, scene);
       }));
       LAYER_KEYS.forEach(key => {
-        const drawingContext = contexts.get(key);
+        const targetContext = contexts.get(key);
         const layer = scene.rects.get(key);
-        if (scene.reading) cutout(drawingContext, scene.reading.rect, scene.reading.attenuation, layer);
-        scene.controls.forEach(zone => cutout(drawingContext, zone.rect, zone.attenuation, layer));
+        if (scene.reading) cutout(targetContext, scene.reading.rect, scene.reading.attenuation, layer);
+        scene.controls.forEach(zone => cutout(targetContext, zone.rect, zone.attenuation, layer));
       });
     }
 
@@ -617,7 +653,7 @@ window.NCNWeatherDepartment = (() => {
       const deltaSeconds = delta / 1000;
       state.lastDelta = delta;
       state.frameCount += 1;
-      state.elapsed += deltaSeconds;
+      state.elapsedMs += delta;
       updateTransition(delta);
       state.currentIntensity = mix(state.currentIntensity, state.targetIntensity, Math.min(1, delta / 260));
       const requested = state.currentIntensity * state.transitionAttenuation;
@@ -626,6 +662,7 @@ window.NCNWeatherDepartment = (() => {
       state.lastEnvelope = envelope;
       const readingScale = scene.reading || context.views?.isReading?.() ? 0.58 : 1;
       const intensity = envelope.allowed ? clamp01(envelope.intensity * readingScale) : 0;
+      const settings = mistSettings(intensity);
       const counts = targetCounts(intensity, quality.profile);
       if (intensity > 0.002) {
         spawnToward("mist", counts.mist, quality.profile.mist, scene.bounds);
@@ -633,8 +670,9 @@ window.NCNWeatherDepartment = (() => {
         spawnToward("rain", counts.rain, 8, scene.bounds);
       }
       TYPES.forEach(type => deactivateSurplus(type, counts[type]));
-      TYPES.forEach(type => particles[type].forEach(particle => updateParticle(particle, deltaSeconds, scene.bounds)));
-      render(intensity, scene);
+      particles.mist.forEach(bank => updateMistBank(bank, deltaSeconds, scene.bounds, settings));
+      ["dust", "rain"].forEach(type => particles[type].forEach(particle => updateParticle(particle, deltaSeconds, scene.bounds)));
+      render(intensity, scene, settings);
       const active = TYPES.reduce((sum, type) => sum + activeCount(type), 0);
       const settling = Boolean(state.transition) || Math.abs(state.currentIntensity - state.targetIntensity) > 0.002;
       return active > 0 || settling || state.targetIntensity > 0.002;
@@ -645,12 +683,15 @@ window.NCNWeatherDepartment = (() => {
       if (state.initialised) return snapshot();
       effects = context.integration?.requireService?.("effects") || null;
       mountCanvases();
-      buildMistSprites();
       const quality = applyQuality(null, true, false);
       collectScene(quality.profile, true);
       clearCanvases();
       runtimeHandle = context.runtime?.register?.("render", runtimeStep, {
-        group: "environment", priority: 20, maxFps: quality.profile.fps, enabled: false, wake: false
+        group: "environment",
+        priority: 20,
+        maxFps: quality.profile.fps,
+        enabled: false,
+        wake: false
       });
       if (!runtimeHandle) throw new Error("Shared runtime registration failed for weather.");
       state.initialised = true;
@@ -717,7 +758,8 @@ window.NCNWeatherDepartment = (() => {
       state.transition = { name: selected.key, from: clonePreset(state.config), to: selected.values, duration, elapsed: 0 };
       if (options.effect === true && state.enabled && !state.suspended) {
         requestEffect(selected.key === "electrical-weather" ? "electrical-disturbance" : "light-flash", null, {
-          intensity: clamp01(options.effectIntensity ?? 0.22), duration: Math.min(duration, 900)
+          intensity: clamp01(options.effectIntensity ?? 0.22),
+          duration: Math.min(duration, 900)
         });
       }
       runtimeHandle?.wake?.("weather:transition");
@@ -756,8 +798,9 @@ window.NCNWeatherDepartment = (() => {
       state.seed = hashSeed(value);
       random = seededRandom(state.seed);
       state.spawnSerial = 0;
-      state.elapsed = 0;
-      configureMistBanks();
+      state.elapsedMs = 0;
+      const bounds = { halfWidth: 4.2, halfHeight: 2.55, near: 2.5, far: 10.5 };
+      particles.mist.forEach(bank => resetMistBank(bank, bounds, true));
       deactivateAll(false);
       runtimeHandle?.wake?.("weather:seed");
       return state.seed;
@@ -784,7 +827,8 @@ window.NCNWeatherDepartment = (() => {
       setEnabled(true);
       if (meta.requestEffect === true && duration > 0) {
         requestEffect(preset === "electrical-weather" ? "electrical-disturbance" : "light-flash", null, {
-          intensity: clamp01(meta.effectIntensity ?? 0.22), duration: Math.min(duration, 900)
+          intensity: clamp01(meta.effectIntensity ?? 0.22),
+          duration: Math.min(duration, 900)
         });
       }
       if (meta.effect?.name) requestEffect(meta.effect.name, meta.effect.layer || null, meta.effect.options || {});
@@ -835,7 +879,6 @@ window.NCNWeatherDepartment = (() => {
       canvases.clear();
       contexts.clear();
       layerRects.clear();
-      clearMistSprites();
       particles = { mist: [], dust: [], rain: [] };
       effects = null;
       state.initialised = false;
@@ -848,9 +891,7 @@ window.NCNWeatherDepartment = (() => {
       let hash = 2166136261;
       TYPES.forEach(type => particles[type].forEach(particle => {
         if (!particle.active) return;
-        const token = particle.type === "mist"
-          ? `${type}:${particle.start.toFixed(4)}:${particle.baseZ.toFixed(4)}:${particle.width.toFixed(4)}:${particle.age.toFixed(4)}`
-          : `${type}:${particle.x.toFixed(4)}:${particle.y.toFixed(4)}:${particle.z.toFixed(4)}:${particle.age.toFixed(4)}`;
+        const token = `${type}:${particle.x?.toFixed?.(4) || "0"}:${particle.y?.toFixed?.(4) || "0"}:${particle.z?.toFixed?.(4) || "0"}:${particle.age.toFixed(4)}`;
         for (const character of token) { hash ^= character.charCodeAt(0); hash = Math.imul(hash, 16777619); }
       }));
       return hash >>> 0;
@@ -873,7 +914,9 @@ window.NCNWeatherDepartment = (() => {
         seed: state.seed,
         transition: state.transition ? Object.freeze({ name: state.transition.name, duration: state.transition.duration, elapsed: state.transition.elapsed }) : null,
         particles: Object.freeze({
-          mist: activeCount("mist"), dust: activeCount("dust"), rain: activeCount("rain"),
+          mist: activeCount("mist"),
+          dust: activeCount("dust"),
+          rain: activeCount("rain"),
           capacities: Object.freeze({ mist: particles.mist.length, dust: particles.dust.length, rain: particles.rain.length }),
           spawned: state.spawnSerial,
           fingerprint: particleFingerprint()
@@ -882,11 +925,20 @@ window.NCNWeatherDepartment = (() => {
         resources: Object.freeze({
           canvases: canvases.size,
           visibleCanvases: [...canvases.values()].filter(canvas => !canvas.hidden && canvas.style?.visibility !== "hidden").length,
-          runtimeTask: Boolean(runtimeHandle), effectHandles: activeEffectHandles.size, mistSprites: mistSprites.length
+          runtimeTask: Boolean(runtimeHandle),
+          effectHandles: activeEffectHandles.size
         }),
         geometry: Object.freeze({ ...state.geometry }),
         director: state.lastEnvelope ? Object.freeze({ mode: state.lastEnvelope.mode, allowed: state.lastEnvelope.allowed, intensity: state.lastEnvelope.intensity }) : null,
-        diagnostics: Object.freeze({ qualityChanges: state.qualityChanges, fpsUpdates: state.fpsUpdates, mistRenderer: "terminal-fx-bank-port" }),
+        diagnostics: Object.freeze({
+          qualityChanges: state.qualityChanges,
+          fpsUpdates: state.fpsUpdates,
+          mistRenderer: "floor-mist-test-01-banks",
+          floorVeil: false,
+          generalHaze: false,
+          frontEnergy: false,
+          approvedMist: APPROVED_MIST
+        }),
         lastDelta: state.lastDelta,
         frameCount: state.frameCount,
         effectRequests: state.effectRequests,
@@ -897,9 +949,20 @@ window.NCNWeatherDepartment = (() => {
     }
 
     return Object.freeze({
-      init, applyProfile, suspend, resume, reset, destroy,
-      setPreset, setIntensity, transitionTo, snapshot,
-      setEnabled, setWind, setQuality, setSeed,
+      init,
+      applyProfile,
+      suspend,
+      resume,
+      reset,
+      destroy,
+      setPreset,
+      setIntensity,
+      transitionTo,
+      snapshot,
+      setEnabled,
+      setWind,
+      setQuality,
+      setSeed,
       requestAtmosphericEffect: requestEffect
     });
   }
