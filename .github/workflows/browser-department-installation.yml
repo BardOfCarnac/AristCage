@@ -6,6 +6,7 @@ on:
       - "index.html"
       - "js/integration-browser-probe.js"
       - "js/integration-service-gate.js"
+      - "js/integration-frozen-publications.js"
       - "js/integration-departments.js"
       - "js/integration-services.js"
       - "js/module-manager.js"
@@ -26,8 +27,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check probe syntax
-        run: node --check js/integration-browser-probe.js
+      - name: Check probe and bridge syntax
+        run: |
+          node --check js/integration-browser-probe.js
+          node --check js/integration-frozen-publications.js
 
       - name: Start static viewer
         run: |
