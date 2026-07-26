@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "departments/chamber-movement/**"
+      - "js/chamber-motion-adapter.js"
+      - "tests/chamber-motion-camera-refresh.test.js"
       - ".github/workflows/chamber-movement.yml"
   push:
     branches:
@@ -13,7 +15,7 @@ on:
       - ".github/workflows/chamber-movement.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -23,30 +25,9 @@ jobs:
         working-directory: departments/chamber-movement
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: agent/prepare-module-host
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Apply pending camera-refresh correction
-        working-directory: .
-        run: |
-          set -euo pipefail
-          patch="scripts/apply-chamber-motion-camera-refresh-fix.js"
-          if [[ ! -f "$patch" ]]; then
-            echo "No pending camera-refresh correction."
-            exit 0
-          fi
-          node "$patch"
-          node --check js/chamber-motion-adapter.js
-          node tests/chamber-motion-camera-refresh.test.js
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add js/chamber-motion-adapter.js tests/chamber-motion-camera-refresh.test.js
-          git rm "$patch"
-          git commit -m "Keep chamber movement alive across camera refresh"
-          git push origin HEAD:agent/prepare-module-host
       - name: Verify source-part integrity
         run: node tests/source-integrity.js
       - name: Rebuild browser artifact
@@ -61,3 +42,8 @@ jobs:
         run: node tests/acceptance.js
       - name: Run PR 86 publication contract
         run: node tests/publication-contract.js
+      - name: Preserve active movement across camera refresh
+        working-directory: .
+        run: |
+          node --check js/chamber-motion-adapter.js
+          node tests/chamber-motion-camera-refresh.test.js
