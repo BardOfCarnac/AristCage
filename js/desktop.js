@@ -108,11 +108,12 @@
   }
 
   async function changeDesktopView({ entryId = NCN_STATE.selectedEntryId, panel = null } = {}) {
-    if (!isDesktop() || NCN_PROJECTION_TRANSITIONING) return;
+    if (!isDesktop() || NCN_PROJECTION_TRANSITIONING) return false;
 
+    const previousPanel = NCN_STATE.activePanel;
     const oldInspectorObjects = inspectorProjectionObjects();
 
-    await runProjectionTransaction({
+    const completed = await runProjectionTransaction({
       name: panel ? `desktop-panel:${panel}` : `desktop-story:${entryId}`,
       dismiss: oldInspectorObjects,
       commit: () => {
@@ -124,6 +125,16 @@
       },
       resolve: inspectorProjectionObjects
     });
+
+    if (
+      completed
+      && previousPanel !== NCN_STATE.activePanel
+      && typeof announcePanelState === "function"
+    ) {
+      announcePanelState("desktop-panel-settled");
+    }
+
+    return completed;
   }
 
   document.addEventListener("click", event => {
