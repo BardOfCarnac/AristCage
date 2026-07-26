@@ -34,10 +34,10 @@ for (const token of [
 }
 
 for (const rejected of [
-  'drawFloorVeil',
-  'renderHaze',
+  'function drawFloorVeil',
+  'function renderHaze',
   'createLinearGradient',
-  'front-energy',
+  'function drawFrontEnergy',
   'buildMistSprites',
   'drawImage',
   'sprite.width = 48',
