@@ -1,9 +1,42 @@
 # NCN Weather Department — PR-86 publication
 
-This directory is a departmental candidate for the replaceable `weather` slot on
-`agent/prepare-module-host` (PR #86). It deliberately does **not** install itself,
-modify `index.html`, replace the incumbent slot, or touch RedWire, Dripfeed or
-chamber structures.
+This directory is the departmental candidate for the replaceable `weather` slot on
+`agent/prepare-module-host`. It does not install itself, modify application roots,
+replace the incumbent slot, or touch protected RedWire, Dripfeed, Optical or chamber
+structures.
+
+## Approved everyday mist
+
+The default RedWire mist is the agreed **Floor Mist / Chamber Test 01 — Low mist**
+bank renderer, adapted only to the four host-supplied depth layers and shared runtime.
+
+Its visual constants are:
+
+- density `0.62`
+- height `0.34`
+- opacity `0.58`
+- lateral drift `+0.18`
+- depth flow `-0.12`
+- turbulence `0.42`
+- softness `0.66`
+- deterministic seed `2045`
+- 36 active banks at ordinary desktop quality and the RedWire baseline intensity
+
+Each bank uses three to five overlapping elliptical radial puffs. Bank dimensions,
+lift, alpha and speed retain the ranges from the approved test. The host's four weather
+layers divide the original far pass into `far` and `rear`, while preserving the original
+middle and near boundaries.
+
+The following experimental extras are expressly excluded:
+
+- continuous floor veil
+- generic or vertical red haze
+- front floor-energy line
+- sprite reconstructions, pixelated or otherwise
+
+Normal mist is pale grey-white with only the small local red luminosity embedded in
+the first puff of each bank, as in the approved test. RedWire's chamber supplies the
+ambient red architecture; Weather does not wash the chamber in red.
 
 ## Load order for intake
 
@@ -21,19 +54,9 @@ createNCNWeatherDepartment
 createWeather
 ```
 
-Preflight without replacing the incumbent:
+## Capability boundary
 
-```js
-NCNIntegrationHarness.inspectCandidate(
-  "weather",
-  NCNWeatherDepartment.createWeather,
-  NCNWeatherDepartmentManifest
-);
-```
-
-## Contract
-
-The factory consumes the capability-scoped PR-86 department context. It uses only:
+The factory uses only:
 
 - `context.layers.weather.far`
 - `context.layers.weather.rear`
@@ -41,90 +64,42 @@ The factory consumes the capability-scoped PR-86 department context. It uses onl
 - `context.layers.weather.near`
 - `context.runtime` for its sole recurring task
 - `context.director` for environment and fault envelopes
-- `context.integration.requireService("effects")` for accepted reusable effects
-- `context.views` for reading and control-zone descriptors
+- `context.integration.requireService("effects")`
+- `context.views` for reading and control-zone attenuation
 - `context.chamber` for read-only projection geometry
 
-It never queries or alters protected Optical, RedWire, Dripfeed or chamber roots.
-Weather CSS targets only `.ncn-department-weather-canvas*`; canonical layer geometry
-and stacking remain host-owned.
-
-## Public API
-
-```js
-const weather = createWeather(context);
-await weather.init();
-weather.applyProfile(profile, meta);
-weather.suspend();
-weather.resume();
-weather.reset();
-weather.destroy();
-weather.setPreset("mist");
-weather.setIntensity(0.35);
-weather.transitionTo("rain", { duration: 3000 });
-weather.snapshot();
-```
-
-Additional controls are `setEnabled`, `setWind`, `setQuality`, `setSeed` and
-`requestAtmosphericEffect`.
+Construction is inert. `init()` creates one canvas in each supplied layer and registers
+one task in runtime group `environment`. There is no private animation loop, interval
+or per-bank timer.
 
 ## Effects boundary
 
-Weather resolves only the declared `effects` dependency. The only effect names it
-may request are:
+Weather may request only:
 
-- `electrical-disturbance` on the `fault` channel;
-- `light-flash` on the `environment` channel.
+- `electrical-disturbance` on `fault`
+- `light-flash` on `environment`
 
-Both are marked with the explicit `ambient` purpose. Unknown names are rejected
-before reaching the Effects service. Weather does not call a global effects object
-or dispatch a fallback window event.
+Both requests are forced to the `ambient` purpose. Caller-supplied channel and purpose
+values cannot override this policy.
 
-## Runtime and frame work
+## Profiles, suspension and cleanup
 
-Construction creates no resources. `init()` creates one canvas in each supplied
-layer and registers exactly one recurring task in runtime group `environment`.
-There is no module-owned `requestAnimationFrame`, interval or per-particle timer.
+RedWire requests `mist` at intensity `0.42` with seed `2045`; that baseline maps to the
+approved visual values above. Dripfeed disables Weather completely.
 
-Camera state, four layer rectangles, the reading zone and control zones are each
-resolved once per shared-runtime frame and passed through particle update and
-rendering. Particle drawing performs no additional layout or camera lookup.
+Suspension stops the shared-runtime task, clears all canvases and hides them. Disable,
+reset and destruction deactivate all banks and particles, cancel Weather-owned Effects
+handles and remove all owned canvases without altering the integration slot.
 
-## Quality and reduced motion
+## Validation
 
-`quality: "auto"` follows the host continuously. Initial reduced mode is honoured
-before the first frame, and later full → reduced → full changes do not become
-latched as an explicit user choice. Explicit `reduced`, `low`, `medium` or `high`
-settings remain available for diagnostics.
+- `tests/weather-module.node.test.js` covers shared-runtime behaviour, deterministic
+  replay, approved bank count/specification, the absence of linear haze gradients,
+  quality changes, Effects policy, suspension and cleanup.
+- `tests/weather-mist-visual-contract.test.js` protects the agreed mist constants and
+  bank construction while rejecting the floor veil, generic haze, front-energy line
+  and sprite reconstructions.
+- `tests/weather-pr86-host.test.js` performs the protected application round trip
+  without replacing the incumbent slot.
 
-Reduced mode uses 8fps, 10 mist particles, 8 dust particles and no rain. The visual
-director remains authoritative and may suppress weather further.
-
-## Suspension and cleanup
-
-Suspension stops the runtime task, clears all canvases and hides them so the final
-weather frame cannot remain frozen over the interface. Resume restores the canvases
-with a zero-delta guard before playback continues.
-
-`destroy()` unregisters the sole task, cancels owned effect handles, removes all four
-canvases, clears pools and releases every owned reference. It does not change the
-incumbent integration slot.
-
-## Deterministic testing
-
-All particle variation and effect request seeds come from local seeded generators.
-There is no `Math.random()` identity or variation. Given the same seed, profile and
-runtime deltas, the particle fingerprint is repeatable.
-
-Validation files:
-
-- `tests/weather-module.node.test.js` — deterministic runtime, Effects-name,
-  quality, suspension, geometry and cleanup acceptance;
-- `tests/weather-module.test.js` — generic browser/context acceptance;
-- `tests/weather-pr86-host.test.js` — manual PR-86 intake and protected
-  RedWire → Dripfeed → RedWire round trip without slot installation;
-- `.github/workflows/weather-department-check.yml` — syntax, deterministic Node
-  harness and static ownership checks.
-
-The integration agent remains responsible for staged installation, incumbent
-retirement and rendered desktop/mobile testing.
+Rendered desktop and mobile inspection remains the integration gate before merge.
