@@ -3,32 +3,52 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 
 const source = fs.readFileSync(path.resolve(__dirname, '..', 'weather-module.js'), 'utf8');
+const presets = fs.readFileSync(path.resolve(__dirname, '..', 'weather-presets.js'), 'utf8');
 
 for (const token of [
-  'sprite.width = 192;',
-  'sprite.height = 96;',
-  'createRadialGradient?.(96, 52, 2, 96, 52, 88)',
-  'rgba(255,62,44,.60)',
-  'rgba(220,18,29,.40)',
-  'rgba(112,3,13,.15)',
-  'lane: index % 5',
-  'start: mix(-1.2, 1.2, layout())',
-  'baseZ: mix(2.75, 10.2, layout())',
-  'width: mix(0.8, 2.3, layout())',
-  'phase: layout() * 90',
-  'drawingContext.globalCompositeOperation = "lighter"',
-  'mistRenderer: "terminal-fx-bank-port"'
+  'density: 0.62',
+  'height: 0.34',
+  'opacity: 0.58',
+  'drift: 0.18',
+  'depthFlow: -0.12',
+  'turbulence: 0.42',
+  'softness: 0.66',
+  'bankCount: 36',
+  'bank.width = randomBetween(0.90, 2.40)',
+  'bank.depth = randomBetween(0.60, 2.00)',
+  'bank.lift = randomBetween(0.02, 0.28)',
+  'bank.alpha = randomBetween(0.55, 1.0)',
+  'bank.speed = randomBetween(0.72, 1.28)',
+  'bank.puffs = Math.round(randomBetween(3, 5))',
+  'const sideSpeed = settings.drift * 0.22',
+  'const depthSpeed = settings.depthFlow * 0.28',
+  'createRadialGradient?.(0, 0, 0.08, 0, 0, 1)',
+  'rgba(206, 188, 188',
+  'rgba(255, 38, 35',
+  'mistRenderer: "floor-mist-test-01-banks"',
+  'floorVeil: false',
+  'generalHaze: false',
+  'frontEnergy: false'
 ]) {
-  assert.ok(source.includes(token), `Approved mist visual contract is missing: ${token}`);
+  assert.ok(source.includes(token), `Approved Floor Mist visual contract is missing: ${token}`);
 }
 
 for (const rejected of [
-  'sprite.width = 48;',
-  'sprite.height = 28;',
-  'imageSmoothingEnabled = false',
-  'const variants = 4'
+  'drawFloorVeil',
+  'renderHaze',
+  'createLinearGradient',
+  'front-energy',
+  'buildMistSprites',
+  'drawImage',
+  'sprite.width = 48',
+  'sprite.width = 192',
+  'imageSmoothingEnabled'
 ]) {
-  assert.equal(source.includes(rejected), false, `Superseded mist reconstruction remains: ${rejected}`);
+  assert.equal(source.includes(rejected), false, `Unapproved mist extra or reconstruction remains: ${rejected}`);
 }
 
-console.log('Approved Terminal FX mist visual contract is preserved.');
+for (const hazeValue of ['haze: 0.12', 'haze: 0.23', 'haze: 0.48', 'haze: 0.17', 'haze: 0.24', 'haze: 0.31']) {
+  assert.equal(presets.includes(hazeValue), false, `Weather preset still requests unapproved haze: ${hazeValue}`);
+}
+
+console.log('Approved Floor Mist bank visual contract is preserved without haze extras.');
