@@ -1,0 +1,58 @@
+name: Developer Panel Checks
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "js/dev-panel-controls.js"
+      - "css/dev-panel-controls.css"
+      - ".github/workflows/dev-panel-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check developer control syntax
+        run: node --check js/dev-panel-controls.js
+
+      - name: Check shared launcher and service wiring
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const script = fs.readFileSync('js/dev-panel-controls.js', 'utf8');
+          const css = fs.readFileSync('css/dev-panel-controls.css', 'utf8');
+
+          for (const source of ['css/dev-panel-controls.css', 'js/dev-panel-controls.js']) {
+            if (!html.includes(source)) throw new Error(`index.html does not load ${source}.`);
+          }
+
+          const diagnostics = html.indexOf('js/diagnostics.js');
+          const integration = html.indexOf('js/integration-departments.js');
+          const controls = html.indexOf('js/dev-panel-controls.js');
+          if (diagnostics < 0 || integration < diagnostics || controls < integration) {
+            throw new Error('Developer controls must load after diagnostics and integrated departments.');
+          }
+
+          for (const token of [
+            'ensureDiagnosticsInterface',
+            'data-debug-weather',
+            'data-debug-motion',
+            'syncApplicationProfile',
+            'chamber-motion',
+            'weather'
+          ]) {
+            if (!script.includes(token)) throw new Error(`Developer controls are missing ${token}.`);
+          }
+
+          if (!css.includes('.diagnostics-toggle') || !css.includes('display: block !important')) {
+            throw new Error('The application-neutral developer launcher is not forced visible.');
+          }
+          console.log('Shared developer panel controls are wired correctly.');
+          NODE
