@@ -62,6 +62,7 @@
 
     const drawing = canvas.getContext("2d");
     const activePoses = new Map();
+    const capturedHandles = new Set();
     const geometryListeners = new Set();
     const catalogs = new Map();
 
@@ -72,6 +73,9 @@
     let geometryVersion = 0;
     let dpr = 1;
     let camera = null;
+    let catalogRefreshPending = false;
+    let pendingGeometryDetail = null;
+    let catalogRefreshQueued = false;
 
     function currentCamera() {
       return context.chamber?.getCameraSnapshot?.()
@@ -102,10 +106,37 @@
       });
     }
 
+    function movementActive() {
+      return capturedHandles.size > 0 || activePoses.size > 0;
+    }
+
+    function notifyGeometryChange(detail) {
+      geometryListeners.forEach(listener => {
+        try { listener(detail || camera); } catch (error) { console.error(error); }
+      });
+    }
+
+    function flushDeferredGeometryChange() {
+      catalogRefreshQueued = false;
+      if (destroyed || movementActive() || !catalogRefreshPending) return;
+      const detail = pendingGeometryDetail;
+      catalogRefreshPending = false;
+      pendingGeometryDetail = null;
+      rebuildCatalogs();
+      notifyGeometryChange(detail || camera);
+    }
+
+    function queueDeferredGeometryChange() {
+      if (destroyed || movementActive() || !catalogRefreshPending || catalogRefreshQueued) return;
+      catalogRefreshQueued = true;
+      enqueue(flushDeferredGeometryChange);
+    }
+
     function applyStoredPose(id, pose) {
       if (pose) activePoses.set(id, pose);
       else activePoses.delete(id);
       scheduleDraw();
+      queueDeferredGeometryChange();
     }
 
     function makeHandle(id, region, u, v, geometry) {
@@ -123,10 +154,16 @@
           }),
           size: geometry.size
         }),
-        capture: () => Object.freeze({ pose: activePoses.get(id) || null }),
+        capture() {
+          capturedHandles.add(id);
+          return Object.freeze({ pose: activePoses.get(id) || null });
+        },
         applyPose: pose => applyStoredPose(id, pose),
         restore: snapshot => applyStoredPose(id, snapshot?.pose || null),
-        clearPose: () => applyStoredPose(id, null)
+        clearPose() {
+          capturedHandles.delete(id);
+          applyStoredPose(id, null);
+        }
       });
     }
 
@@ -252,15 +289,28 @@
 
     function announceGeometryChange(event) {
       if (destroyed) return;
+      const nextCamera = currentCamera() || event?.detail || camera;
+      if (nextCamera) {
+        camera = nextCamera;
+        sizeCanvas(camera);
+      }
+      scheduleDraw();
+
+      if (movementActive()) {
+        catalogRefreshPending = true;
+        pendingGeometryDetail = event?.detail || camera;
+        return;
+      }
+
       rebuildCatalogs();
-      geometryListeners.forEach(listener => {
-        try { listener(event?.detail || camera); } catch (error) { console.error(error); }
-      });
+      notifyGeometryChange(event?.detail || camera);
     }
 
     function clear() {
       activePoses.clear();
+      capturedHandles.clear();
       scheduleDraw();
+      queueDeferredGeometryChange();
     }
 
     function setSuspended(next) {
@@ -277,6 +327,8 @@
         geometryVersion,
         drawCount,
         activePoseCount: activePoses.size,
+        capturedHandleCount: capturedHandles.size,
+        deferredGeometryRefresh: catalogRefreshPending,
         canvasConnected: canvas.isConnected,
         canvasVisible: canvas.isConnected && canvas.hidden !== true,
         catalogs: Object.freeze(Object.fromEntries(
@@ -292,6 +344,10 @@
       geometryListeners.clear();
       catalogs.clear();
       activePoses.clear();
+      capturedHandles.clear();
+      catalogRefreshPending = false;
+      pendingGeometryDetail = null;
+      catalogRefreshQueued = false;
       canvas.remove();
       return true;
     }
@@ -443,7 +499,13 @@
           clusterSize: detail.name === "submit" ? [3, 6] : [2, 5],
           intensity: detail.name === "submit" ? 0.68 : 0.58
         }, `panel:${detail.name}`);
-      } else if (service?.snapshot?.().activeSequenceCount) {
+        return;
+      }
+
+      const eligiblePanelStillOpen = currentApplication() === "redwire"
+        && ["filter", "submit"].includes(currentPanel());
+      const explicitClose = detail.open === false || detail.name == null;
+      if (explicitClose && !eligiblePanelStillOpen && service?.snapshot?.().activeSequenceCount) {
         void service.settle?.({ reason: "panel-closed", duration: 420 });
       }
     }
