@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { chromium } from "playwright";
 
 const baseUrl = process.env.NCN_TEST_URL || "http://127.0.0.1:4173/";
 const browser = await chromium.launch({ headless: true });
+fs.mkdirSync("artifacts", { recursive: true });
 
 async function sample(page) {
   return page.evaluate(() => {
@@ -125,6 +127,8 @@ async function runViewport(name, viewport) {
     pageErrors,
     samples
   };
+  fs.writeFileSync(`artifacts/chamber-motion-${name}.json`, JSON.stringify(diagnostics, null, 2));
+  await page.screenshot({ path: `artifacts/chamber-motion-${name}.png`, fullPage: true });
   console.log(`CHAMBER_RENDER_DIAGNOSTICS:${JSON.stringify(diagnostics)}`);
 
   assert.ok(active.length >= 8, `${name}: movement should remain active across multiple rendered samples`);
@@ -150,7 +154,6 @@ async function runViewport(name, viewport) {
       && state.adapter?.canvasVisible === false;
   }, null, { timeout: 10_000 });
 
-  await page.screenshot({ path: `artifacts/chamber-motion-${name}.png`, fullPage: true });
   await page.close();
 }
 
