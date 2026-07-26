@@ -1,0 +1,36 @@
+name: Apply Chamber Motion Camera Fix
+
+on:
+  push:
+    branches:
+      - agent/prepare-module-host
+    paths:
+      - "scripts/apply-chamber-motion-camera-refresh-fix.js"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/prepare-module-host
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply integration correction
+        run: node scripts/apply-chamber-motion-camera-refresh-fix.js
+      - name: Validate corrected adapter
+        run: |
+          node --check js/chamber-motion-adapter.js
+          node tests/chamber-motion-camera-refresh.test.js
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/chamber-motion-adapter.js tests/chamber-motion-camera-refresh.test.js
+          git commit -m "Keep chamber movement alive across camera refresh"
+          git push origin HEAD:agent/prepare-module-host
