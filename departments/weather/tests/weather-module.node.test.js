@@ -5,10 +5,16 @@ const assert = require('node:assert/strict');
 
 class FakeGradient { addColorStop() {} }
 class FakeContext {
-  constructor() { this.clearCalls = 0; }
+  constructor() {
+    this.clearCalls = 0;
+    this.drawImageCalls = 0;
+    this.imageSmoothingEnabled = true;
+    this.globalAlpha = 1;
+  }
   setTransform() {}
   clearRect() { this.clearCalls += 1; }
   fillRect() {}
+  drawImage() { this.drawImageCalls += 1; }
   beginPath() {}
   moveTo() {}
   lineTo() {}
@@ -195,6 +201,11 @@ function activeTotal(snapshot) {
   return snapshot.particles.mist + snapshot.particles.dust + snapshot.particles.rain;
 }
 
+function mistBankDraws() {
+  return Object.values(layers).reduce((sum, layer) =>
+    sum + layer.children.reduce((layerSum, canvas) => layerSum + canvas.context.drawImageCalls, 0), 0);
+}
+
 (async () => {
   const source = fs.readFileSync(path.join(directory, 'weather-module.js'), 'utf8');
   assert.equal(global.NCNWeatherDepartmentManifest.replaces, 'weather');
@@ -203,6 +214,8 @@ function activeTotal(snapshot) {
   for (const forbidden of ['requestAnimationFrame', 'setInterval', 'Math.random', 'querySelector', 'window.NCNEffects', 'dispatchEvent']) {
     assert.equal(source.includes(forbidden), false, `forbidden token: ${forbidden}`);
   }
+  assert.ok(source.includes('buildMistSprites'), 'mist bank sprite factory must be present');
+  assert.ok(source.includes('drawMistBank'), 'mist must use the bank renderer');
 
   const weather = global.NCNWeatherDepartment.createWeather(context);
   const beforeChildren = Object.values(layers).reduce((sum, layer) => sum + layer.children.length, 0);
@@ -218,6 +231,7 @@ function activeTotal(snapshot) {
   runtime.step(16, 40);
   const redwireA = weather.snapshot();
   assert.ok(redwireA.particles.mist > 0);
+  assert.ok(mistBankDraws() > 0, 'active mist must draw low-resolution bank sprites');
   assert.equal(redwireA.resources.visibleCanvases, 4);
   assert.equal(redwireA.zones.reading, true);
   assert.equal(redwireA.zones.controls, 1);

@@ -130,6 +130,7 @@ window.NCNWeatherDepartment = (() => {
     const contexts = new Map();
     const layerRects = new Map();
     let particles = { mist: [], dust: [], rain: [] };
+    let mistSprites = [];
     const activeEffectHandles = new Set();
     let resumeGuard = true;
 
@@ -287,6 +288,55 @@ window.NCNWeatherDepartment = (() => {
       }
     }
 
+    function clearMistSprites() {
+      mistSprites.forEach(sprite => sprite.remove?.());
+      mistSprites = [];
+    }
+
+    function buildMistSprites() {
+      clearMistSprites();
+      const variants = 4;
+      for (let variant = 0; variant < variants; variant += 1) {
+        const sprite = document.createElement("canvas");
+        sprite.width = 48;
+        sprite.height = 28;
+        const spriteContext = sprite.getContext?.("2d", { alpha: true });
+        if (!spriteContext) continue;
+        const spriteRandom = seededRandom(`${state.seed}:mist-sprite:${variant}`);
+        const blobs = Array.from({ length: 4 + Math.floor(spriteRandom() * 3) }, () => ({
+          x: mix(0.12, 0.88, spriteRandom()),
+          y: mix(0.38, 0.84, spriteRandom()),
+          rx: mix(0.12, 0.34, spriteRandom()),
+          ry: mix(0.14, 0.30, spriteRandom()),
+          gain: mix(0.6, 1.15, spriteRandom())
+        }));
+        for (let y = 0; y < sprite.height; y += 1) {
+          for (let x = 0; x < sprite.width; x += 1) {
+            const nx = x / (sprite.width - 1);
+            const ny = y / (sprite.height - 1);
+            let field = 0;
+            for (const blob of blobs) {
+              const dx = (nx - blob.x) / blob.rx;
+              const dy = (ny - blob.y) / blob.ry;
+              field += Math.exp(-(dx * dx + dy * dy) * 2.4) * blob.gain;
+            }
+            const baseLift = clamp01((ny - 0.18) / 0.72);
+            field *= mix(0.4, 1.2, baseLift);
+            const threshold = 0.42;
+            if (field <= threshold) continue;
+            const alpha = Math.pow(clamp01((field - threshold) / 1.2), 1.05) * 0.86;
+            const warm = 0.4 + baseLift * 0.6;
+            const red = Math.round(mix(145, 255, warm));
+            const green = Math.round(mix(10, 70, warm));
+            const blue = Math.round(mix(12, 34, warm));
+            spriteContext.fillStyle = `rgba(${red},${green},${blue},${alpha})`;
+            spriteContext.fillRect(x, y, 1, 1);
+          }
+        }
+        mistSprites.push(sprite);
+      }
+    }
+
     function applyQuality(frame = null, force = false, notifyRuntime = true) {
       const resolved = effectiveQuality(frame);
       const changed = force || state.resolvedQuality !== resolved;
@@ -321,20 +371,25 @@ window.NCNWeatherDepartment = (() => {
       state.spawnSerial += 1;
       particle.active = true;
       particle.age = 0;
-      particle.life = type === "mist" ? randomBetween(5.5, 12)
+      particle.life = type === "mist" ? randomBetween(7.5, 15.5)
         : type === "dust" ? randomBetween(2.8, 7)
           : randomBetween(0.9, 2.2);
       particle.x = randomBetween(-limits.halfWidth * 1.16, limits.halfWidth * 1.16);
       particle.y = type === "rain"
         ? randomBetween(-limits.halfHeight * 0.2, limits.halfHeight * 1.15)
-        : randomBetween(-limits.halfHeight * 0.95, limits.halfHeight * 0.85);
+        : type === "mist"
+          ? randomBetween(-limits.halfHeight * 1.02, -limits.halfHeight * 0.28)
+          : randomBetween(-limits.halfHeight * 0.95, limits.halfHeight * 0.85);
       particle.z = randomBetween(limits.near + 0.15, limits.far);
-      particle.size = type === "mist" ? randomBetween(0.18, 0.64)
+      particle.size = type === "mist" ? randomBetween(1.1, 2.4)
         : type === "dust" ? randomBetween(0.8, 2.2)
           : randomBetween(5, 14);
       particle.alpha = randomBetween(0.45, 1);
       particle.phase = randomBetween(0, Math.PI * 2);
       particle.velocity = randomBetween(0.72, 1.24);
+      particle.floorBand = type === "mist" ? randomBetween(-limits.halfHeight * 1.0, -limits.halfHeight * 0.34) : particle.y;
+      particle.heightBias = type === "mist" ? randomBetween(0.42, 0.86) : 1;
+      particle.variant = type === "mist" ? Math.floor(randomBetween(0, Math.max(1, mistSprites.length))) : 0;
       particle.layer = depthLayer(particle.z, limits);
     }
 
@@ -411,9 +466,13 @@ window.NCNWeatherDepartment = (() => {
         particle.y += (wind.y * 0.24 + Math.cos(particle.phase + particle.age) * 0.025) * deltaSeconds;
         particle.z += (wind.z + state.config.depthFlow) * 0.20 * deltaSeconds;
       } else {
-        particle.x += (wind.x * (0.24 + state.config.drift) + wave * turbulence * 0.045) * particle.velocity * deltaSeconds;
-        particle.y += (wind.y * 0.12 + Math.cos(particle.phase + particle.age * 0.42) * 0.018) * deltaSeconds;
-        particle.z += (wind.z + state.config.depthFlow) * 0.12 * deltaSeconds;
+        particle.x += (wind.x * (0.18 + state.config.drift * 0.6) + wave * turbulence * 0.026) * particle.velocity * deltaSeconds;
+        particle.y = mix(
+          particle.y,
+          particle.floorBand + Math.cos(particle.phase + particle.age * 0.42) * 0.045,
+          Math.min(1, deltaSeconds * 1.5)
+        );
+        particle.z += (wind.z + state.config.depthFlow) * 0.10 * deltaSeconds;
       }
       if (particle.x > limits.halfWidth * 1.25) particle.x = -limits.halfWidth * 1.25;
       if (particle.x < -limits.halfWidth * 1.25) particle.x = limits.halfWidth * 1.25;
@@ -458,12 +517,12 @@ window.NCNWeatherDepartment = (() => {
       const layer = scene.rects.get(key);
       if (!layer || !ctx || intensity <= 0) return;
       const depthScale = { far: 1, rear: 0.72, middle: 0.46, near: 0.22 }[key];
-      const alpha = state.config.haze * intensity * depthScale * 0.13;
+      const alpha = state.config.haze * intensity * depthScale * 0.09;
       if (alpha <= 0.001) return;
       const gradient = ctx.createLinearGradient?.(0, 0, 0, layer.height);
       if (!gradient) return;
       gradient.addColorStop?.(0, "rgba(150,12,14,0)");
-      gradient.addColorStop?.(0.46, `rgba(224,34,26,${alpha * 0.45})`);
+      gradient.addColorStop?.(0.46, `rgba(224,34,26,${alpha * 0.42})`);
       gradient.addColorStop?.(1, `rgba(255,86,48,${alpha})`);
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, layer.width, layer.height);
@@ -474,7 +533,25 @@ window.NCNWeatherDepartment = (() => {
       return particle.alpha * Math.max(0, Math.min(1, life * 5, (1 - life) * 5));
     }
 
+    function drawMistBank(ctx, particle, intensity, scene) {
+      const point = project(particle, particle.layer, scene);
+      const opacity = particleOpacity(particle) * intensity;
+      if (opacity <= 0.002) return;
+      const sprite = mistSprites[particle.variant % Math.max(1, mistSprites.length)] || null;
+      if (!sprite || typeof ctx.drawImage !== "function") return;
+      const width = (160 + state.config.moisture * 120) * particle.size / Math.max(1.9, particle.z * 0.54);
+      const height = width * mix(0.28, 0.42, particle.heightBias);
+      ctx.save();
+      const previousSmoothing = ctx.imageSmoothingEnabled;
+      if ("imageSmoothingEnabled" in ctx) ctx.imageSmoothingEnabled = false;
+      ctx.globalAlpha = opacity * 0.92;
+      ctx.drawImage(sprite, point.x - width * 0.5, point.y - height * 0.72, width, height);
+      if ("imageSmoothingEnabled" in ctx) ctx.imageSmoothingEnabled = previousSmoothing;
+      ctx.restore();
+    }
+
     function drawParticle(ctx, particle, intensity, scene) {
+      if (particle.type === "mist") return drawMistBank(ctx, particle, intensity, scene);
       const point = project(particle, particle.layer, scene);
       const opacity = particleOpacity(particle) * intensity;
       if (opacity <= 0.002) return;
@@ -487,19 +564,8 @@ window.NCNWeatherDepartment = (() => {
         ctx.stroke();
         return;
       }
-      if (particle.type === "dust") {
-        ctx.fillStyle = `rgba(255,112,70,${opacity * 0.56})`;
-        ctx.fillRect(point.x, point.y, particle.size, particle.size);
-        return;
-      }
-      const radius = Math.max(8, particle.size * 52 / Math.max(2.5, particle.z));
-      const gradient = ctx.createRadialGradient?.(point.x, point.y, 0, point.x, point.y, radius);
-      if (!gradient) return;
-      gradient.addColorStop?.(0, `rgba(255,82,54,${opacity * 0.14})`);
-      gradient.addColorStop?.(0.56, `rgba(230,38,30,${opacity * 0.08})`);
-      gradient.addColorStop?.(1, "rgba(150,12,14,0)");
-      ctx.fillStyle = gradient;
-      ctx.fillRect(point.x - radius, point.y - radius, radius * 2, radius * 2);
+      ctx.fillStyle = `rgba(255,112,70,${opacity * 0.56})`;
+      ctx.fillRect(point.x, point.y, particle.size, particle.size);
     }
 
     function clearCanvases() {
@@ -616,6 +682,7 @@ window.NCNWeatherDepartment = (() => {
       if (state.initialised) return snapshot();
       effects = context.integration?.requireService?.("effects") || null;
       mountCanvases();
+      buildMistSprites();
       const quality = applyQuality(null, true, false);
       collectFrameScene(quality.profile, true);
       clearCanvases();
@@ -748,6 +815,7 @@ window.NCNWeatherDepartment = (() => {
       state.seed = hashSeed(value);
       random = seededRandom(state.seed);
       state.spawnSerial = 0;
+      buildMistSprites();
       deactivateAllParticles(false);
       if (state.enabled && !state.suspended) runtimeHandle?.wake?.("weather:seed");
       return state.seed;
@@ -845,6 +913,7 @@ window.NCNWeatherDepartment = (() => {
       canvases.clear();
       contexts.clear();
       layerRects.clear();
+      clearMistSprites();
       particles = { mist: [], dust: [], rain: [] };
       effects = null;
       state.initialised = false;
