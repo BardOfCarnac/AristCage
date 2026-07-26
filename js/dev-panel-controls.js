@@ -22,7 +22,9 @@
   let weatherStatus = null;
   let motionStatus = null;
   let serviceMessage = null;
-  let motionEventsBound = false;
+  let motionEventsService = null;
+  let departmentReadyAttempt = null;
+  let lastAction = null;
 
   function currentApplication() {
     return window.NCNApplications?.current?.()
@@ -30,10 +32,34 @@
       || "redwire";
   }
 
-  function ensureBaseInterface() {
-    window.ensureDiagnosticsInterface?.();
-    panel = document.querySelector(".diagnostics-panel");
+  function currentService(name) {
+    return window.NCNIntegration?.getService?.(name) || null;
+  }
 
+  async function resolveService(name) {
+    const live = currentService(name);
+    if (live) return live;
+
+    if (!departmentReadyAttempt) {
+      departmentReadyAttempt = Promise.resolve(window.NCNIntegratedDepartments?.ready?.())
+        .catch(error => error)
+        .finally(() => { departmentReadyAttempt = null; });
+    }
+    await departmentReadyAttempt;
+
+    const resolved = currentService(name);
+    if (!resolved) throw new Error(`${name} service is unavailable.`);
+    return resolved;
+  }
+
+  function ensureBaseInterface() {
+    if (typeof window.ensureDiagnosticsInterface === "function") {
+      window.ensureDiagnosticsInterface();
+    } else if (typeof ensureDiagnosticsInterface === "function") {
+      ensureDiagnosticsInterface();
+    }
+
+    panel = document.querySelector(".diagnostics-panel");
     const toggle = document.querySelector(".diagnostics-toggle");
     if (toggle && !toggle.textContent.trim()) {
       toggle.textContent = document.documentElement.classList.contains("diagnostics-on")
@@ -92,25 +118,35 @@
       </section>`;
   }
 
-  function service(name) {
-    return window.NCNIntegration?.getService?.(name) || null;
-  }
-
-  async function readyServices() {
-    try {
-      await window.NCNIntegratedDepartments?.ready?.();
-      bindMotionEvents();
-      return true;
-    } catch (error) {
-      setMessage(`Department services unavailable: ${String(error?.message || error)}`, true);
-      return false;
+  function setMessage(message, error = false) {
+    if (serviceMessage) {
+      serviceMessage.textContent = String(message || "");
+      serviceMessage.classList.toggle("is-error", Boolean(error));
     }
   }
 
-  function setMessage(message, error = false) {
-    if (!serviceMessage) return;
-    serviceMessage.textContent = String(message || "");
-    serviceMessage.classList.toggle("is-error", Boolean(error));
+  function recordAction(type, value, status, detail = null) {
+    lastAction = Object.freeze({
+      type,
+      value,
+      status,
+      detail,
+      at: typeof performance !== "undefined" ? performance.now() : Date.now()
+    });
+    return lastAction;
+  }
+
+  function setEnvironmentPreview(enabled, reason = "developer-control") {
+    const root = document.documentElement;
+    if (!root) return false;
+    if (enabled) {
+      root.dataset.devEnvironmentPreview = "true";
+      root.dataset.devEnvironmentReason = reason;
+    } else {
+      delete root.dataset.devEnvironmentPreview;
+      delete root.dataset.devEnvironmentReason;
+    }
+    return enabled;
   }
 
   function resolvedWeatherIntensity() {
@@ -130,16 +166,41 @@
   }
 
   async function applyWeather(name) {
-    if (!await readyServices()) return;
-    const profile = weatherProfile(name);
-    const applied = window.NCNIntegration?.applyProfile?.("weather", profile, {
-      application: currentApplication(),
-      reason: `dev-panel-weather:${name}`,
-      requestEffect: name === "electrical",
-      effectIntensity: profile.intensity || 0
-    });
-    setMessage(applied ? `Weather override: ${profile.preset}` : "Weather override was not applied.", !applied);
-    window.setTimeout(updateReadouts, 50);
+    const selected = WEATHER_PRESETS[name] ? name : "mist";
+    setMessage(`Applying Weather: ${selected}…`);
+    recordAction("weather", selected, "requested");
+
+    try {
+      const weather = await resolveService("weather");
+      const profile = weatherProfile(selected);
+      const meta = {
+        application: currentApplication(),
+        reason: `dev-panel-weather:${selected}`,
+        requestEffect: selected === "electrical",
+        effectIntensity: profile.intensity || 0
+      };
+
+      let result;
+      if (typeof weather.applyProfile === "function") {
+        result = await Promise.resolve(weather.applyProfile(profile, meta));
+      } else if (window.NCNIntegration?.applyProfile?.("weather", profile, meta)) {
+        result = weather.snapshot?.() || null;
+      } else {
+        throw new Error("Weather has no usable profile entry point.");
+      }
+
+      setEnvironmentPreview(selected !== "clear", `weather:${selected}`);
+      const snapshot = weather.snapshot?.() || result || null;
+      recordAction("weather", selected, "complete", snapshot);
+      setMessage(`Weather active: ${snapshot?.targetPreset || snapshot?.preset || profile.preset}.`);
+      updateReadouts();
+      return snapshot;
+    } catch (error) {
+      recordAction("weather", selected, "error", String(error?.message || error));
+      setMessage(`Weather failed: ${String(error?.message || error)}`, true);
+      updateReadouts();
+      return null;
+    }
   }
 
   function motionProfile(clusterSize) {
@@ -155,72 +216,141 @@
     });
   }
 
+  function motionIsActive(snapshot = currentService("chamber-motion")?.snapshot?.()) {
+    return Number(snapshot?.activeSequenceCount || 0) > 0;
+  }
+
+  function weatherIsActive(snapshot = currentService("weather")?.snapshot?.()) {
+    return Boolean(snapshot && snapshot.enabled !== false && Number(snapshot.targetIntensity ?? snapshot.intensity ?? 0) > 0.002);
+  }
+
+  function refreshEnvironmentPreview() {
+    const active = currentApplication() === "dripfeed" && (weatherIsActive() || motionIsActive());
+    setEnvironmentPreview(active, active ? "active-developer-override" : "developer-control-idle");
+    return active;
+  }
+
   async function triggerMotion(action) {
-    if (!await readyServices()) return;
-    const motion = service("chamber-motion");
-    if (!motion?.trigger) {
-      setMessage("Chamber Movement service is unavailable.", true);
-      return;
-    }
+    const selected = ["left", "right", "large", "settle", "cancel"].includes(action) ? action : "large";
+    setMessage(`Requesting Chamber Movement: ${selected}…`);
+    recordAction("motion", selected, "requested");
 
-    if (action === "settle") {
-      const result = motion.settle?.({ reason: "dev-panel", duration: 520 });
-      setMessage("Requested a clean chamber settle.");
-      Promise.resolve(result).finally(() => window.setTimeout(updateReadouts, 30));
-      return;
-    }
-    if (action === "cancel") {
-      const result = motion.cancel?.({ reason: "dev-panel" });
-      setMessage("Cancelled active chamber movement.");
-      Promise.resolve(result).finally(() => window.setTimeout(updateReadouts, 30));
-      return;
-    }
+    try {
+      const motion = await resolveService("chamber-motion");
 
-    const large = action === "large";
-    const clusterSize = large ? [4, 7] : [2, 5];
-    const region = action === "left"
-      ? "left-wall"
-      : action === "right"
-        ? "right-wall"
-        : "side-walls";
-    const profile = motionProfile(clusterSize);
+      if (selected === "settle") {
+        const result = await Promise.resolve(motion.settle?.({ reason: "dev-panel", duration: 520 }));
+        recordAction("motion", selected, "complete", result);
+        setMessage("Requested a clean chamber settle.");
+        updateReadouts();
+        window.setTimeout(refreshEnvironmentPreview, 560);
+        return result;
+      }
 
-    window.NCNIntegration?.applyProfile?.("chamber-motion", profile, {
-      application: currentApplication(),
-      reason: `dev-panel-motion:${action}`
-    });
+      if (selected === "cancel") {
+        const result = await Promise.resolve(motion.cancel?.({ reason: "dev-panel" }));
+        recordAction("motion", selected, "complete", result);
+        setMessage("Cancelled active chamber movement.");
+        updateReadouts();
+        refreshEnvironmentPreview();
+        return result;
+      }
 
-    const result = motion.trigger({
-      pattern: "extract-rotate-settle",
-      region,
-      targetRegion: "rear-wall",
-      clusterSize,
-      intensity: profile.intensity,
-      duration: 5200,
-      effects: Object.freeze({})
-    });
-    setMessage(`Triggered ${large ? "large" : region} chamber movement.`);
-    window.setTimeout(updateReadouts, 30);
-    Promise.resolve(result).then(value => {
-      setMessage(`Chamber result: ${value?.status || "complete"}.`, value?.status === "error");
+      const large = selected === "large";
+      const clusterSize = large ? [4, 7] : [2, 5];
+      const region = selected === "left"
+        ? "left-wall"
+        : selected === "right"
+          ? "right-wall"
+          : "side-walls";
+      const profile = motionProfile(clusterSize);
+      const meta = {
+        application: currentApplication(),
+        reason: `dev-panel-motion:${selected}`
+      };
+
+      if (typeof motion.applyProfile === "function") {
+        await Promise.resolve(motion.applyProfile(profile, meta));
+      } else if (!window.NCNIntegration?.applyProfile?.("chamber-motion", profile, meta)) {
+        throw new Error("Chamber Movement has no usable profile entry point.");
+      }
+
+      setEnvironmentPreview(true, `motion:${selected}`);
+      const result = await Promise.resolve(motion.trigger({
+        pattern: "extract-rotate-settle",
+        region,
+        targetRegion: "rear-wall",
+        clusterSize,
+        intensity: profile.intensity,
+        duration: 5200,
+        effects: Object.freeze({})
+      }));
+
+      recordAction("motion", selected, "complete", result);
+      setMessage(`Chamber result: ${result?.status || "complete"}.`, result?.status === "error");
       updateReadouts();
-    }).catch(error => {
-      setMessage(`Chamber movement failed: ${String(error?.message || error)}`, true);
+      refreshEnvironmentPreview();
+      return result;
+    } catch (error) {
+      recordAction("motion", selected, "error", String(error?.message || error));
+      setMessage(`Chamber Movement failed: ${String(error?.message || error)}`, true);
       updateReadouts();
-    });
+      refreshEnvironmentPreview();
+      return null;
+    }
   }
 
   async function restoreApplicationProfile() {
-    if (!await readyServices()) return;
-    service("chamber-motion")?.cancel?.({ reason: "dev-panel-profile-restore" });
-    const result = window.NCNIntegration?.syncApplicationProfile?.("dev-panel-profile-restore");
-    setMessage(`Restored ${result?.application || currentApplication()} environment profile.`);
-    window.setTimeout(updateReadouts, 50);
+    setMessage(`Restoring ${currentApplication()} profile…`);
+    recordAction("profile", currentApplication(), "requested");
+
+    try {
+      const motion = currentService("chamber-motion");
+      await Promise.resolve(motion?.cancel?.({ reason: "dev-panel-profile-restore" }));
+      const result = window.NCNIntegration?.syncApplicationProfile?.("dev-panel-profile-restore")
+        || Object.freeze({ application: currentApplication(), applied: [] });
+      setEnvironmentPreview(false);
+      recordAction("profile", result.application || currentApplication(), "complete", result);
+      setMessage(`Restored ${result.application || currentApplication()} environment profile.`);
+      window.setTimeout(updateReadouts, 50);
+      return result;
+    } catch (error) {
+      recordAction("profile", currentApplication(), "error", String(error?.message || error));
+      setMessage(`Profile restore failed: ${String(error?.message || error)}`, true);
+      return null;
+    }
+  }
+
+  async function switchApplication(name) {
+    const selected = name === "dripfeed" ? "dripfeed" : "redwire";
+    setMessage(`Switching to ${selected}…`);
+    recordAction("application", selected, "requested");
+
+    try {
+      const result = await Promise.resolve(window.NCNApplications?.switchTo?.(selected));
+      setEnvironmentPreview(false);
+      recordAction("application", selected, "complete", result);
+      setMessage(result === false ? `${selected} is already active.` : `Switched to ${selected}.`);
+      updateReadouts();
+      return result;
+    } catch (error) {
+      recordAction("application", selected, "error", String(error?.message || error));
+      setMessage(`Application switch failed: ${String(error?.message || error)}`, true);
+      return false;
+    }
+  }
+
+  async function dispatchControl(type, value) {
+    if (type === "weather") return applyWeather(value);
+    if (type === "motion") return triggerMotion(value);
+    if (type === "application") return switchApplication(value);
+    if (type === "profile") return restoreApplicationProfile();
+    throw new RangeError(`Unknown developer control: ${type}`);
   }
 
   function updateWeatherReadout() {
     if (!weatherStatus) return;
-    const snapshot = service("weather")?.snapshot?.();
+    const snapshot = currentService("weather")?.snapshot?.();
     if (!snapshot) {
       weatherStatus.textContent = "Unavailable";
       return;
@@ -234,7 +364,7 @@
 
   function updateMotionReadout() {
     if (!motionStatus) return;
-    const snapshot = service("chamber-motion")?.snapshot?.();
+    const snapshot = currentService("chamber-motion")?.snapshot?.();
     if (!snapshot) {
       motionStatus.textContent = "Unavailable";
       return;
@@ -262,25 +392,14 @@
   }
 
   function bindMotionEvents() {
-    if (motionEventsBound) return;
-    const motion = service("chamber-motion");
-    if (!motion?.addEventListener) return;
+    const motion = currentService("chamber-motion");
+    if (!motion?.addEventListener || motionEventsService === motion) return;
+    motionEventsService = motion;
     ["blockmove:start", "blockmove:extract", "blockmove:settle", "blockmove:complete", "blockmove:cancel", "blockmove:error"]
-      .forEach(type => motion.addEventListener(type, updateReadouts));
-    motionEventsBound = true;
-  }
-
-  function bindControls() {
-    controls.querySelectorAll("[data-debug-weather]").forEach(button => {
-      button.addEventListener("click", () => void applyWeather(button.dataset.debugWeather));
-    });
-    controls.querySelectorAll("[data-debug-motion]").forEach(button => {
-      button.addEventListener("click", () => void triggerMotion(button.dataset.debugMotion));
-    });
-    controls.querySelector("[data-debug-restore-profile]")?.addEventListener("click", () => {
-      void restoreApplicationProfile();
-    });
-    weatherIntensity?.addEventListener("input", updateReadouts);
+      .forEach(type => motion.addEventListener(type, () => {
+        updateReadouts();
+        refreshEnvironmentPreview();
+      }));
   }
 
   function ensureControls() {
@@ -303,28 +422,78 @@
     motionStatus = controls.querySelector("[data-debug-motion-status]");
     serviceMessage = controls.querySelector("[data-debug-service-message]");
 
-    if (controls.dataset.bound !== "true") {
-      controls.dataset.bound = "true";
-      bindControls();
-    }
     updateReadouts();
-    void readyServices().then(updateReadouts);
+    bindMotionEvents();
     return true;
   }
 
-  const observer = new MutationObserver(() => {
-    if (!controls?.isConnected) ensureControls();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+  function controlFromEvent(event) {
+    const button = event.target?.closest?.("button");
+    if (!button) return null;
+    if (button.dataset.debugWeather) return { type: "weather", value: button.dataset.debugWeather };
+    if (button.dataset.debugMotion) return { type: "motion", value: button.dataset.debugMotion };
+    if (button.dataset.debugApp) return { type: "application", value: button.dataset.debugApp };
+    if (button.hasAttribute("data-debug-restore-profile")) return { type: "profile", value: currentApplication() };
+    return null;
+  }
 
-  window.addEventListener("ncn:application-change", () => window.setTimeout(updateReadouts, 40));
-  window.addEventListener("ncn:lifecycle-change", updateReadouts);
-  window.NCNEvents?.on?.("integration:profile-applied", updateReadouts);
-  window.NCNEvents?.on?.("integration:department-installed", () => {
-    motionEventsBound = false;
-    bindMotionEvents();
+  function handleControlClick(event) {
+    const request = controlFromEvent(event);
+    if (!request) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    void dispatchControl(request.type, request.value);
+  }
+
+  function handleControlInput(event) {
+    if (!event.target?.matches?.("[data-debug-weather-intensity]")) return;
+    weatherIntensity = event.target;
     updateReadouts();
+  }
+
+  function snapshot() {
+    return Object.freeze({
+      application: currentApplication(),
+      panelConnected: Boolean(panel?.isConnected),
+      controlsConnected: Boolean(controls?.isConnected),
+      environmentPreview: document.documentElement?.dataset?.devEnvironmentPreview === "true",
+      lastAction,
+      weather: currentService("weather")?.snapshot?.() || null,
+      chamberMotion: currentService("chamber-motion")?.snapshot?.() || null
+    });
+  }
+
+  window.NCNDevPanel = Object.freeze({
+    ensureControls,
+    dispatchControl,
+    applyWeather,
+    triggerMotion,
+    restoreApplicationProfile,
+    switchApplication,
+    updateReadouts,
+    snapshot
   });
 
-  ensureControls();
+  if (typeof document !== "undefined" && document.body) {
+    document.addEventListener("click", handleControlClick, true);
+    document.addEventListener("input", handleControlInput, true);
+
+    const observer = new MutationObserver(() => {
+      if (!controls?.isConnected) ensureControls();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    window.addEventListener("ncn:application-change", () => {
+      setEnvironmentPreview(false);
+      window.setTimeout(updateReadouts, 40);
+    });
+    window.addEventListener("ncn:lifecycle-change", updateReadouts);
+    window.NCNEvents?.on?.("integration:profile-applied", updateReadouts);
+    window.NCNEvents?.on?.("integration:department-installed", () => {
+      bindMotionEvents();
+      updateReadouts();
+    });
+
+    ensureControls();
+  }
 })();
