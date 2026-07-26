@@ -6,6 +6,7 @@ on:
       - "departments/chamber-movement/**"
       - "js/chamber-motion-adapter.js"
       - "js/chamber-motion-activity.js"
+      - "js/desktop.js"
       - "tests/chamber-motion-camera-refresh.test.js"
       - "tests/chamber-motion-activity.test.js"
       - "tests/chamber-motion-render-smoke.mjs"
