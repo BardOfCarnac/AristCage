@@ -43,6 +43,8 @@ jobs:
           exit 1
 
       - name: Install accepted departments in Chromium
+        id: browser_probe
+        continue-on-error: true
         run: |
           set -euo pipefail
           browser="$(command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
@@ -61,12 +63,40 @@ jobs:
             "http://127.0.0.1:4173/index.html?integrationProbe=1" \
             > /tmp/ncn-browser-probe.html
 
+          python3 - <<'PY'
+          import html
+          import re
+          from pathlib import Path
+
+          source = Path('/tmp/ncn-browser-probe.html').read_text()
+          match = re.search(r'<pre id="integration-browser-probe"[^>]*>(.*?)</pre>', source, re.S)
+          Path('/tmp/ncn-browser-probe.json').write_text(
+              html.unescape(match.group(1)).strip() if match else '{"message":"Probe output element missing."}'
+          )
+          PY
+
           grep -o 'data-integration-probe-status="[^"]*"' /tmp/ncn-browser-probe.html || true
-          if ! grep -q 'data-integration-probe-status="ready"' /tmp/ncn-browser-probe.html; then
-            echo "Accepted departments failed to install in the real browser page."
-            sed -n '/id="integration-browser-probe"/,/<\/pre>/p' /tmp/ncn-browser-probe.html
-            exit 1
-          fi
+          cat /tmp/ncn-browser-probe.json
+          grep -q 'data-integration-probe-status="ready"' /tmp/ncn-browser-probe.html
+
+      - name: Upload browser probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncn-browser-department-probe
+          path: |
+            /tmp/ncn-browser-probe.html
+            /tmp/ncn-browser-probe.json
+            /tmp/ncn-server.log
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Enforce browser installation result
+        if: steps.browser_probe.outcome != 'success'
+        run: |
+          echo "Accepted departments failed to install in the real browser page."
+          test ! -f /tmp/ncn-browser-probe.json || cat /tmp/ncn-browser-probe.json
+          exit 1
 
       - name: Stop static viewer
         if: always()
