@@ -6,6 +6,7 @@ on:
       - "index.html"
       - "js/dev-panel-controls.js"
       - "css/dev-panel-controls.css"
+      - "tests/dev-panel-controls.test.js"
       - ".github/workflows/dev-panel-check.yml"
   workflow_dispatch:
 
@@ -19,7 +20,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Check developer control syntax
-        run: node --check js/dev-panel-controls.js
+        run: |
+          node --check js/dev-panel-controls.js
+          node --check tests/dev-panel-controls.test.js
+
+      - name: Run developer control execution harness
+        run: node tests/dev-panel-controls.test.js
 
       - name: Check shared launcher and service wiring
         run: |
@@ -44,6 +50,8 @@ jobs:
             'ensureDiagnosticsInterface',
             'data-debug-weather',
             'data-debug-motion',
+            'dispatchControl',
+            'resolveService',
             'syncApplicationProfile',
             'chamber-motion',
             'weather'
@@ -53,6 +61,9 @@ jobs:
 
           if (!css.includes('.diagnostics-toggle') || !css.includes('display: block !important')) {
             throw new Error('The application-neutral developer launcher is not forced visible.');
+          }
+          if (!css.includes('data-dev-environment-preview')) {
+            throw new Error('Developer Weather and movement previews are not lifted above Dripfeed.');
           }
           console.log('Shared developer panel controls are wired correctly.');
           NODE
