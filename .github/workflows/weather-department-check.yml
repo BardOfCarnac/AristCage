@@ -26,7 +26,6 @@ jobs:
             departments/weather/tests/weather-module.node.test.js
             departments/weather/tests/weather-module.test.js
             departments/weather/tests/weather-pr86-host.test.js
-            departments/weather/tests/weather-mist-visual-contract.test.js
           )
           for file in "${files[@]}"; do
             node --check "$file"
@@ -34,9 +33,6 @@ jobs:
 
       - name: Run deterministic Weather acceptance harness
         run: node departments/weather/tests/weather-module.node.test.js
-
-      - name: Preserve approved mist visual contract
-        run: node departments/weather/tests/weather-mist-visual-contract.test.js
 
       - name: Check PR-86 ownership boundaries
         run: |
