@@ -5,7 +5,9 @@ on:
     paths:
       - "departments/chamber-movement/**"
       - "js/chamber-motion-adapter.js"
+      - "js/chamber-motion-activity.js"
       - "tests/chamber-motion-camera-refresh.test.js"
+      - "tests/chamber-motion-activity.test.js"
       - ".github/workflows/chamber-movement.yml"
   push:
     branches:
@@ -47,3 +49,8 @@ jobs:
         run: |
           node --check js/chamber-motion-adapter.js
           node tests/chamber-motion-camera-refresh.test.js
+      - name: Sustain panel movement through the host runtime
+        working-directory: .
+        run: |
+          node --check js/chamber-motion-activity.js
+          node tests/chamber-motion-activity.test.js
