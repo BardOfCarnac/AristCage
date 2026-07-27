@@ -1,0 +1,76 @@
+/*==================================================
+  DRIPFEED ANIMATED HEADER WORDMARK
+==================================================*/
+
+html[data-ncn-app="dripfeed"] .rail-title {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "word"
+    "tag";
+  align-items: start;
+  gap: 2px;
+}
+
+html[data-ncn-app="dripfeed"] .rail-title strong {
+  overflow: visible;
+  line-height: 0;
+}
+
+html[data-ncn-app="dripfeed"] .rail-title > span {
+  display: none !important;
+}
+
+html[data-ncn-app="dripfeed"] .rail-title::after {
+  content: "buy sell be seen";
+  margin: 0;
+  color: rgba(244, 234, 226, .66);
+  font-size: clamp(.56rem, 1.45vw, .76rem);
+  line-height: 1.2;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+html[data-ncn-app="dripfeed"] .dripfeed-wordmark-host {
+  display: block;
+  width: min(100%, clamp(24rem, 54vw, 48rem));
+  max-width: 100%;
+  min-height: clamp(3.5rem, 8vw, 6.7rem);
+  color: #f4eee8;
+  font-family: "Saira", "Arial Black", system-ui, sans-serif;
+  font-size: clamp(2.2rem, 6.4vw, 4.45rem);
+  font-weight: 900;
+  line-height: 1;
+}
+
+html[data-ncn-app="dripfeed"] .dripfeed-wordmark-host[data-wordmark-state="ready"] {
+  min-height: 0;
+  font-size: 0;
+}
+
+html[data-ncn-app="dripfeed"] .dripfeed-wordmark-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+@media (max-width: 740px), (hover: none) and (pointer: coarse) {
+  html[data-ncn-app="dripfeed"] .rail-title {
+    gap: 1px;
+  }
+
+  html[data-ncn-app="dripfeed"] .dripfeed-wordmark-host {
+    width: min(100%, 31rem);
+    min-height: clamp(3.25rem, 13vw, 5.8rem);
+  }
+
+  html[data-ncn-app="dripfeed"] .rail-title::after {
+    font-size: clamp(.54rem, 2.35vw, .7rem);
+  }
+}
+
+@media (max-width: 390px) {
+  html[data-ncn-app="dripfeed"] .dripfeed-wordmark-host {
+    width: 100%;
+  }
+}
