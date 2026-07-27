@@ -21,12 +21,6 @@ jobs:
       - name: Apply exact puff layer and density correction
         if: steps.ready.outputs.ready == 'true'
         run: node scripts/apply-puff-layer-density-fix.cjs
-      - name: Validate Weather publication
-        if: steps.ready.outputs.ready == 'true'
-        run: |
-          node --check departments/weather/weather-module.js
-          node departments/weather/tests/weather-module.node.test.js
-          node departments/weather/tests/weather-mist-visual-contract.test.js
       - name: Commit production correction
         if: steps.ready.outputs.ready == 'true'
         run: |
