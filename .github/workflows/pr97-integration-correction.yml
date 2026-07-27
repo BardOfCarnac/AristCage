@@ -1,0 +1,77 @@
+name: PR97 Integration Correction
+
+on:
+  push:
+    branches:
+      - agent/weather-depth-frame-publication
+
+permissions:
+  contents: write
+
+jobs:
+  correct-weather-contract:
+    if: ${{ !contains(github.event.head_commit.message, '[pr97-corrected]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/weather-depth-frame-publication
+          fetch-depth: 0
+
+      - name: Align production frame token and viewport contract
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          module = Path('departments/weather/weather-module.js')
+          text = module.read_text()
+          old = 'const candidate = frame?.frameToken ?? frame?.token ?? frame?.frameId ?? frame?.id;'
+          new = 'const candidate = frame?.frameToken ?? frame?.token ?? frame?.frameId ?? frame?.frame ?? frame?.id;'
+          if old not in text:
+              raise SystemExit('Expected primitiveFrameToken source was not found')
+          module.write_text(text.replace(old, new, 1))
+
+          node_test = Path('departments/weather/tests/weather-module.node.test.js')
+          text = node_test.read_text()
+          old = 'frameToken: ++this.frameSerial'
+          new = 'frame: ++this.frameSerial'
+          if old not in text:
+              raise SystemExit('Expected fake runtime frameToken was not found')
+          text = text.replace(old, new, 1)
+          anchor = "assert.strictEqual(weather.getDepthFrame(depthFrame.runtimeToken), depthFrame);"
+          addition = """assert.notEqual(depthFrame.runtimeToken, null, 'production-shaped runtime frames must publish a shared runtime token');\n  assert.strictEqual(weather.getDepthFrame(depthFrame.runtimeToken), depthFrame);"""
+          if anchor not in text:
+              raise SystemExit('Expected runtime-token assertion anchor was not found')
+          text = text.replace(anchor, addition, 1)
+          node_test.write_text(text)
+
+          host_test = Path('departments/weather/tests/weather-pr86-host.test.js')
+          text = host_test.read_text()
+          anchor = '&& depthFrame.depthConvention === "smaller-positive-z-is-nearer",'
+          replacement = '&& depthFrame.depthConvention === "smaller-positive-z-is-nearer"\n        && depthFrame.runtimeToken !== null,'
+          if anchor not in text:
+              raise SystemExit('Expected host depth-frame assertion anchor was not found')
+          text = text.replace(anchor, replacement, 1)
+          host_test.write_text(text)
+
+          readme = Path('departments/weather/README.md')
+          text = readme.read_text()
+          text = text.replace(
+              'treats `viewport` only as a page-space rendering bound, with the target context origin\n  corresponding to the viewport\'s top-left;',
+              'treats `viewport` only as a viewport-relative CSS-pixel rendering bound, equivalent\n  to `getBoundingClientRect()` coordinates, with the target context origin corresponding to\n  the viewport\'s top-left;'
+          )
+          if 'page-space rendering bound' in text:
+              raise SystemExit('README still describes the depth frame as page-space')
+          readme.write_text(text)
+
+          workflow = Path('.github/workflows/pr97-integration-correction.yml')
+          workflow.unlink()
+          PY
+
+      - name: Commit corrected Weather contract
+        run: |
+          git config user.name "NCN Integration Agent"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Align Weather depth frames with the production runtime [pr97-corrected]"
+          git push origin HEAD:agent/weather-depth-frame-publication
