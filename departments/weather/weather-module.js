@@ -24,14 +24,14 @@ window.NCNWeatherDepartment = (() => {
     seed: 2045
   });
   const QUALITY = Object.freeze({
-    reduced: Object.freeze({ mist: 10, dust: 8, rain: 0, fps: 8, dpr: 1 }),
-    low: Object.freeze({ mist: 18, dust: 24, rain: 48, fps: 12, dpr: 1 }),
-    medium: Object.freeze({ mist: 36, dust: 40, rain: 96, fps: 30, dpr: 1.2 }),
-    high: Object.freeze({ mist: 48, dust: 64, rain: 144, fps: 30, dpr: 1.5 })
+    reduced: Object.freeze({ mist: 14, dust: 8, rain: 0, fps: 8, dpr: 1 }),
+    low: Object.freeze({ mist: 28, dust: 24, rain: 48, fps: 12, dpr: 1 }),
+    medium: Object.freeze({ mist: 56, dust: 40, rain: 96, fps: 30, dpr: 1.2 }),
+    high: Object.freeze({ mist: 72, dust: 64, rain: 144, fps: 30, dpr: 1.5 })
   });
   const PRESET_KEYS = Object.freeze([
     "mist", "smoke", "dust", "rain", "haze", "moisture", "turbulence",
-    "drift", "fallSpeed", "depthFlow", "electrical"
+    "drift", "fallSpeed", "depthFlow", "verticalFill", "bankScale", "bankMultiplier", "electrical"
   ]);
   const ACCEPTED_EFFECTS = Object.freeze({
     "electrical-disturbance": Object.freeze({ channel: "fault", purpose: "ambient", layer: "near" }),
@@ -285,6 +285,8 @@ window.NCNWeatherDepartment = (() => {
       bank.width = randomBetween(0.90, 2.40);
       bank.depth = randomBetween(0.60, 2.00);
       bank.lift = randomBetween(0.02, 0.28);
+      bank.verticalSeed = random();
+      bank.scaleSeed = randomBetween(0.88, 1.12);
       bank.alpha = randomBetween(0.55, 1.0);
       bank.phase = randomBetween(0, Math.PI * 2);
       bank.phase2 = randomBetween(0, Math.PI * 2);
@@ -401,20 +403,24 @@ window.NCNWeatherDepartment = (() => {
       const presetBaseline = Number(PRESETS.mist?.mist) || 0.48;
       const presetRatio = presetBaseline > 0 ? clamp(state.config.mist / presetBaseline, 0, 2) : 0;
       const intensityRatio = clamp(intensity / APPROVED_MIST.baselineIntensity, 0, 1.5);
+      const verticalFill = clamp01(state.config.verticalFill);
       return Object.freeze({
         density: clamp(APPROVED_MIST.density * presetRatio, 0, 1),
-        height: APPROVED_MIST.height,
+        height: APPROVED_MIST.height * mix(1, 3.6, verticalFill),
         opacity: clamp(APPROVED_MIST.opacity * intensityRatio, 0, 1),
         drift: APPROVED_MIST.drift + state.wind.x,
         depthFlow: APPROVED_MIST.depthFlow + state.wind.z,
         turbulence: APPROVED_MIST.turbulence,
-        softness: APPROVED_MIST.softness
+        softness: APPROVED_MIST.softness,
+        verticalFill,
+        bankScale: clamp(state.config.bankScale || 1, 0.7, 1.8),
+        bankMultiplier: clamp(state.config.bankMultiplier || 1, 1, 1.8)
       });
     }
 
     function targetCounts(intensity, profile) {
       const settings = mistSettings(intensity);
-      const originalCount = Math.round(12 + settings.density * 38);
+      const originalCount = Math.round((12 + settings.density * 38) * settings.bankMultiplier);
       return {
         mist: intensity > 0.002 && settings.density > 0.03 ? Math.min(profile.mist, originalCount) : 0,
         dust: Math.round(profile.dust * clamp01(state.config.dust * intensity)),
@@ -536,15 +542,22 @@ window.NCNWeatherDepartment = (() => {
         for (let index = 0; index < bank.puffs; index += 1) {
           const normal = bank.puffs === 1 ? 0.5 : index / (bank.puffs - 1);
           const wobble = Math.sin(state.elapsedMs * 0.00033 * bank.speed + bank.phase + index * 1.7);
-          const x = bank.x + (normal - 0.5) * bank.width * 1.35 + wobble * bank.width * 0.12 * settings.turbulence;
-          const z = bank.z + Math.sin(bank.phase2 + index * 2.1) * bank.depth * 0.28;
-          const lift = bank.lift + settings.height * (0.18 + 0.26 * Math.sin(bank.phase + index * 1.3) ** 2);
+          const seededScale = mix(1, bank.scaleSeed || 1, settings.verticalFill);
+          const bankScale = settings.bankScale * seededScale;
+          const bankWidth = bank.width * bankScale;
+          const bankDepth = bank.depth * bankScale;
+          const x = bank.x + (normal - 0.5) * bankWidth * 1.35 + wobble * bankWidth * 0.12 * settings.turbulence;
+          const z = bank.z + Math.sin(bank.phase2 + index * 2.1) * bankDepth * 0.28;
+          const verticalRange = scene.bounds.halfHeight * 1.72 * settings.verticalFill;
+          const lift = bank.lift
+            + (bank.verticalSeed || 0) * verticalRange
+            + settings.height * (0.18 + 0.26 * Math.sin(bank.phase + index * 1.3) ** 2);
           const centre = project(x, floorY + lift, z, pass, scene);
-          const left = project(x - bank.width * (0.30 + 0.09 * index), floorY + lift, z, pass, scene);
-          const right = project(x + bank.width * (0.30 + 0.09 * index), floorY + lift, z, pass, scene);
+          const left = project(x - bankWidth * (0.30 + 0.09 * index), floorY + lift, z, pass, scene);
+          const right = project(x + bankWidth * (0.30 + 0.09 * index), floorY + lift, z, pass, scene);
           const upper = project(x, floorY + lift + settings.height * (0.40 + 0.25 * bank.alpha), z, pass, scene);
-          const depthA = project(x, floorY + lift * 0.6, clamp(z - bank.depth * 0.32, scene.bounds.near + 0.05, scene.bounds.far), pass, scene);
-          const depthB = project(x, floorY + lift * 0.6, clamp(z + bank.depth * 0.32, scene.bounds.near + 0.05, scene.bounds.far), pass, scene);
+          const depthA = project(x, floorY + lift * 0.6, clamp(z - bankDepth * 0.32, scene.bounds.near + 0.05, scene.bounds.far), pass, scene);
+          const depthB = project(x, floorY + lift * 0.6, clamp(z + bankDepth * 0.32, scene.bounds.near + 0.05, scene.bounds.far), pass, scene);
           const radiusX = Math.max(4, Math.abs(right.x - left.x) * 0.60);
           const verticalHeight = Math.abs(upper.y - centre.y);
           const floorDepthHeight = Math.abs(depthA.y - depthB.y) * 0.42;

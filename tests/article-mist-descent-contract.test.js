@@ -12,6 +12,7 @@ for (const token of [
   'priority: 5',
   'service.getDepthFrame(frame?.frame)',
   'depthFrame.renderForeground',
+  'includeAttenuation: false',
   'privateAnimationLoop: false',
   'weatherSimulation: "read-only-current-depth-frame"'
 ]) {

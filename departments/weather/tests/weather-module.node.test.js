@@ -199,7 +199,7 @@ function renderCounts() {
   assert.equal(snapshot.resources.canvases, 4);
   assert.equal(snapshot.resources.visibleCanvases, 0);
   assert.equal(snapshot.quality, 'medium');
-  assert.deepEqual(snapshot.particles.capacities, { mist: 36, dust: 40, rain: 96 });
+  assert.deepEqual(snapshot.particles.capacities, { mist: 56, dust: 40, rain: 96 });
 
   weather.applyProfile({ enabled: true, preset: 'mist', intensity: 0.42, seed: 2045 });
   runtime.step(16, 40);
@@ -223,6 +223,20 @@ function renderCounts() {
   });
   const renders = renderCounts();
   assert.ok(renders.radial > 0, 'approved mist banks must draw radial puffs');
+
+  weather.applyProfile({ enabled: true, preset: 'heavy-mist', intensity: 0.92, seed: 2045 });
+  runtime.handle.enable();
+  runtime.step(16, 60);
+  const heavy = weather.snapshot();
+  assert.equal(heavy.preset, 'heavy-mist');
+  assert.ok(heavy.particles.mist > approved.particles.mist,
+    'heavy mist must use materially more banks than ordinary mist at normal desktop quality');
+  assert.ok(weather.getDepthFrame().puffCount > depthFrame?.puffCount || heavy.particles.mist > 36,
+    'heavy mist must publish a denser exact-depth field');
+
+  weather.applyProfile({ enabled: true, preset: 'mist', intensity: 0.42, seed: 2045 });
+  runtime.handle.enable();
+  runtime.step(16, 40);
   assert.equal(renders.linear, 0, 'Weather must not draw a floor veil or general haze gradient');
 
   const depthFrame = weather.getDepthFrame();
@@ -292,7 +306,7 @@ function renderCounts() {
   runtime.handle.enable();
   runtime.step(16, 1);
   assert.equal(weather.snapshot().quality, 'reduced');
-  assert.deepEqual(weather.snapshot().particles.capacities, { mist: 10, dust: 8, rain: 0 });
+  assert.deepEqual(weather.snapshot().particles.capacities, { mist: 14, dust: 8, rain: 0 });
 
   runtime.quality = 'full';
   settings.quality = 'full';

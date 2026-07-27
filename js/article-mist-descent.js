@@ -121,7 +121,8 @@ window.NCNArticleMistDescent = (() => {
       }
       return depthFrame.renderForeground(context, {
         nearerThan: Number(surface.chamberZ),
-        viewport
+        viewport,
+        includeAttenuation: false
       });
     } finally {
       context.restore();

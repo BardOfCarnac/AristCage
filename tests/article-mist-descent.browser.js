@@ -36,19 +36,48 @@ async function activeRect(page) {
   });
 }
 
-async function compositorPixels(page) {
-  return page.evaluate(() => {
+async function compositorCoverage(page, rect) {
+  return page.evaluate(bounds => {
     const canvas = document.querySelector(".ncn-article-mist-compositor");
-    if (!canvas || canvas.hidden || !canvas.width || !canvas.height) return 0;
+    if (!canvas || canvas.hidden || !canvas.width || !canvas.height || !bounds) return { visible: 0, total: 0, ratio: 0 };
     const context = canvas.getContext("2d");
-    const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const scaleX = canvas.width / window.innerWidth;
+    const scaleY = canvas.height / window.innerHeight;
+    const left = Math.max(0, Math.floor(bounds.left * scaleX));
+    const top = Math.max(0, Math.floor(bounds.top * scaleY));
+    const right = Math.min(canvas.width, Math.ceil((bounds.left + bounds.width) * scaleX));
+    const bottom = Math.min(canvas.height, Math.ceil((bounds.top + bounds.height) * scaleY));
+    const width = Math.max(1, right - left);
+    const height = Math.max(1, bottom - top);
+    const data = context.getImageData(left, top, width, height).data;
     let visible = 0;
-    const stride = 4 * 12;
-    for (let index = 3; index < data.length; index += stride) {
-      if (data[index] > 2) visible += 1;
+    let total = 0;
+    const step = 6;
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        const alpha = data[(y * width + x) * 4 + 3];
+        total += 1;
+        if (alpha > 4) visible += 1;
+      }
     }
-    return visible;
+    return { visible, total, ratio: total ? visible / total : 0 };
+  }, rect);
+}
+
+async function enableHeavyMist(page) {
+  await page.evaluate(() => {
+    window.NCNIntegration.applyProfile("weather", {
+      enabled: true,
+      preset: "heavy-mist",
+      intensity: 0.92,
+      mist: 0.96,
+      wind: 0
+    }, { reason: "article-mist-rendered-proof" });
   });
+  await page.waitForFunction(() => {
+    const state = window.NCNIntegration?.getService?.("weather")?.snapshot?.();
+    return state?.preset === "heavy-mist" && state?.particles?.mist > 36;
+  }, null, { timeout: 10000 });
 }
 
 async function runViewport(browser, name, viewport) {
@@ -62,6 +91,7 @@ async function runViewport(browser, name, viewport) {
 
   await page.goto(baseUrl, { waitUntil: "networkidle" });
   await waitForReady(page);
+  await enableHeavyMist(page);
   assert.equal(await removeLowestArticle(page), true, `${name}: expected a removable article`);
 
   await page.waitForFunction(() => (
@@ -78,12 +108,13 @@ async function runViewport(browser, name, viewport) {
   assert.ok(middle.top > start.top + 4, `${name}: article did not move downward through the chamber`);
   assert.ok(middle.width < start.width, `${name}: article did not move deeper in the chamber`);
 
-  let pixels = await compositorPixels(page);
-  if (!pixels) {
+  let coverage = await compositorCoverage(page, middle);
+  if (coverage.ratio < 0.03) {
     await page.waitForTimeout(180);
-    pixels = await compositorPixels(page);
+    coverage = await compositorCoverage(page, await activeRect(page));
   }
-  assert.ok(pixels > 0, `${name}: the foreground compositor never received persistent mist pixels`);
+  assert.ok(coverage.ratio >= 0.03,
+    `${name}: heavy mist covered only ${(coverage.ratio * 100).toFixed(2)}% of the descending article sample`);
 
   await page.screenshot({
     path: path.join(artifactDir, `${name}-mid-descent.png`),
@@ -99,6 +130,7 @@ async function runViewport(browser, name, viewport) {
 
   await page.reload({ waitUntil: "networkidle" });
   await waitForReady(page);
+  await enableHeavyMist(page);
   assert.equal(await removeLowestArticle(page), true, `${name}: expected a second removable article`);
   await page.waitForFunction(() => window.NCNArticleMistDescent.snapshot().active > 0, null, { timeout: 5000 });
   await page.evaluate(async () => {
