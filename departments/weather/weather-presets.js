@@ -1,9 +1,10 @@
 /* Data-only presets shared by the PR-86 weather publication.
    Haze remains a compatibility field but is intentionally zero in every profile.
-   The visible mist treatment is owned by the approved bank renderer. */
+   Mist and smoke use only the RedWire energy palette inside the approved bank renderer. */
 window.NCNWeatherPresets = (() => {
   const preset = values => Object.freeze({
     mist: 0,
+    smoke: 0,
     dust: 0,
     rain: 0,
     haze: 0,
@@ -38,6 +39,14 @@ window.NCNWeatherPresets = (() => {
       turbulence: 0.24,
       drift: 0.16,
       depthFlow: -0.026
+    }),
+    smoke: preset({
+      mist: 0.58,
+      smoke: 1,
+      moisture: 0.28,
+      turbulence: 0.34,
+      drift: 0.12,
+      depthFlow: -0.060
     }),
     "light-rain": preset({
       mist: 0.18,
