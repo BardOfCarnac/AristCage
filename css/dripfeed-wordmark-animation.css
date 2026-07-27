@@ -17,17 +17,19 @@ html[data-ncn-app="dripfeed"] .rail-title strong {
 }
 
 html[data-ncn-app="dripfeed"] .rail-title > span {
-  display: none !important;
-}
-
-html[data-ncn-app="dripfeed"] .rail-title::after {
-  content: "buy sell be seen";
+  grid-area: tag;
+  display: block !important;
+  max-width: none;
   margin: 0;
   color: rgba(244, 234, 226, .66);
   font-size: clamp(.56rem, 1.45vw, .76rem);
   line-height: 1.2;
   letter-spacing: .18em;
   text-transform: uppercase;
+}
+
+html[data-ncn-app="dripfeed"] .rail-title::after {
+  content: none !important;
 }
 
 html[data-ncn-app="dripfeed"] .dripfeed-wordmark-host {
@@ -64,7 +66,7 @@ html[data-ncn-app="dripfeed"] .dripfeed-wordmark-svg {
     min-height: clamp(3.25rem, 13vw, 5.8rem);
   }
 
-  html[data-ncn-app="dripfeed"] .rail-title::after {
+  html[data-ncn-app="dripfeed"] .rail-title > span {
     font-size: clamp(.54rem, 2.35vw, .7rem);
   }
 }
