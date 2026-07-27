@@ -1,0 +1,55 @@
+/*==================================================
+  ARTICLE DESCENT THROUGH MIST
+
+  The stage contains the real live Optical semantic nodes after their normal
+  dismissal begins. The compositor repeats only the matching foreground part
+  of Weather's persistent field above those nodes.
+==================================================*/
+
+.ncn-optical-descent-stage,
+.ncn-article-mist-compositor {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  background: transparent;
+}
+
+.ncn-optical-descent-stage {
+  z-index: 15;
+  overflow: visible;
+  contain: layout paint;
+}
+
+.ncn-article-mist-compositor {
+  z-index: 16;
+  contain: strict;
+}
+
+.optical-mode .ncn-optical-descent-stage .optical-semantic-item.optical-descending {
+  opacity: 1 !important;
+  filter: none !important;
+  animation: none !important;
+  transition: none !important;
+  transform:
+    translate(var(--optical-descent-x, 0px), var(--optical-descent-y, 0px))
+    scale(var(--optical-item-scale, 1))
+    scale(var(--optical-descent-scale, 1)) !important;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+html[data-ncn-app="dripfeed"] .ncn-optical-descent-stage,
+html[data-ncn-app="dripfeed"] .ncn-article-mist-compositor,
+body[data-ncn-app="dripfeed"] .ncn-optical-descent-stage,
+body[data-ncn-app="dripfeed"] .ncn-article-mist-compositor {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .optical-mode .ncn-optical-descent-stage .optical-semantic-item.optical-descending {
+    opacity: 1 !important;
+    filter: none !important;
+  }
+}
