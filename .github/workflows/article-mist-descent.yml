@@ -19,6 +19,7 @@ jobs:
           node --check departments/weather/weather-module.js
           node --check tests/article-mist-descent-contract.test.js
           node --check tests/article-mist-descent.browser.js
+          node --check tests/weather-density-boundary.browser.js
       - name: Verify ownership and runtime contract
         run: node tests/article-mist-descent-contract.test.js
 
@@ -44,7 +45,9 @@ jobs:
           cat /tmp/ncn-article-mist-http.log
           exit 1
       - name: Run desktop and mobile rendered proof
-        run: node tests/article-mist-descent.browser.js
+        run: |
+          node tests/weather-density-boundary.browser.js
+          node tests/article-mist-descent.browser.js
       - name: Upload rendered proof
         if: always()
         uses: actions/upload-artifact@v4
