@@ -34,9 +34,18 @@ The following experimental extras are expressly excluded:
 - front floor-energy line
 - sprite reconstructions, pixelated or otherwise
 
-Normal mist is pale grey-white with only the small local red luminosity embedded in
-the first puff of each bank, as in the approved test. RedWire's chamber supplies the
-ambient red architecture; Weather does not wash the chamber in red.
+## Energy-palette colour policy
+
+Weather uses only the RedWire energy palette:
+
+- ordinary mist has a red body with brighter red local illumination;
+- the `smoke` preset darkens the same banks into deep crimson and maroon values;
+- electrical or heated weather may lift those reds toward orange;
+- the chamber is never covered by a general colour wash to achieve this effect.
+
+The bank colour changes locally inside each radial puff. It does not reintroduce haze,
+a floor veil or the front floor-energy line. Blue-white remains the responsibility of
+rare electrical Effects rather than the normal mist body.
 
 ## Load order for intake
 
@@ -96,9 +105,9 @@ handles and remove all owned canvases without altering the integration slot.
 - `tests/weather-module.node.test.js` covers shared-runtime behaviour, deterministic
   replay, approved bank count/specification, the absence of linear haze gradients,
   quality changes, Effects policy, suspension and cleanup.
-- `tests/weather-mist-visual-contract.test.js` protects the agreed mist constants and
-  bank construction while rejecting the floor veil, generic haze, front-energy line
-  and sprite reconstructions.
+- `tests/weather-mist-visual-contract.test.js` protects the agreed mist constants,
+  energy-palette colour policy and bank construction while rejecting white mist,
+  the floor veil, generic haze, front-energy line and sprite reconstructions.
 - `tests/weather-pr86-host.test.js` performs the protected application round trip
   without replacing the incumbent slot.
 
