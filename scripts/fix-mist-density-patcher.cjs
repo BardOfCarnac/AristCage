@@ -40,5 +40,11 @@ const heavyContract = `replace("departments/weather/tests/weather-mist-visual-co
 if (!source.includes(workflowAnchor)) throw new Error("Main patcher workflow anchor was not found.");
 source = source.replace(workflowAnchor, heavyContract + workflowAnchor);
 
+const browserStart = source.indexOf('write("tests/weather-density-boundary.browser.js", `');
+const browserEnd = source.indexOf('\n`);\n\nconsole.log("Applied denser mist fields', browserStart);
+if (browserStart < 0 || browserEnd < 0) throw new Error("Embedded browser proof block was not found.");
+const browserBlock = source.slice(browserStart, browserEnd).replaceAll("${", "\\${");
+source = source.slice(0, browserStart) + browserBlock + source.slice(browserEnd);
+
 fs.writeFileSync(path, source);
-console.log("Corrected density-boundary patcher for the current visual contract.");
+console.log("Corrected density-boundary patcher for the current visual contract and embedded browser proof.");
