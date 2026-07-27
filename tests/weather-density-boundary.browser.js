@@ -15,7 +15,7 @@ async function waitForWeather(page) {
 }
 
 async function applyMist(page, preset) {
-  const minimum = preset === "heavy-mist" ? 90 : 60;
+  const minimum = preset === "heavy-mist" ? 120 : 80;
   await page.evaluate(({ preset }) => {
     window.NCNIntegration.applyProfile("weather", {
       enabled: true,
@@ -112,8 +112,8 @@ async function runViewport(browser, name, viewport) {
       }
     }
 
-    if ((report.mist?.activeBanks || 0) < 60) failures.push(`${name}: ordinary mist remained too empty`);
-    if ((report["heavy-mist"]?.activeBanks || 0) < 90) failures.push(`${name}: heavy mist remained too empty`);
+    if ((report.mist?.activeBanks || 0) < 80) failures.push(`${name}: ordinary mist remained too empty`);
+    if ((report["heavy-mist"]?.activeBanks || 0) < 120) failures.push(`${name}: heavy mist remained too empty`);
     failures.push(...errors.map(error => `${name}: browser error: ${error}`));
   } catch (error) {
     failures.push(`${name}: proof execution failed: ${error?.stack || error}`);
