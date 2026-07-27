@@ -25,6 +25,7 @@ const newVisualBlock = `replace("departments/weather/tests/weather-mist-visual-c
 
 if (!source.includes(oldVisualBlock)) throw new Error("Main patcher visual-contract block was not found.");
 source = source.replace(oldVisualBlock, newVisualBlock);
+source = source.replace("approved.particles.mist, 69, 'ordinary mist", "approved.particles.mist, 64, 'ordinary mist");
 
 const workflowAnchor = `replace(".github/workflows/article-mist-descent.yml",`;
 const heavyContract = `replace("departments/weather/tests/weather-mist-visual-contract.test.js",
