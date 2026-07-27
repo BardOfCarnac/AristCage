@@ -1,0 +1,58 @@
+name: Integration Visual Round Trip
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "css/**"
+      - "js/**"
+      - "departments/**"
+      - "tests/integration-visual-roundtrip.mjs"
+      - ".github/workflows/integration-visual-roundtrip.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visual-roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check smoke-test syntax
+        run: node --check tests/integration-visual-roundtrip.mjs
+
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1
+          npx playwright install --with-deps chromium
+
+      - name: Run desktop and mobile visual round trip
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 > /tmp/ncn-integration-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          node tests/integration-visual-roundtrip.mjs
+
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-visual-roundtrip
+          path: |
+            artifacts/integration-roundtrip/
+            /tmp/ncn-integration-http.log
+          if-no-files-found: warn
+          retention-days: 14
