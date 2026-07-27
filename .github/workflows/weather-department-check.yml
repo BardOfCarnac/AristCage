@@ -5,6 +5,12 @@ on:
     paths:
       - "departments/weather/**"
       - ".github/workflows/weather-department-check.yml"
+  push:
+    branches:
+      - agent/prepare-module-host
+    paths:
+      - "departments/weather/**"
+      - ".github/workflows/weather-department-check.yml"
   workflow_dispatch:
 
 permissions:
