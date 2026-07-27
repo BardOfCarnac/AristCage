@@ -71,3 +71,12 @@ jobs:
           }
           console.log('Weather publication respects the PR-86 scoped ownership boundary.');
           NODE
+
+      - name: Upload scoped Weather source snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-source-snapshot
+          path: departments/weather/
+          if-no-files-found: error
+          retention-days: 1
