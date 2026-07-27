@@ -60,7 +60,8 @@ window.NCNWeatherPR86HostTests = (() => {
       const depthFrame = candidate.getDepthFrame();
       check("Weather publishes an immutable exact-depth frame",
         Boolean(depthFrame) && Object.isFrozen(depthFrame)
-        && depthFrame.depthConvention === "smaller-positive-z-is-nearer",
+        && depthFrame.depthConvention === "smaller-positive-z-is-nearer"
+        && depthFrame.runtimeToken !== null,
         depthFrame);
       check("Weather depth frame exposes no private puff collection",
         !Object.prototype.hasOwnProperty.call(depthFrame, "puffs"), depthFrame);

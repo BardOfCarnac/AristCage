@@ -94,7 +94,7 @@ function createRuntime() {
             delta,
             quality: this.quality,
             reducedMotion: this.quality === 'reduced',
-            frameToken: ++this.frameSerial
+            frame: ++this.frameSerial
           }) !== false;
         }
       }
@@ -233,6 +233,7 @@ function renderCounts() {
     'depth frame must represent individual puffs rather than only bank centres');
   assert.equal(Object.hasOwn(depthFrame, 'puffs'), false, 'private puff state must not be exposed');
   assert.strictEqual(weather.getDepthFrame(depthFrame.token), depthFrame);
+  assert.notEqual(depthFrame.runtimeToken, null, 'production-shaped runtime frames must publish a shared runtime token');
   assert.strictEqual(weather.getDepthFrame(depthFrame.runtimeToken), depthFrame);
   assert.equal(weather.getDepthFrame('not-the-current-frame'), null);
   assert.throws(() => depthFrame.renderForeground(new FakeContext(), { nearerThan: Infinity }), /finite nearerThan/);

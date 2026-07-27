@@ -105,8 +105,9 @@ Private bank and puff collections are never returned. `renderForeground()`:
   the normal Weather frame;
 - performs no simulation update, spawn, reset or particle mutation;
 - preserves the ordinary puff draw order after depth filtering;
-- treats `viewport` only as a page-space rendering bound, with the target context origin
-  corresponding to the viewport's top-left;
+- treats `viewport` only as a viewport-relative CSS-pixel rendering bound, equivalent
+  to `getBoundingClientRect()` coordinates, with the target context origin corresponding to
+  the viewport's top-left;
 - reproduces the current reading/control attenuation unless
   `includeAttenuation: false` is explicitly supplied;
 - allocates no canvas, timer or article-specific resource.

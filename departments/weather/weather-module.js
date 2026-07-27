@@ -155,7 +155,7 @@ window.NCNWeatherDepartment = (() => {
     }
 
     function primitiveFrameToken(frame) {
-      const candidate = frame?.frameToken ?? frame?.token ?? frame?.frameId ?? frame?.id;
+      const candidate = frame?.frameToken ?? frame?.token ?? frame?.frameId ?? frame?.frame ?? frame?.id;
       return ["string", "number", "bigint"].includes(typeof candidate) ? candidate : null;
     }
 
