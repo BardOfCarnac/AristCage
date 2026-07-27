@@ -28,9 +28,23 @@ window.NCNApplications = (() => {
   const dripfeedRoot = document.querySelector('#dripfeed-root');
   let dripfeedApp = null;
   let switching = false;
+  let railMeasurementFrame = 0;
 
   function profile(name) {
     return profiles[name] || profiles.redwire;
+  }
+
+  function measureRailClearance() {
+    railMeasurementFrame = 0;
+    const rail = document.querySelector('.rail');
+    const bottom = Math.max(0, Math.ceil(rail?.getBoundingClientRect?.().bottom || 0));
+    document.documentElement.style.setProperty('--ncn-rail-clearance', `${bottom}px`);
+    return bottom;
+  }
+
+  function requestRailMeasurement() {
+    if (railMeasurementFrame) cancelAnimationFrame(railMeasurementFrame);
+    railMeasurementFrame = requestAnimationFrame(measureRailClearance);
   }
 
   function updateChrome(name) {
@@ -52,6 +66,7 @@ window.NCNApplications = (() => {
       }
     }
     if (version) version.textContent = current.version;
+    requestRailMeasurement();
   }
 
   function ensureDripfeed() {
@@ -75,6 +90,7 @@ window.NCNApplications = (() => {
       const app = ensureDripfeed();
       setMountVisibility('dripfeed');
       app?.activate?.();
+      requestRailMeasurement();
       return;
     }
 
@@ -82,6 +98,7 @@ window.NCNApplications = (() => {
     render();
     updateProjection();
     activatePresence(true);
+    requestRailMeasurement();
   }
 
   function resolveApplication(name, animate) {
@@ -142,6 +159,9 @@ window.NCNApplications = (() => {
     return profiles[session] ? session : 'redwire';
   }
 
+  window.addEventListener('resize', requestRailMeasurement, { passive: true });
+  document.fonts?.ready?.then(requestRailMeasurement).catch?.(() => {});
+
   const initial = initialApplication();
   if (initial === 'dripfeed') {
     void switchTo('dripfeed', { animate: false, force: true, reason: 'initial' });
@@ -156,6 +176,7 @@ window.NCNApplications = (() => {
     current: () => NCN_STATE.activeApp,
     isSwitching: () => switching,
     profiles: () => Object.values(profiles).map(item => ({ ...item })),
+    getRailClearance: () => measureRailClearance(),
     getDepthPlaneDefinitions: () => (
       NCN_STATE.activeApp === 'dripfeed'
         ? dripfeedApp?.getDepthPlaneDefinitions?.() || window.Dripfeed?.depth?.PLANE_DEFINITIONS || []
