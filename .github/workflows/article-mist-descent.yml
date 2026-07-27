@@ -1,25 +1,56 @@
-name: Apply Heavy Mist Test Corrections
+name: Article Mist Descent
 
 on:
+  push:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply-heavy-mist-test-fix:
-    if: ${{ github.head_ref == 'agent/article-mist-descent' }}
+  contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: agent/article-mist-descent
-      - name: Apply corrected test ordering and diagnostics
-        run: node scripts/fix-heavy-mist-tests.cjs
-      - name: Commit corrected tests
+      - name: Syntax check
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add departments/weather/tests/weather-module.node.test.js tests/article-mist-descent.browser.js
-          git commit -m "Correct heavy mist validation ordering"
-          git push origin HEAD:agent/article-mist-descent
+          node --check js/article-mist-descent.js
+          node --check js/optical-descent-adapter.js
+          node --check departments/weather/weather-module.js
+          node --check tests/article-mist-descent-contract.test.js
+          node --check tests/article-mist-descent.browser.js
+      - name: Verify ownership and runtime contract
+        run: node tests/article-mist-descent-contract.test.js
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install browser runner
+        run: |
+          npm install --no-save playwright@1.52.0
+          npx playwright install --with-deps chromium
+      - name: Start local site
+        run: |
+          python3 -m http.server 4173 > /tmp/ncn-article-mist-http.log 2>&1 &
+          echo $! > /tmp/ncn-article-mist-http.pid
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/index.html >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/ncn-article-mist-http.log
+          exit 1
+      - name: Run desktop and mobile rendered proof
+        run: node tests/article-mist-descent.browser.js
+      - name: Upload rendered proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: article-mist-descent-proof
+          path: |
+            artifacts/article-mist-descent
+            /tmp/ncn-article-mist-http.log
+          if-no-files-found: warn
