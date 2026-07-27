@@ -24,10 +24,10 @@ window.NCNWeatherDepartment = (() => {
     seed: 2045
   });
   const QUALITY = Object.freeze({
-    reduced: Object.freeze({ mist: 14, dust: 8, rain: 0, fps: 8, dpr: 1 }),
-    low: Object.freeze({ mist: 28, dust: 24, rain: 48, fps: 12, dpr: 1 }),
-    medium: Object.freeze({ mist: 56, dust: 40, rain: 96, fps: 30, dpr: 1.2 }),
-    high: Object.freeze({ mist: 72, dust: 64, rain: 144, fps: 30, dpr: 1.5 })
+    reduced: Object.freeze({ mist: 20, dust: 8, rain: 0, fps: 8, dpr: 1 }),
+    low: Object.freeze({ mist: 48, dust: 24, rain: 48, fps: 12, dpr: 1 }),
+    medium: Object.freeze({ mist: 96, dust: 40, rain: 96, fps: 30, dpr: 1.2 }),
+    high: Object.freeze({ mist: 128, dust: 64, rain: 144, fps: 30, dpr: 1.5 })
   });
   const PRESET_KEYS = Object.freeze([
     "mist", "smoke", "dust", "rain", "haze", "moisture", "turbulence",
@@ -282,8 +282,8 @@ window.NCNWeatherDepartment = (() => {
     function resetMistBank(bank, bounds, initial = false) {
       bank.x = randomBetween(-bounds.halfWidth * 1.25, bounds.halfWidth * 1.25);
       bank.z = randomBetween(bounds.near + 0.2, bounds.far - 0.25);
-      bank.width = randomBetween(0.90, 2.40);
-      bank.depth = randomBetween(0.60, 2.00);
+      bank.width = randomBetween(0.62, 1.58);
+      bank.depth = randomBetween(0.38, 1.15);
       bank.lift = randomBetween(0.02, 0.28);
       bank.verticalSeed = random();
       bank.scaleSeed = randomBetween(0.88, 1.12);
@@ -420,7 +420,7 @@ window.NCNWeatherDepartment = (() => {
 
     function targetCounts(intensity, profile) {
       const settings = mistSettings(intensity);
-      const originalCount = Math.round((12 + settings.density * 38) * settings.bankMultiplier);
+      const originalCount = Math.round((18 + settings.density * 58) * settings.bankMultiplier);
       return {
         mist: intensity > 0.002 && settings.density > 0.03 ? Math.min(profile.mist, originalCount) : 0,
         dust: Math.round(profile.dust * clamp01(state.config.dust * intensity)),
@@ -547,7 +547,20 @@ window.NCNWeatherDepartment = (() => {
           const bankWidth = bank.width * bankScale;
           const bankDepth = bank.depth * bankScale;
           const x = bank.x + (normal - 0.5) * bankWidth * 1.35 + wobble * bankWidth * 0.12 * settings.turbulence;
-          const z = bank.z + Math.sin(bank.phase2 + index * 2.1) * bankDepth * 0.28;
+          const z = clamp(
+            bank.z + Math.sin(bank.phase2 + index * 2.1) * bankDepth * 0.28,
+            scene.bounds.near + 0.05,
+            scene.bounds.far - 0.05
+          );
+          const chamberClip = normaliseRect(scene.camera?.apertureAt?.(z, scene.bounds.halfWidth))
+            || Object.freeze({
+              left: layerRect.left,
+              top: layerRect.top,
+              right: layerRect.left + layerRect.width,
+              bottom: layerRect.top + layerRect.height,
+              width: layerRect.width,
+              height: layerRect.height
+            });
           const verticalRange = scene.bounds.halfHeight * 1.72 * settings.verticalFill;
           const lift = bank.lift
             + (bank.verticalSeed || 0) * verticalRange
@@ -570,6 +583,7 @@ window.NCNWeatherDepartment = (() => {
             localY: centre.y,
             pageX: centre.x + layerRect.left,
             pageY: centre.y + layerRect.top,
+            chamberClip,
             radiusX,
             radiusY,
             alpha,
@@ -586,8 +600,23 @@ window.NCNWeatherDepartment = (() => {
       return Object.freeze(puffs);
     }
 
-    function drawMistPuff(targetContext, puff, x = puff.localX, y = puff.localY) {
+    function shiftedClipRect(rect, originX = 0, originY = 0) {
+      if (!rect) return null;
+      return {
+        left: rect.left - originX,
+        top: rect.top - originY,
+        width: rect.width,
+        height: rect.height
+      };
+    }
+
+    function drawMistPuff(targetContext, puff, x = puff.localX, y = puff.localY, clipRect = null) {
       targetContext.save?.();
+      if (clipRect && typeof targetContext.rect === "function" && typeof targetContext.clip === "function") {
+        targetContext.beginPath?.();
+        targetContext.rect(clipRect.left, clipRect.top, clipRect.width, clipRect.height);
+        targetContext.clip();
+      }
       targetContext.translate?.(x, y);
       targetContext.scale?.(puff.radiusX, puff.radiusY);
       const gradient = targetContext.createRadialGradient?.(0, 0, 0.08, 0, 0, 1);
@@ -685,7 +714,13 @@ window.NCNWeatherDepartment = (() => {
         }
         for (const puff of puffs) {
           if (!(puff.z < nearerThan) || !puffIntersectsViewport(puff, viewport)) continue;
-          drawMistPuff(targetContext, puff, puff.pageX - originX, puff.pageY - originY);
+          drawMistPuff(
+            targetContext,
+            puff,
+            puff.pageX - originX,
+            puff.pageY - originY,
+            shiftedClipRect(puff.chamberClip, originX, originY)
+          );
           rendered += 1;
         }
         if (options.includeAttenuation !== false) {
@@ -704,6 +739,7 @@ window.NCNWeatherDepartment = (() => {
         depthConvention: DEPTH_CONVENTION,
         puffCount: puffs.length,
         depthRange,
+        chamberClipped: true,
         renderForeground
       });
       currentDepthFrame = handle;
@@ -770,7 +806,16 @@ window.NCNWeatherDepartment = (() => {
       const puffs = buildMistPuffs(settings, scene);
       publishDepthFrame(runtimeFrame, scene, puffs);
       clearCanvases();
-      puffs.forEach(puff => drawMistPuff(contexts.get(puff.layer), puff));
+      puffs.forEach(puff => {
+        const layer = scene.rects.get(puff.layer);
+        drawMistPuff(
+          contexts.get(puff.layer),
+          puff,
+          puff.localX,
+          puff.localY,
+          shiftedClipRect(puff.chamberClip, layer.left, layer.top)
+        );
+      });
       ["dust", "rain"].forEach(type => particles[type].forEach(particle => {
         if (particle.active) drawParticle(contexts.get(particle.layer), particle, intensity, scene);
       }));

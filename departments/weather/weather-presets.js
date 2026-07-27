@@ -30,21 +30,24 @@ window.NCNWeatherPresets = (() => {
       depthFlow: -0.025
     }),
     mist: preset({
-      mist: 0.48,
-      moisture: 0.42,
+      mist: 0.54,
+      moisture: 0.48,
       turbulence: 0.17,
       drift: 0.20,
-      depthFlow: -0.018
+      depthFlow: -0.018,
+      verticalFill: 0.10,
+      bankScale: 0.88,
+      bankMultiplier: 1.18
     }),
     "heavy-mist": preset({
-      mist: 0.96,
-      moisture: 0.90,
+      mist: 0.98,
+      moisture: 0.92,
       turbulence: 0.28,
       drift: 0.12,
       depthFlow: -0.018,
       verticalFill: 0.82,
-      bankScale: 1.34,
-      bankMultiplier: 1.55
+      bankScale: 1.08,
+      bankMultiplier: 1.85
     }),
     smoke: preset({
       mist: 0.58,

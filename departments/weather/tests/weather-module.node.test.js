@@ -199,12 +199,12 @@ function renderCounts() {
   assert.equal(snapshot.resources.canvases, 4);
   assert.equal(snapshot.resources.visibleCanvases, 0);
   assert.equal(snapshot.quality, 'medium');
-  assert.deepEqual(snapshot.particles.capacities, { mist: 56, dust: 40, rain: 96 });
+  assert.deepEqual(snapshot.particles.capacities, { mist: 96, dust: 40, rain: 96 });
 
   weather.applyProfile({ enabled: true, preset: 'mist', intensity: 0.42, seed: 2045 });
   runtime.step(16, 40);
   const approved = weather.snapshot();
-  assert.equal(approved.particles.mist, 36, 'approved Low mist must use 36 banks at normal quality');
+  assert.equal(approved.particles.mist, 64, 'ordinary mist must use a dense field of smaller banks at normal quality');
   assert.equal(approved.diagnostics.mistRenderer, 'floor-mist-test-01-banks');
   assert.equal(approved.diagnostics.floorVeil, false);
   assert.equal(approved.diagnostics.generalHaze, false);
@@ -244,6 +244,7 @@ function renderCounts() {
   assert.ok(depthFrame, 'active Weather must publish its current immutable depth frame');
   assert.equal(Object.isFrozen(depthFrame), true);
   assert.equal(depthFrame.depthConvention, 'smaller-positive-z-is-nearer');
+  assert.equal(depthFrame.chamberClipped, true, 'published mist puffs must remain clipped to the chamber aperture');
   assert.ok(depthFrame.puffCount >= approved.particles.mist * 3,
     'depth frame must represent individual puffs rather than only bank centres');
   assert.equal(Object.hasOwn(depthFrame, 'puffs'), false, 'private puff state must not be exposed');
@@ -307,7 +308,7 @@ function renderCounts() {
   runtime.handle.enable();
   runtime.step(16, 1);
   assert.equal(weather.snapshot().quality, 'reduced');
-  assert.deepEqual(weather.snapshot().particles.capacities, { mist: 14, dust: 8, rain: 0 });
+  assert.deepEqual(weather.snapshot().particles.capacities, { mist: 20, dust: 8, rain: 0 });
 
   runtime.quality = 'full';
   settings.quality = 'full';

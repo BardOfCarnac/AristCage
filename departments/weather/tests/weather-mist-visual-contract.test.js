@@ -14,8 +14,8 @@ for (const token of [
   'turbulence: 0.42',
   'softness: 0.66',
   'bankCount: 36',
-  'bank.width = randomBetween(0.90, 2.40)',
-  'bank.depth = randomBetween(0.60, 2.00)',
+  'bank.width = randomBetween(0.62, 1.58)',
+  'bank.depth = randomBetween(0.38, 1.15)',
   'bank.lift = randomBetween(0.02, 0.28)',
   'bank.verticalSeed = random()',
   'bank.scaleSeed = randomBetween(0.88, 1.12)',
@@ -39,7 +39,9 @@ for (const token of [
   'frontEnergy: false',
   'const DEPTH_CONVENTION = "smaller-positive-z-is-nearer"',
   'function buildMistPuffs(settings, scene)',
-  'const z = bank.z + Math.sin(bank.phase2 + index * 2.1) * bankDepth * 0.28',
+  'scene.camera?.apertureAt?.(z, scene.bounds.halfWidth)',
+  'shiftedClipRect(puff.chamberClip',
+  'chamberClipped: true',
   'const verticalRange = scene.bounds.halfHeight * 1.72 * settings.verticalFill',
   'height: APPROVED_MIST.height * mix(1, 3.6, verticalFill)',
   'puffs.sort((a, b) => b.z - a.z)',
@@ -80,8 +82,8 @@ for (const token of [
   'haze: 0',
   '"heavy-mist": preset({',
   'verticalFill: 0.82',
-  'bankScale: 1.34',
-  'bankMultiplier: 1.55'
+  'bankScale: 1.08',
+  'bankMultiplier: 1.85'
 ]) {
   assert.ok(presets.includes(token), `Weather palette or volume preset is missing: ${token}`);
 }
