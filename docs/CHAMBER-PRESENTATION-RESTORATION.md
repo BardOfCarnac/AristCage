@@ -65,3 +65,7 @@ The recovered prototypes remain the visual source of truth:
 `tests/chamber-motion-presentation-render.mjs` runs the real page in Chromium at desktop and mobile sizes. It opens Filter, samples the rendered wall-matched canvas, requires movement beyond extraction, confirms repeated Weather occlusion passes, verifies the old renderer remains hidden, closes Filter, and checks clean settlement.
 
 A human rendered pass is still required before merge, particularly to judge line parity at different depths and the near-layer transition when a cluster travels very close to the viewer.
+
+## Revalidation after article-mist integration
+
+This draft is being revalidated against the current `main` after PR #98 merged the denser ordinary/heavy Weather field, exact per-puff chamber clipping and article-mist composition. The pull-request browser run therefore exercises the wall-matched block presentation and Weather occlusion against the current integrated Weather renderer rather than the earlier sparse field.
