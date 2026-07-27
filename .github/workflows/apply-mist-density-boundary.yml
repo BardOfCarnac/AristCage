@@ -27,6 +27,9 @@ jobs:
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
           fi
+      - name: Align patcher with current Weather contract
+        if: steps.ready.outputs.ready == 'true'
+        run: node scripts/fix-mist-density-patcher.cjs
       - name: Apply denser fields and chamber clipping
         if: steps.ready.outputs.ready == 'true'
         run: node scripts/apply-mist-density-boundary.cjs
@@ -40,12 +43,12 @@ jobs:
           node departments/weather/tests/weather-mist-visual-contract.test.js
       - name: Remove one-shot patch files
         if: steps.ready.outputs.ready == 'true'
-        run: rm scripts/apply-mist-density-boundary.cjs .github/workflows/apply-mist-density-boundary.yml
+        run: rm scripts/apply-mist-density-boundary.cjs scripts/fix-mist-density-patcher.cjs .github/workflows/apply-mist-density-boundary.yml
       - name: Commit corrected implementation
         if: steps.ready.outputs.ready == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add departments/weather/weather-presets.js departments/weather/weather-module.js departments/weather/tests/weather-module.node.test.js departments/weather/tests/weather-mist-visual-contract.test.js tests/weather-density-boundary.browser.js .github/workflows/article-mist-descent.yml scripts/apply-mist-density-boundary.cjs .github/workflows/apply-mist-density-boundary.yml
+          git add departments/weather/weather-presets.js departments/weather/weather-module.js departments/weather/tests/weather-module.node.test.js departments/weather/tests/weather-mist-visual-contract.test.js tests/weather-density-boundary.browser.js .github/workflows/article-mist-descent.yml scripts/apply-mist-density-boundary.cjs scripts/fix-mist-density-patcher.cjs .github/workflows/apply-mist-density-boundary.yml
           git commit -m "Densify mist and clip it to the chamber [mist-density-boundary-applied]"
           git push origin HEAD:agent/article-mist-descent
