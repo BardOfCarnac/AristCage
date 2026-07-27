@@ -35,6 +35,7 @@ jobs:
       - name: Run desktop and mobile visual round trip
         run: |
           set -euo pipefail
+          mkdir -p artifacts/integration-roundtrip
           python3 -m http.server 4173 > /tmp/ncn-integration-http.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
@@ -44,7 +45,7 @@ jobs:
             fi
             sleep 1
           done
-          node tests/integration-visual-roundtrip.mjs
+          node tests/integration-visual-roundtrip.mjs 2>&1 | tee artifacts/integration-roundtrip/test-output.log
 
       - name: Upload visual evidence
         if: always()
