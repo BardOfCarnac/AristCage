@@ -41,7 +41,7 @@ async function outsideChamberPixels(page) {
     for (const [layer, z] of Object.entries(minimumDepth)) {
       const canvas = document.querySelector(`.ncn-department-weather-${layer}`);
       if (!canvas || canvas.hidden || !canvas.width || !canvas.height) {
-        result[layer] = { visibleOutside: 0, sampledOutside: 0 };
+        result[layer] = { visibleOutside: 0, sampledOutside: 0, maximumAlpha: 0 };
         continue;
       }
       const rect = canvas.getBoundingClientRect();
@@ -51,6 +51,7 @@ async function outsideChamberPixels(page) {
       const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
       let visibleOutside = 0;
       let sampledOutside = 0;
+      let maximumAlpha = 0;
       const step = 4;
       for (let py = 0; py < canvas.height; py += step) {
         const pageY = rect.top + (py + 0.5) / scaleY;
@@ -60,10 +61,12 @@ async function outsideChamberPixels(page) {
             || pageY < aperture.top || pageY > aperture.bottom;
           if (!outside) continue;
           sampledOutside += 1;
-          if (data[(py * canvas.width + px) * 4 + 3] > 2) visibleOutside += 1;
+          const alpha = data[(py * canvas.width + px) * 4 + 3];
+          maximumAlpha = Math.max(maximumAlpha, alpha);
+          if (alpha > 2) visibleOutside += 1;
         }
       }
-      result[layer] = { visibleOutside, sampledOutside };
+      result[layer] = { visibleOutside, sampledOutside, maximumAlpha };
     }
     return result;
   });
@@ -73,50 +76,70 @@ async function runViewport(browser, name, viewport) {
   const context = await browser.newContext({ viewport });
   const page = await context.newPage();
   const errors = [];
+  const failures = [];
   page.on("pageerror", error => errors.push(String(error)));
   page.on("console", message => {
     if (message.type() === "error") errors.push(message.text());
   });
 
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
-  await waitForWeather(page);
-
   const report = {};
-  for (const preset of ["mist", "heavy-mist"]) {
-    await applyMist(page, preset);
-    const snapshot = await page.evaluate(() => window.NCNIntegration.getService("weather").snapshot());
-    const outside = await outsideChamberPixels(page);
-    report[preset] = {
-      activeBanks: snapshot.particles.mist,
-      puffCount: snapshot.diagnostics.depthFrame.puffCount,
-      outside
-    };
-    for (const [layer, sample] of Object.entries(outside)) {
-      assert.equal(sample.visibleOutside, 0,
-        `${name} ${preset}: mist escaped the ${layer} chamber aperture at ${sample.visibleOutside} sampled pixels`);
+  try {
+    await page.goto(baseUrl, { waitUntil: "networkidle" });
+    await waitForWeather(page);
+
+    for (const preset of ["mist", "heavy-mist"]) {
+      await applyMist(page, preset);
+      const snapshot = await page.evaluate(() => window.NCNIntegration.getService("weather").snapshot());
+      const outside = await outsideChamberPixels(page);
+      report[preset] = {
+        activeBanks: snapshot.particles.mist,
+        puffCount: snapshot.diagnostics.depthFrame.puffCount,
+        outside
+      };
+
+      await page.screenshot({
+        path: path.join(artifactDir, `${name}-${preset}-field.png`),
+        fullPage: false
+      });
+
+      for (const [layer, sample] of Object.entries(outside)) {
+        if (sample.visibleOutside !== 0) {
+          failures.push(
+            `${name} ${preset}: mist escaped the ${layer} chamber aperture at `
+            + `${sample.visibleOutside} sampled pixels (maximum alpha ${sample.maximumAlpha})`
+          );
+        }
+      }
     }
-    await page.screenshot({
-      path: path.join(artifactDir, `${name}-${preset}-field.png`),
-      fullPage: false
-    });
+
+    if ((report.mist?.activeBanks || 0) < 60) failures.push(`${name}: ordinary mist remained too empty`);
+    if ((report["heavy-mist"]?.activeBanks || 0) < 90) failures.push(`${name}: heavy mist remained too empty`);
+    failures.push(...errors.map(error => `${name}: browser error: ${error}`));
+  } catch (error) {
+    failures.push(`${name}: proof execution failed: ${error?.stack || error}`);
+  } finally {
+    fs.writeFileSync(
+      path.join(artifactDir, `${name}-weather-density-boundary.json`),
+      JSON.stringify({ report, failures, errors }, null, 2)
+    );
+    await context.close();
   }
 
-  assert.ok(report.mist.activeBanks >= 60, `${name}: ordinary mist remained too empty`);
-  assert.ok(report["heavy-mist"].activeBanks >= 90, `${name}: heavy mist remained too empty`);
-  fs.writeFileSync(path.join(artifactDir, `${name}-weather-density-boundary.json`), JSON.stringify(report, null, 2));
-  assert.deepEqual(errors, [], `${name}: browser errors: ${errors.join(" | ")}`);
-  await context.close();
+  return failures;
 }
 
 (async () => {
   const browser = await chromium.launch({ headless: true });
+  const failures = [];
   try {
-    await runViewport(browser, "desktop", { width: 1440, height: 900 });
-    await runViewport(browser, "mobile", { width: 390, height: 844 });
-    console.log("PASS: ordinary and heavy mist use dense bank fields clipped to the chamber wireframe");
+    failures.push(...await runViewport(browser, "desktop", { width: 1440, height: 900 }));
+    failures.push(...await runViewport(browser, "mobile", { width: 390, height: 844 }));
   } finally {
     await browser.close();
   }
+
+  assert.deepEqual(failures, [], failures.join("\n"));
+  console.log("PASS: ordinary and heavy mist use dense bank fields clipped to the chamber wireframe");
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
