@@ -1,0 +1,163 @@
+/* Shared developer launcher and service controls. */
+.diagnostics-toggle {
+  display: block !important;
+  min-width: 58px;
+  min-height: 34px;
+  opacity: .76;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+html.diagnostics-on .diagnostics-toggle {
+  opacity: 1;
+  color: var(--white);
+  border-color: var(--orange);
+  box-shadow: 0 0 12px rgba(255, 90, 45, .25);
+}
+
+.diagnostics-panel {
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+.diagnostics-panel button,
+.diagnostics-panel input,
+.diagnostics-panel label {
+  pointer-events: auto !important;
+}
+
+/* The terminal environment normally sits behind the application plane. A manual
+   developer override temporarily lifts it above Dripfeed so Weather and movement
+   tests are actually visible there. The shared title rail remains above both. */
+html[data-dev-environment-preview="true"] .ncn-environment-system {
+  z-index: 35;
+}
+
+.diagnostics-service-block {
+  display: grid;
+  gap: 7px;
+  padding: 7px;
+  border: 1px solid rgba(255, 70, 40, .18);
+  background: rgba(255, 40, 20, .025);
+}
+
+.diagnostics-service-block + .diagnostics-service-block {
+  margin-top: 7px;
+}
+
+.diagnostics-service-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.diagnostics-service-heading strong {
+  color: var(--white);
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.diagnostics-service-heading span {
+  color: var(--orange);
+  font-size: .56rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnostics-control-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.diagnostics-control-grid button,
+.diagnostics-restore-profile {
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 5px;
+  border: 1px solid rgba(255, 80, 50, .36);
+  background: rgba(0, 0, 0, .42);
+  color: var(--amber);
+  font: 600 .55rem/1.1 var(--font-main);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.diagnostics-control-grid button:hover,
+.diagnostics-control-grid button:focus-visible,
+.diagnostics-restore-profile:hover,
+.diagnostics-restore-profile:focus-visible {
+  color: var(--white);
+  border-color: var(--orange);
+  box-shadow: 0 0 8px rgba(255, 100, 50, .18);
+  outline: none;
+}
+
+.diagnostics-control-grid button:active,
+.diagnostics-restore-profile:active {
+  color: var(--white);
+  background: rgba(255, 70, 40, .16);
+  transform: translateY(1px);
+}
+
+.diagnostics-range-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 3.2em;
+  gap: 7px;
+  align-items: center;
+  color: rgba(255, 190, 130, .7);
+  font-size: .55rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.diagnostics-range-control input {
+  width: 100%;
+  accent-color: var(--orange);
+}
+
+.diagnostics-range-control output {
+  color: var(--white);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnostics-environment-readout {
+  margin-top: 7px;
+}
+
+.diagnostics-restore-profile {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.diagnostics-service-message {
+  min-height: 1.25em;
+  margin-top: 6px;
+  color: rgba(255, 205, 150, .72);
+  font-size: .56rem;
+}
+
+.diagnostics-service-message.is-error {
+  color: #ff6f61;
+}
+
+@media (max-width: 600px) {
+  .diagnostics-toggle {
+    right: 7px;
+    bottom: calc(7px + env(safe-area-inset-bottom));
+  }
+
+  .diagnostics-control-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .diagnostics-panel {
+    width: calc(100vw - 78px);
+    max-height: 62vh;
+  }
+}

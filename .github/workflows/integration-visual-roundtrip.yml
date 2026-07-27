@@ -1,0 +1,78 @@
+name: Integration Visual Round Trip
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "css/**"
+      - "js/**"
+      - "departments/**"
+      - "tests/integration-visual-roundtrip.mjs"
+      - ".github/workflows/integration-visual-roundtrip.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visual-roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check smoke-test syntax
+        run: node --check tests/integration-visual-roundtrip.mjs
+
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1 > /tmp/ncn-browser-install.log 2>&1
+          npx playwright install --with-deps chromium >> /tmp/ncn-browser-install.log 2>&1
+
+      - name: Run desktop and mobile visual round trip
+        id: roundtrip
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/integration-roundtrip
+          python3 -m http.server 4173 > /tmp/ncn-integration-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          node tests/integration-visual-roundtrip.mjs 2>&1 | tee artifacts/integration-roundtrip/test-output.log
+
+      - name: Print visual diagnostics
+        if: always()
+        run: |
+          echo "Round-trip outcome: ${{ steps.roundtrip.outcome }}"
+          find artifacts/integration-roundtrip -maxdepth 1 -type f -print 2>/dev/null || true
+          test ! -f artifacts/integration-roundtrip/test-output.log || cat artifacts/integration-roundtrip/test-output.log
+          for failure in artifacts/integration-roundtrip/*-failure.txt; do
+            test ! -e "$failure" || { echo "--- $failure"; cat "$failure"; }
+          done
+          echo "--- static server log"
+          test ! -f /tmp/ncn-integration-http.log || tail -80 /tmp/ncn-integration-http.log
+
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-visual-roundtrip
+          path: |
+            artifacts/integration-roundtrip
+            /tmp/ncn-integration-http.log
+            /tmp/ncn-browser-install.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce visual round-trip result
+        if: steps.roundtrip.outcome != 'success'
+        run: exit 1

@@ -1,0 +1,110 @@
+name: Browser Department Installation
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "js/integration-browser-probe.js"
+      - "js/integration-service-gate.js"
+      - "js/integration-frozen-publications.js"
+      - "js/integration-departments.js"
+      - "js/integration-services.js"
+      - "js/module-manager.js"
+      - "js/department-context.js"
+      - "js/viewer-host.js"
+      - "js/departments/effects/**"
+      - "departments/weather/**"
+      - "departments/chamber-movement/**"
+      - ".github/workflows/browser-department-installation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install-in-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check probe and bridge syntax
+        run: |
+          node --check js/integration-browser-probe.js
+          node --check js/integration-frozen-publications.js
+
+      - name: Start static viewer
+        run: |
+          python3 -m http.server 4173 > /tmp/ncn-server.log 2>&1 &
+          echo $! > /tmp/ncn-server.pid
+          for attempt in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:4173/index.html > /dev/null; then
+              exit 0
+            fi
+            sleep 0.2
+          done
+          cat /tmp/ncn-server.log
+          exit 1
+
+      - name: Install accepted departments in Chromium
+        id: browser_probe
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          browser="$(command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
+          if [ -z "$browser" ]; then
+            echo "No Chromium-compatible browser is available on the runner."
+            exit 1
+          fi
+
+          "$browser" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --disable-dev-shm-usage \
+            --virtual-time-budget=12000 \
+            --dump-dom \
+            "http://127.0.0.1:4173/index.html?integrationProbe=1" \
+            > /tmp/ncn-browser-probe.html
+
+          python3 - <<'PY'
+          import html
+          import re
+          from pathlib import Path
+
+          source = Path('/tmp/ncn-browser-probe.html').read_text()
+          match = re.search(r'<pre id="integration-browser-probe"[^>]*>(.*?)</pre>', source, re.S)
+          Path('/tmp/ncn-browser-probe.json').write_text(
+              html.unescape(match.group(1)).strip() if match else '{"message":"Probe output element missing."}'
+          )
+          PY
+
+          grep -o 'data-integration-probe-status="[^"]*"' /tmp/ncn-browser-probe.html || true
+          cat /tmp/ncn-browser-probe.json
+          grep -q 'data-integration-probe-status="ready"' /tmp/ncn-browser-probe.html
+
+      - name: Upload browser probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncn-browser-department-probe
+          path: |
+            /tmp/ncn-browser-probe.html
+            /tmp/ncn-browser-probe.json
+            /tmp/ncn-server.log
+            js/integration-services.js
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Enforce browser installation result
+        if: steps.browser_probe.outcome != 'success'
+        run: |
+          echo "Accepted departments failed to install in the real browser page."
+          test ! -f /tmp/ncn-browser-probe.json || cat /tmp/ncn-browser-probe.json
+          exit 1
+
+      - name: Stop static viewer
+        if: always()
+        run: |
+          if [ -f /tmp/ncn-server.pid ]; then
+            kill "$(cat /tmp/ncn-server.pid)" || true
+          fi

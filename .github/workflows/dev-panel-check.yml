@@ -1,0 +1,97 @@
+name: Developer Panel Checks
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "js/dev-panel-controls.js"
+      - "js/integration-service-gate.js"
+      - "css/dev-panel-controls.css"
+      - "tests/dev-panel-controls.test.js"
+      - "tests/integration-service-gate.test.js"
+      - ".github/workflows/dev-panel-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check developer control syntax
+        run: |
+          node --check js/dev-panel-controls.js
+          node --check js/integration-service-gate.js
+          node --check tests/dev-panel-controls.test.js
+          node --check tests/integration-service-gate.test.js
+
+      - name: Run service capability gate harness
+        run: node tests/integration-service-gate.test.js
+
+      - name: Run developer control execution harness
+        run: node tests/dev-panel-controls.test.js
+
+      - name: Check shared launcher and service wiring
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const script = fs.readFileSync('js/dev-panel-controls.js', 'utf8');
+          const gate = fs.readFileSync('js/integration-service-gate.js', 'utf8');
+          const css = fs.readFileSync('css/dev-panel-controls.css', 'utf8');
+
+          for (const source of [
+            'css/dev-panel-controls.css',
+            'js/integration-service-gate.js',
+            'js/dev-panel-controls.js'
+          ]) {
+            if (!html.includes(source)) throw new Error(`index.html does not load ${source}.`);
+          }
+
+          const diagnostics = html.indexOf('js/diagnostics.js');
+          const integration = html.indexOf('js/integration-departments.js');
+          const capabilityGate = html.indexOf('js/integration-service-gate.js');
+          const controls = html.indexOf('js/dev-panel-controls.js');
+          if (
+            diagnostics < 0
+            || integration < diagnostics
+            || capabilityGate < integration
+            || controls < capabilityGate
+          ) {
+            throw new Error('Developer controls must load after the department installer and capability gate.');
+          }
+
+          for (const token of [
+            'ensureDiagnosticsInterface',
+            'data-debug-weather',
+            'data-debug-motion',
+            'dispatchControl',
+            'resolveService',
+            'syncApplicationProfile',
+            'chamber-motion',
+            'weather'
+          ]) {
+            if (!script.includes(token)) throw new Error(`Developer controls are missing ${token}.`);
+          }
+
+          for (const token of [
+            'REQUIRED_CAPABILITIES',
+            'applyProfile',
+            'trigger',
+            'hasPublicService',
+            '__capabilityGate'
+          ]) {
+            if (!gate.includes(token)) throw new Error(`Integration service gate is missing ${token}.`);
+          }
+
+          if (!css.includes('.diagnostics-toggle') || !css.includes('display: block !important')) {
+            throw new Error('The application-neutral developer launcher is not forced visible.');
+          }
+          if (!css.includes('data-dev-environment-preview')) {
+            throw new Error('Developer Weather and movement previews are not lifted above Dripfeed.');
+          }
+          console.log('Shared developer panel controls are wired correctly.');
+          NODE

@@ -1,0 +1,90 @@
+name: Chamber Movement Department
+
+on:
+  pull_request:
+    paths:
+      - "departments/chamber-movement/**"
+      - "js/chamber-motion-adapter.js"
+      - "js/chamber-motion-activity.js"
+      - "js/desktop.js"
+      - "tests/chamber-motion-camera-refresh.test.js"
+      - "tests/chamber-motion-activity.test.js"
+      - "tests/chamber-motion-render-smoke.mjs"
+      - ".github/workflows/chamber-movement.yml"
+  push:
+    branches:
+      - agent/publish-block-rearrangement-pr86
+    paths:
+      - "departments/chamber-movement/**"
+      - ".github/workflows/chamber-movement.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: departments/chamber-movement
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify source-part integrity
+        run: node tests/source-integrity.js
+      - name: Rebuild browser artifact
+        run: node build-publication.js
+      - name: Verify committed artifact matches generated source
+        run: git diff --exit-code -- block-rearrangement.js
+      - name: Check production source syntax
+        run: node --check block-rearrangement.js
+      - name: Check publication syntax
+        run: node --check publication.js
+      - name: Run deterministic acceptance suite
+        run: node tests/acceptance.js
+      - name: Run PR 86 publication contract
+        run: node tests/publication-contract.js
+      - name: Preserve active movement across camera refresh
+        working-directory: .
+        run: |
+          node --check js/chamber-motion-adapter.js
+          node tests/chamber-motion-camera-refresh.test.js
+      - name: Sustain panel movement through the host runtime
+        working-directory: .
+        run: |
+          node --check js/chamber-motion-activity.js
+          node tests/chamber-motion-activity.test.js
+
+  rendered-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1
+          npx playwright install --with-deps chromium
+      - name: Verify visible desktop and mobile movement
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python3 -m http.server 4173 > /tmp/ncn-chamber-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/chamber-motion-render-smoke.mjs
+      - name: Upload rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chamber-motion-render-smoke
+          path: artifacts/
+          if-no-files-found: ignore

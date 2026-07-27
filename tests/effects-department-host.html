@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NCN Effects Department Host Test</title>
+  <style>
+    body{margin:0;background:#070202;color:#ffd8cc;font:14px/1.45 system-ui,sans-serif}
+    main{padding:20px;max-width:900px;margin:auto}
+    #target{position:fixed;left:120px;top:110px;width:360px;height:150px;padding:20px;border:1px solid #d43a23;background:#160605;color:#ffb19b}
+    #effects{position:fixed;inset:0;pointer-events:none}
+    .pass{color:#9effb2}.fail{color:#ff8b7b}
+  </style>
+</head>
+<body>
+  <main><h1>Effects Department host contract</h1><ol id="results"></ol></main>
+  <article id="target"><h2>REDWIRE RELAY TEST</h2><p>Temporary visual output must remain in environment:effects.</p></article>
+  <div id="effects" data-ncn-environment-layer="effects"></div>
+  <script src="../js/departments/effects/effects-manifest.js"></script>
+  <script src="../js/departments/effects/effects-public-names.js"></script>
+  <script src="../js/departments/effects/effects-catalogue-signal.js"></script>
+  <script src="../js/departments/effects/effects-catalogue-fault.js"></script>
+  <script src="../js/departments/effects/effects-catalogue-environment.js"></script>
+  <script src="../js/departments/effects/effects-module.js"></script>
+  <script src="effects-department-host.js"></script>
+</body>
+</html>
