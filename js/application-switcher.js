@@ -19,7 +19,7 @@ window.NCNApplications = (() => {
     dripfeed: Object.freeze({
       name: 'dripfeed',
       mark: 'DF',
-      version: '14.07.2045 / DF 0.8.1 / APP 02',
+      version: '',
       documentTitle: 'Dripfeed // Night City News Terminal'
     })
   });
@@ -57,15 +57,22 @@ window.NCNApplications = (() => {
     document.body.dataset.ncnApp = current.name;
     document.title = current.documentTitle;
 
+    window.DripfeedWordmark?.destroy?.();
+
     if (mark) mark.textContent = current.mark;
     if (title) {
       if (current.name === 'dripfeed') {
-        title.innerHTML = '<span class="dripfeed-wordmark" aria-label="Dripfeed"><span class="drip-word">drip</span><span class="feed-word">FEED</span></span>';
+        title.innerHTML = '<span class="dripfeed-wordmark-host" role="img" aria-label="DripFeed">DripFeed</span>';
+        void window.DripfeedWordmark?.mount?.(title.querySelector('.dripfeed-wordmark-host'));
       } else {
         title.textContent = current.title;
       }
     }
-    if (version) version.textContent = current.version;
+    if (version) {
+      const showVersion = current.name !== 'dripfeed';
+      version.hidden = !showVersion;
+      version.textContent = showVersion ? current.version : '';
+    }
     requestRailMeasurement();
   }
 
