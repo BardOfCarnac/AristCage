@@ -114,6 +114,25 @@
   min-height: 100% !important;
 }
 
+/* The permanent terminal rail remains the nearest layer. Dripfeed overlays use
+   the live measured rail edge as their viewport instead of resolving underneath
+   it, keeping close controls visible and clickable at every title/font size. */
+html[data-ncn-app="dripfeed"] #dripfeed-root .overlay {
+  top: var(--ncn-rail-clearance, 0px);
+}
+
+html[data-ncn-app="dripfeed"] #dripfeed-root .reader-card,
+html[data-ncn-app="dripfeed"] #dripfeed-root .submit-card {
+  max-height: calc(100dvh - var(--ncn-rail-clearance, 0px) - 18px);
+}
+
+@media (max-width: 740px), (hover: none) and (pointer: coarse) {
+  html[data-ncn-app="dripfeed"] #dripfeed-root .reader-card,
+  html[data-ncn-app="dripfeed"] #dripfeed-root .submit-card {
+    max-height: calc(100dvh - var(--ncn-rail-clearance, 0px) - 8px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   #dripfeed-root .reader-flight-stage {
     display: none !important;
