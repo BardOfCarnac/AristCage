@@ -30,7 +30,7 @@ window.NCNWeatherDepartment = (() => {
     high: Object.freeze({ mist: 48, dust: 64, rain: 144, fps: 30, dpr: 1.5 })
   });
   const PRESET_KEYS = Object.freeze([
-    "mist", "dust", "rain", "haze", "moisture", "turbulence",
+    "mist", "smoke", "dust", "rain", "haze", "moisture", "turbulence",
     "drift", "fallSpeed", "depthFlow", "electrical"
   ]);
   const ACCEPTED_EFFECTS = Object.freeze({
@@ -469,12 +469,36 @@ window.NCNWeatherDepartment = (() => {
       };
     }
 
+    function energyColour(red, green, blue, alpha) {
+      return `rgba(${Math.round(red)}, ${Math.round(green)}, ${Math.round(blue)}, ${alpha})`;
+    }
+
     function passColour(alpha) {
-      return `rgba(206, 188, 188, ${alpha})`;
+      const smoke = clamp01(state.config.smoke);
+      const heat = clamp01(state.config.electrical);
+      const baseRed = mix(214, 92, smoke);
+      const baseGreen = mix(18, 2, smoke);
+      const baseBlue = mix(30, 12, smoke);
+      return energyColour(
+        mix(baseRed, 255, heat),
+        mix(baseGreen, 104, heat),
+        mix(baseBlue, 52, heat),
+        alpha
+      );
     }
 
     function redColour(alpha) {
-      return `rgba(255, 38, 35, ${alpha})`;
+      const smoke = clamp01(state.config.smoke);
+      const heat = clamp01(state.config.electrical);
+      const baseRed = mix(255, 166, smoke);
+      const baseGreen = mix(38, 8, smoke);
+      const baseBlue = mix(35, 18, smoke);
+      return energyColour(
+        mix(baseRed, 255, heat),
+        mix(baseGreen, 126, heat),
+        mix(baseBlue, 70, heat),
+        alpha
+      );
     }
 
     function drawMistBank(targetContext, bank, settings, scene) {
