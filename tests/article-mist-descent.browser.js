@@ -71,12 +71,15 @@ async function enableHeavyMist(page) {
       preset: "heavy-mist",
       intensity: 0.92,
       mist: 0.96,
+      quality: "high",
       wind: 0
     }, { reason: "article-mist-rendered-proof" });
   });
   await page.waitForFunction(() => {
     const state = window.NCNIntegration?.getService?.("weather")?.snapshot?.();
-    return state?.preset === "heavy-mist" && state?.particles?.mist > 36;
+    return state?.preset === "heavy-mist"
+      && state?.quality === "high"
+      && state?.particles?.mist > 36;
   }, null, { timeout: 10000 });
 }
 
