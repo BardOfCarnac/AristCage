@@ -2,6 +2,7 @@ name: Apply Mist Density And Chamber Boundary
 
 on:
   push:
+  pull_request:
 
 permissions:
   contents: write
@@ -12,7 +13,7 @@ concurrency:
 
 jobs:
   apply:
-    if: ${{ github.ref == 'refs/heads/agent/article-mist-descent' && !contains(github.event.head_commit.message, '[mist-density-boundary-applied]') }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/agent/article-mist-descent') || (github.event_name == 'pull_request' && github.head_ref == 'agent/article-mist-descent') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
