@@ -1,0 +1,22 @@
+name: Article Mist Descent
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check
+        run: |
+          node --check js/article-mist-descent.js
+          node --check js/optical-descent-adapter.js
+          node --check departments/weather/weather-module.js
+          node --check tests/article-mist-descent-contract.test.js
+      - name: Verify ownership and runtime contract
+        run: node tests/article-mist-descent-contract.test.js
