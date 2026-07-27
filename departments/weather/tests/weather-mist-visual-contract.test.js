@@ -23,8 +23,14 @@ for (const token of [
   'const sideSpeed = settings.drift * 0.22',
   'const depthSpeed = settings.depthFlow * 0.28',
   'createRadialGradient?.(0, 0, 0.08, 0, 0, 1)',
-  'rgba(206, 188, 188',
-  'rgba(255, 38, 35',
+  'const smoke = clamp01(state.config.smoke)',
+  'const heat = clamp01(state.config.electrical)',
+  'mix(214, 92, smoke)',
+  'mix(18, 2, smoke)',
+  'mix(30, 12, smoke)',
+  'mix(baseRed, 255, heat)',
+  'mix(baseGreen, 104, heat)',
+  'mix(baseBlue, 52, heat)',
   'mistRenderer: "floor-mist-test-01-banks"',
   'floorVeil: false',
   'generalHaze: false',
@@ -42,13 +48,23 @@ for (const rejected of [
   'drawImage',
   'sprite.width = 48',
   'sprite.width = 192',
-  'imageSmoothingEnabled'
+  'imageSmoothingEnabled',
+  'rgba(206, 188, 188'
 ]) {
-  assert.equal(source.includes(rejected), false, `Unapproved mist extra or reconstruction remains: ${rejected}`);
+  assert.equal(source.includes(rejected), false, `Unapproved mist extra, white body or reconstruction remains: ${rejected}`);
+}
+
+for (const token of [
+  'smoke: 0',
+  'smoke: preset({',
+  'smoke: 1',
+  'haze: 0'
+]) {
+  assert.ok(presets.includes(token), `Weather palette preset is missing: ${token}`);
 }
 
 for (const hazeValue of ['haze: 0.12', 'haze: 0.23', 'haze: 0.48', 'haze: 0.17', 'haze: 0.24', 'haze: 0.31']) {
   assert.equal(presets.includes(hazeValue), false, `Weather preset still requests unapproved haze: ${hazeValue}`);
 }
 
-console.log('Approved Floor Mist bank visual contract is preserved without haze extras.');
+console.log('Approved Floor Mist banks use the RedWire energy palette without haze extras.');
