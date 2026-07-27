@@ -1,0 +1,80 @@
+name: Chamber Presentation Restoration
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "js/chamber-motion-presentation.js"
+      - "tests/chamber-motion-presentation.test.js"
+      - "tests/chamber-motion-presentation-render.mjs"
+      - "docs/CHAMBER-PRESENTATION-RESTORATION.md"
+      - ".github/workflows/chamber-presentation-restoration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check restoration syntax
+        run: |
+          node --check js/chamber-motion-presentation.js
+          node --check tests/chamber-motion-presentation.test.js
+          node --check tests/chamber-motion-presentation-render.mjs
+      - name: Run deterministic restoration harness
+        run: node tests/chamber-motion-presentation.test.js
+      - name: Check page load order
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const integration = html.indexOf('js/integration-departments.js');
+          const activity = html.indexOf('js/chamber-motion-activity.js');
+          const presentation = html.indexOf('js/chamber-motion-presentation.js');
+          const probe = html.indexOf('js/integration-browser-probe.js');
+          if (integration < 0 || activity < integration || presentation < activity || probe < presentation) {
+            throw new Error('Chamber presentation must load after accepted department installation/activity and before the browser probe.');
+          }
+          if ((html.match(/js\/chamber-motion-presentation\.js/g) || []).length !== 1) {
+            throw new Error('Chamber presentation must be loaded exactly once.');
+          }
+          console.log('Chamber presentation load order is correct.');
+          NODE
+
+  rendered-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1
+          npx playwright install --with-deps chromium
+      - name: Verify restored presentation on desktop and mobile
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python3 -m http.server 4173 > /tmp/ncn-chamber-presentation-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/chamber-motion-presentation-render.mjs
+      - name: Upload rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chamber-presentation-restoration
+          path: artifacts/
+          if-no-files-found: ignore
