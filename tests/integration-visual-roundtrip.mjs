@@ -84,6 +84,13 @@ async function capture(page, viewportName, stateName, records) {
   return snapshot;
 }
 
+async function waitForProjectionIdle(page) {
+  await page.waitForFunction(() => (
+    typeof NCN_PROJECTION_TRANSITIONING === "undefined"
+    || NCN_PROJECTION_TRANSITIONING === false
+  ), null, { timeout: 12_000 });
+}
+
 async function openPanel(page, name) {
   await page.click(`[data-panel="${name}"]`);
   await page.waitForFunction(expected => (
@@ -93,13 +100,16 @@ async function openPanel(page, name) {
     "#feed > .entry.panel, #desktop-inspector > .entry.panel",
     { state: "visible", timeout: 10_000 }
   );
+  await waitForProjectionIdle(page);
 }
 
 async function closePanel(page, name) {
+  await waitForProjectionIdle(page);
   await page.click(`[data-panel="${name}"]`);
   await page.waitForFunction(() => (
     typeof NCN_STATE !== "undefined" && NCN_STATE.activePanel == null
   ), null, { timeout: 10_000 });
+  await waitForProjectionIdle(page);
 }
 
 async function verifyFilterContract(page) {
@@ -132,6 +142,7 @@ async function selectStory(page, mobile) {
     ), entryId, { timeout: 10_000 });
     await page.waitForSelector("#desktop-inspector .headline", { state: "visible", timeout: 10_000 });
   }
+  await waitForProjectionIdle(page);
 }
 
 async function switchApplication(page, application) {
