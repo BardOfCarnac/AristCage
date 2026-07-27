@@ -157,7 +157,7 @@ async function runViewport(browser, name, viewport) {
   try {
     await runViewport(browser, "desktop", { width: 1440, height: 900 });
     await runViewport(browser, "mobile", { width: 390, height: 844 });
-    console.log("PASS: live Optical articles descend through foreground puffs from the persistent Weather field");
+    console.log("PASS: full-quality heavy mist occupies the chamber and occludes live descending Optical articles");
   } finally {
     await browser.close();
   }
