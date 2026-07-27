@@ -231,8 +231,9 @@ function renderCounts() {
   assert.equal(heavy.preset, 'heavy-mist');
   assert.ok(heavy.particles.mist > approved.particles.mist,
     'heavy mist must use materially more banks than ordinary mist at normal desktop quality');
-  assert.ok(weather.getDepthFrame().puffCount > depthFrame?.puffCount || heavy.particles.mist > 36,
-    'heavy mist must publish a denser exact-depth field');
+  const heavyDepthFrame = weather.getDepthFrame();
+  assert.ok(heavyDepthFrame.puffCount >= heavy.particles.mist * 3,
+    'heavy mist must publish an exact-depth puff field for every active bank');
 
   weather.applyProfile({ enabled: true, preset: 'mist', intensity: 0.42, seed: 2045 });
   runtime.handle.enable();

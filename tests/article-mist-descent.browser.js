@@ -113,13 +113,16 @@ async function runViewport(browser, name, viewport) {
     await page.waitForTimeout(180);
     coverage = await compositorCoverage(page, await activeRect(page));
   }
-  assert.ok(coverage.ratio >= 0.03,
-    `${name}: heavy mist covered only ${(coverage.ratio * 100).toFixed(2)}% of the descending article sample`);
-
+  fs.writeFileSync(
+    path.join(artifactDir, `${name}-coverage.json`),
+    JSON.stringify({ start, middle, coverage }, null, 2)
+  );
   await page.screenshot({
     path: path.join(artifactDir, `${name}-mid-descent.png`),
     fullPage: false
   });
+  assert.ok(coverage.ratio >= 0.03,
+    `${name}: heavy mist covered only ${(coverage.ratio * 100).toFixed(2)}% of the descending article sample`);
 
   await page.waitForFunction(() => (
     window.NCNArticleMistDescent.snapshot().active === 0
