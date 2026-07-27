@@ -26,6 +26,7 @@ jobs:
             departments/weather/tests/weather-module.node.test.js
             departments/weather/tests/weather-module.test.js
             departments/weather/tests/weather-pr86-host.test.js
+            departments/weather/tests/weather-mist-visual-contract.test.js
           )
           for file in "${files[@]}"; do
             node --check "$file"
@@ -34,7 +35,10 @@ jobs:
       - name: Run deterministic Weather acceptance harness
         run: node departments/weather/tests/weather-module.node.test.js
 
-      - name: Check PR-86 ownership boundaries
+      - name: Run mist visual contract
+        run: node departments/weather/tests/weather-mist-visual-contract.test.js
+
+      - name: Check Weather ownership boundaries
         run: |
           node <<'NODE'
           const fs = require('fs');
@@ -49,6 +53,11 @@ jobs:
             'context.views?.getControlZones',
             '"electrical-disturbance"',
             '"light-flash"',
+            'const DEPTH_CONVENTION = "smaller-positive-z-is-nearer"',
+            'function getDepthFrame(frameToken = null)',
+            'if (!(puff.z < nearerThan)',
+            'puffs.sort((a, b) => b.z - a.z)',
+            'getDepthFrame,',
             'animationLoop: "shared-runtime"'
           ]) {
             if (!source.includes(token)) throw new Error(`Weather publication is missing ${token}.`);
@@ -59,7 +68,12 @@ jobs:
             'Math.random',
             'querySelector',
             'window.NCNEffects',
-            'dispatchEvent'
+            'dispatchEvent',
+            'NCNOptical',
+            'articleId',
+            'getArticle',
+            'depthSlices',
+            'sliceCount'
           ]) {
             if (source.includes(forbidden)) throw new Error(`Weather publication contains forbidden token ${forbidden}.`);
           }
@@ -69,5 +83,8 @@ jobs:
           for (const layer of ['weather:far', 'weather:rear', 'weather:middle', 'weather:near']) {
             if (!manifest.includes(`"${layer}"`)) throw new Error(`Manifest is missing ${layer}.`);
           }
-          console.log('Weather publication respects the PR-86 scoped ownership boundary.');
+          for (const capability of ['"getDepthFrame"', '"snapshot"']) {
+            if (!manifest.includes(capability)) throw new Error(`Manifest is missing ${capability}.`);
+          }
+          console.log('Weather publication respects its scoped ownership boundary.');
           NODE

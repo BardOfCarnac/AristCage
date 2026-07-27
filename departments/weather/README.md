@@ -1,9 +1,8 @@
 # NCN Weather Department — PR-86 publication
 
-This directory is the departmental candidate for the replaceable `weather` slot on
-`agent/prepare-module-host`. It does not install itself, modify application roots,
-replace the incumbent slot, or touch protected RedWire, Dripfeed, Optical or chamber
-structures.
+This directory publishes the replaceable `weather` department. It does not install
+itself, modify application roots, replace the incumbent slot, or touch protected
+RedWire, Dripfeed, Optical or chamber structures.
 
 ## Approved everyday mist
 
@@ -81,6 +80,44 @@ Construction is inert. `init()` creates one canvas in each supplied layer and re
 one task in runtime group `environment`. There is no private animation loop, interval
 or per-bank timer.
 
+## Immutable depth-frame surface
+
+Weather publishes a read-only view of the exact mist field used by its most recent
+ordinary render:
+
+```js
+const frame = weather.getDepthFrame(optionalFrameToken);
+
+frame.renderForeground(context2d, {
+  nearerThan: chamberZ,
+  viewport: { left, top, width, height }
+});
+```
+
+The chamber convention is explicit: **smaller positive `z` is nearer**. Foreground
+selection therefore uses each visible puff's actual depth, `puffZ < chamberZ`; it does
+not use the containing bank's centre or a fixed slice count.
+
+The frame handle is frozen and exposes only metadata, a token and the rendering method.
+Private bank and puff collections are never returned. `renderForeground()`:
+
+- uses the same elapsed time, camera projection, colour, softness and puff positions as
+  the normal Weather frame;
+- performs no simulation update, spawn, reset or particle mutation;
+- preserves the ordinary puff draw order after depth filtering;
+- treats `viewport` only as a viewport-relative CSS-pixel rendering bound, equivalent
+  to `getBoundingClientRect()` coordinates, with the target context origin corresponding to
+  the viewport's top-left;
+- reproduces the current reading/control attenuation unless
+  `includeAttenuation: false` is explicitly supplied;
+- allocates no canvas, timer or article-specific resource.
+
+The surface knows nothing about articles or Optical. Integration may apply its own
+pre-existing silhouette clip before calling the method. A frame becomes inert when a
+new Weather state invalidates it, or when Weather is disabled, suspended, reset or
+destroyed. Exact per-puff ordering is the reference contract; a banded implementation
+is not prescribed and may only be introduced later as a proven internal optimisation.
+
 ## Effects boundary
 
 Weather may request only:
@@ -103,11 +140,13 @@ handles and remove all owned canvases without altering the integration slot.
 ## Validation
 
 - `tests/weather-module.node.test.js` covers shared-runtime behaviour, deterministic
-  replay, approved bank count/specification, the absence of linear haze gradients,
-  quality changes, Effects policy, suspension and cleanup.
+  replay, approved bank count/specification, exact immutable puff-depth frames, the
+  absence of simulation mutation during external rendering, quality changes, Effects
+  policy, suspension and cleanup.
 - `tests/weather-mist-visual-contract.test.js` protects the agreed mist constants,
-  energy-palette colour policy and bank construction while rejecting white mist,
-  the floor veil, generic haze, front-energy line and sprite reconstructions.
+  energy-palette colour policy, exact puff-depth publication and bank construction
+  while rejecting fixed depth slices, white mist, the floor veil, generic haze,
+  front-energy line and sprite reconstructions.
 - `tests/weather-pr86-host.test.js` performs the protected application round trip
   without replacing the incumbent slot.
 

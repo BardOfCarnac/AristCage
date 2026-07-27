@@ -21,6 +21,8 @@ class FakeContext {
   save() {}
   restore() {}
   roundRect() {}
+  rect() {}
+  clip() {}
   fill() {}
   translate() {}
   scale() {}
@@ -68,6 +70,7 @@ function createRuntime() {
     task: null,
     handle: null,
     fpsSetCalls: 0,
+    frameSerial: 0,
     register(name, callback, options) {
       assert.equal(options.group, 'environment');
       const task = { name, callback, enabled: options.enabled !== false, suspended: false, fps: options.maxFps };
@@ -90,7 +93,8 @@ function createRuntime() {
           this.task.enabled = this.task.callback({
             delta,
             quality: this.quality,
-            reducedMotion: this.quality === 'reduced'
+            reducedMotion: this.quality === 'reduced',
+            frame: ++this.frameSerial
           }) !== false;
         }
       }
@@ -195,12 +199,12 @@ function renderCounts() {
   assert.equal(snapshot.resources.canvases, 4);
   assert.equal(snapshot.resources.visibleCanvases, 0);
   assert.equal(snapshot.quality, 'medium');
-  assert.deepEqual(snapshot.particles.capacities, { mist: 36, dust: 40, rain: 96 });
+  assert.deepEqual(snapshot.particles.capacities, { mist: 96, dust: 40, rain: 96 });
 
   weather.applyProfile({ enabled: true, preset: 'mist', intensity: 0.42, seed: 2045 });
   runtime.step(16, 40);
   const approved = weather.snapshot();
-  assert.equal(approved.particles.mist, 36, 'approved Low mist must use 36 banks at normal quality');
+  assert.equal(approved.particles.mist, 85, 'ordinary mist must use a dense field of smaller banks at normal quality');
   assert.equal(approved.diagnostics.mistRenderer, 'floor-mist-test-01-banks');
   assert.equal(approved.diagnostics.floorVeil, false);
   assert.equal(approved.diagnostics.generalHaze, false);
@@ -219,7 +223,66 @@ function renderCounts() {
   });
   const renders = renderCounts();
   assert.ok(renders.radial > 0, 'approved mist banks must draw radial puffs');
+
+  weather.applyProfile({ enabled: true, preset: 'heavy-mist', intensity: 0.92, seed: 2045 });
+  runtime.handle.enable();
+  runtime.step(16, 60);
+  const heavy = weather.snapshot();
+  assert.equal(heavy.preset, 'heavy-mist');
+  assert.ok(heavy.particles.mist > approved.particles.mist,
+    'heavy mist must use materially more banks than ordinary mist at normal desktop quality');
+  const heavyDepthFrame = weather.getDepthFrame();
+  assert.ok(heavyDepthFrame.puffCount >= heavy.particles.mist * 3,
+    'heavy mist must publish an exact-depth puff field for every active bank');
+
+  weather.applyProfile({ enabled: true, preset: 'mist', intensity: 0.42, seed: 2045 });
+  runtime.handle.enable();
+  runtime.step(16, 40);
   assert.equal(renders.linear, 0, 'Weather must not draw a floor veil or general haze gradient');
+
+  const depthFrame = weather.getDepthFrame();
+  assert.ok(depthFrame, 'active Weather must publish its current immutable depth frame');
+  assert.equal(Object.isFrozen(depthFrame), true);
+  assert.equal(depthFrame.depthConvention, 'smaller-positive-z-is-nearer');
+  assert.equal(depthFrame.chamberClipped, true, 'published mist puffs must remain clipped to the chamber aperture');
+  assert.ok(depthFrame.puffCount >= approved.particles.mist * 3,
+    'depth frame must represent individual puffs rather than only bank centres');
+  assert.equal(Object.hasOwn(depthFrame, 'puffs'), false, 'private puff state must not be exposed');
+  assert.strictEqual(weather.getDepthFrame(depthFrame.token), depthFrame);
+  assert.notEqual(depthFrame.runtimeToken, null, 'production-shaped runtime frames must publish a shared runtime token');
+  assert.strictEqual(weather.getDepthFrame(depthFrame.runtimeToken), depthFrame);
+  assert.equal(weather.getDepthFrame('not-the-current-frame'), null);
+  assert.throws(() => depthFrame.renderForeground(new FakeContext(), { nearerThan: Infinity }), /finite nearerThan/);
+
+  const beforeDepthRender = weather.snapshot();
+  const foregroundContext = new FakeContext();
+  const allForeground = depthFrame.renderForeground(foregroundContext, {
+    nearerThan: depthFrame.depthRange.farthest + 0.01
+  });
+  const noForeground = depthFrame.renderForeground(new FakeContext(), {
+    nearerThan: depthFrame.depthRange.nearest
+  });
+  const middleDepth = (depthFrame.depthRange.nearest + depthFrame.depthRange.farthest) / 2;
+  const middleForeground = depthFrame.renderForeground(new FakeContext(), { nearerThan: middleDepth });
+  assert.equal(allForeground, depthFrame.puffCount, 'a far threshold must reproduce every current puff');
+  assert.equal(noForeground, 0, 'nothing can be nearer than the current nearest puff');
+  assert.ok(middleForeground > 0 && middleForeground < allForeground,
+    'per-puff depth testing must produce a continuous foreground subset');
+  assert.ok(foregroundContext.radialGradientCalls >= allForeground,
+    'the read-only surface must reproduce current radial puff rendering');
+  const afterDepthRender = weather.snapshot();
+  assert.equal(afterDepthRender.particles.fingerprint, beforeDepthRender.particles.fingerprint,
+    'depth-frame rendering must not mutate Weather simulation state');
+  assert.equal(afterDepthRender.frameCount, beforeDepthRender.frameCount,
+    'depth-frame rendering must not advance the shared-runtime frame');
+
+  weather.setIntensity(0.42);
+  assert.equal(weather.getDepthFrame(), null, 'a changed Weather state invalidates the previous frame view');
+  assert.equal(depthFrame.renderForeground(new FakeContext(), { nearerThan: depthFrame.depthRange.farthest + 1 }), 0,
+    'stale frame handles must safely become inert');
+  runtime.handle.enable();
+  runtime.step(16, 1);
+  assert.ok(weather.getDepthFrame(), 'the next ordinary Weather render republishes a fresh frame');
 
   const deterministicA = approved.particles.fingerprint;
   weather.applyProfile({ enabled: false, preset: 'clear', intensity: 0 });
@@ -245,7 +308,7 @@ function renderCounts() {
   runtime.handle.enable();
   runtime.step(16, 1);
   assert.equal(weather.snapshot().quality, 'reduced');
-  assert.deepEqual(weather.snapshot().particles.capacities, { mist: 10, dust: 8, rain: 0 });
+  assert.deepEqual(weather.snapshot().particles.capacities, { mist: 20, dust: 8, rain: 0 });
 
   runtime.quality = 'full';
   settings.quality = 'full';
@@ -264,14 +327,20 @@ function renderCounts() {
   assert.equal(hostile.options.purpose, 'ambient');
   assert.throws(() => weather.requestAtmosphericEffect('mist-illumination'), /undeclared effect/);
 
+  const beforeSuspendFrame = weather.getDepthFrame();
   weather.suspend();
   const spawnAtSuspend = weather.snapshot().particles.spawned;
+  assert.equal(weather.getDepthFrame(), null);
+  assert.equal(beforeSuspendFrame.renderForeground(new FakeContext(), {
+    nearerThan: beforeSuspendFrame.depthRange.farthest + 1
+  }), 0, 'suspended Weather makes existing depth frames inert');
   assert.equal(weather.snapshot().resources.visibleCanvases, 0);
   runtime.step(250, 5);
   assert.equal(weather.snapshot().particles.spawned, spawnAtSuspend);
   weather.resume();
   runtime.step(1000, 1);
   assert.ok(weather.snapshot().lastDelta <= 64);
+  assert.ok(weather.getDepthFrame(), 'resume republishes a frame only after normal Weather renders again');
 
   weather.applyProfile({ enabled: false, preset: 'clear', intensity: 0 });
   const disabled = weather.snapshot();
@@ -279,6 +348,7 @@ function renderCounts() {
   assert.equal(disabled.resources.visibleCanvases, 0);
   assert.equal(disabled.resources.effectHandles, 0);
   assert.equal(effectHandles[0].cancelled, true);
+  assert.equal(weather.getDepthFrame(), null);
 
   weather.destroy();
   const destroyed = weather.snapshot();

@@ -14,9 +14,11 @@ for (const token of [
   'turbulence: 0.42',
   'softness: 0.66',
   'bankCount: 36',
-  'bank.width = randomBetween(0.90, 2.40)',
-  'bank.depth = randomBetween(0.60, 2.00)',
+  'bank.width = randomBetween(0.62, 1.58)',
+  'bank.depth = randomBetween(0.38, 1.15)',
   'bank.lift = randomBetween(0.02, 0.28)',
+  'bank.verticalSeed = random()',
+  'bank.scaleSeed = randomBetween(0.88, 1.12)',
   'bank.alpha = randomBetween(0.55, 1.0)',
   'bank.speed = randomBetween(0.72, 1.28)',
   'bank.puffs = Math.round(randomBetween(3, 5))',
@@ -34,9 +36,24 @@ for (const token of [
   'mistRenderer: "floor-mist-test-01-banks"',
   'floorVeil: false',
   'generalHaze: false',
-  'frontEnergy: false'
+  'frontEnergy: false',
+  'const DEPTH_CONVENTION = "smaller-positive-z-is-nearer"',
+  'function buildMistPuffs(settings, scene)',
+  'const pass = mistLayer(z)',
+  'scene.camera?.apertureAt?.(z, scene.bounds.halfWidth)',
+  'shiftedClipRect(puff.chamberClip',
+  'chamberClipped: true',
+  'const verticalRange = scene.bounds.halfHeight * 1.72 * settings.verticalFill',
+  'height: APPROVED_MIST.height * mix(1, 3.6, verticalFill)',
+  'puffs.sort((a, b) => b.z - a.z)',
+  'function publishDepthFrame(runtimeFrame, scene, puffs)',
+  'function getDepthFrame(frameToken = null)',
+  'if (!(puff.z < nearerThan)',
+  'renderForeground',
+  'getDepthFrame,',
+  'depthFrame: Object.freeze({'
 ]) {
-  assert.ok(source.includes(token), `Approved Floor Mist visual contract is missing: ${token}`);
+  assert.ok(source.includes(token), `Approved mist visual contract is missing: ${token}`);
 }
 
 for (const rejected of [
@@ -49,7 +66,12 @@ for (const rejected of [
   'sprite.width = 48',
   'sprite.width = 192',
   'imageSmoothingEnabled',
-  'rgba(206, 188, 188'
+  'rgba(206, 188, 188',
+  'depthSlices',
+  'sliceCount',
+  'NCNOptical',
+  'articleId',
+  'getArticle'
 ]) {
   assert.equal(source.includes(rejected), false, `Unapproved mist extra, white body or reconstruction remains: ${rejected}`);
 }
@@ -58,13 +80,17 @@ for (const token of [
   'smoke: 0',
   'smoke: preset({',
   'smoke: 1',
-  'haze: 0'
+  'haze: 0',
+  '"heavy-mist": preset({',
+  'verticalFill: 0.82',
+  'bankScale: 1.08',
+  'bankMultiplier: 1.85'
 ]) {
-  assert.ok(presets.includes(token), `Weather palette preset is missing: ${token}`);
+  assert.ok(presets.includes(token), `Weather palette or volume preset is missing: ${token}`);
 }
 
 for (const hazeValue of ['haze: 0.12', 'haze: 0.23', 'haze: 0.48', 'haze: 0.17', 'haze: 0.24', 'haze: 0.31']) {
   assert.equal(presets.includes(hazeValue), false, `Weather preset still requests unapproved haze: ${hazeValue}`);
 }
 
-console.log('Approved Floor Mist banks use the RedWire energy palette without haze extras.');
+console.log('Ordinary floor mist remains stable while heavy mist adds deterministic chamber volume without haze or fixed slices.');

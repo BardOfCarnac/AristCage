@@ -20,6 +20,27 @@ window.NCNWeatherDepartmentTests = (() => {
     assert(mist.resources.canvases === 4, "Expected one canvas in each supplied weather layer.");
     assert(mist.particles.mist > 0, "Mist should spawn through the shared runtime.");
 
+    const depthFrame = candidate.getDepthFrame();
+    assert(depthFrame && Object.isFrozen(depthFrame), "Weather should publish an immutable current depth frame.");
+    assert(depthFrame.depthConvention === "smaller-positive-z-is-nearer",
+      "Depth frame must declare the shared chamber convention.");
+    assert(!Object.prototype.hasOwnProperty.call(depthFrame, "puffs"),
+      "Depth frame must not expose private puff collections.");
+    const foregroundCanvas = document.createElement("canvas");
+    foregroundCanvas.width = 800;
+    foregroundCanvas.height = 600;
+    const foregroundContext = foregroundCanvas.getContext("2d");
+    const beforeForeground = candidate.snapshot();
+    const foregroundCount = depthFrame.renderForeground(foregroundContext, {
+      nearerThan: depthFrame.depthRange.farthest + 0.01
+    });
+    const afterForeground = candidate.snapshot();
+    assert(foregroundCount === depthFrame.puffCount,
+      "A far threshold should reproduce the exact current puff field.");
+    assert(afterForeground.particles.fingerprint === beforeForeground.particles.fingerprint
+      && afterForeground.frameCount === beforeForeground.frameCount,
+    "Read-only depth rendering must not advance or mutate Weather.");
+
     candidate.transitionTo("rain", { duration: 300 });
     context.__step?.(16, 40);
     const rain = candidate.snapshot();
@@ -29,6 +50,10 @@ window.NCNWeatherDepartmentTests = (() => {
 
     candidate.suspend();
     const suspended = candidate.snapshot();
+    assert(candidate.getDepthFrame() === null, "Suspended Weather must not publish a live depth frame.");
+    assert(depthFrame.renderForeground(foregroundContext, {
+      nearerThan: depthFrame.depthRange.farthest + 1
+    }) === 0, "Stale depth-frame handles must become inert across lifecycle changes.");
     assert(suspended.resources.visibleCanvases === 0, "Suspension must remove the frozen weather frame.");
     context.__step?.(250, 10);
     assert(candidate.snapshot().particles.spawned === suspended.particles.spawned,
