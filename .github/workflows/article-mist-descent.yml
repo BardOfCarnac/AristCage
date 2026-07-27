@@ -16,10 +16,12 @@ jobs:
         with:
           ref: agent/article-mist-descent
       - name: Apply corrected heavy mist volume and proof
-        run: node scripts/apply-heavy-mist-fix.cjs
+        run: |
+          node scripts/fix-heavy-mist-patcher.cjs
+          node scripts/apply-heavy-mist-fix.cjs
       - name: Restore ordinary validation workflow
         run: |
-          rm scripts/apply-heavy-mist-fix.cjs
+          rm scripts/apply-heavy-mist-fix.cjs scripts/fix-heavy-mist-patcher.cjs
           cat > .github/workflows/article-mist-descent.yml <<'YAML'
           name: Article Mist Descent
 
@@ -82,7 +84,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add departments/weather/weather-presets.js departments/weather/weather-module.js departments/weather/tests/weather-module.node.test.js js/article-mist-descent.js tests/article-mist-descent-contract.test.js tests/article-mist-descent.browser.js .github/workflows/article-mist-descent.yml scripts/apply-heavy-mist-fix.cjs
+          git add -A
           git commit -m "Make heavy mist fill the chamber [heavy-mist-applied]"
           git push origin HEAD:agent/article-mist-descent
 
