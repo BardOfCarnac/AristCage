@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   apply:
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/agent/article-mist-descent') || (github.event_name == 'pull_request' && github.head_ref == 'agent/article-mist-descent') }}
+    if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/agent/article-mist-descent') || (github.event_name == 'pull_request' && github.head_ref == 'agent/article-mist-descent')) && !contains(github.event.head_commit.message || '', '[mist-density-diagnostic]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,11 +30,27 @@ jobs:
       - name: Align patcher with current Weather contract
         if: steps.ready.outputs.ready == 'true'
         run: node scripts/fix-mist-density-patcher.cjs
-      - name: Apply denser fields and chamber clipping
+      - id: apply
+        name: Apply denser fields and chamber clipping
         if: steps.ready.outputs.ready == 'true'
-        run: node scripts/apply-mist-density-boundary.cjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/apply-mist-density-boundary.cjs > patch-output.log 2>&1
+          status=$?
+          cat patch-output.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Commit patch diagnostic
+        if: steps.ready.outputs.ready == 'true' && steps.apply.outputs.status != '0'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add patch-output.log
+          git commit -m "Record mist patch diagnostic [mist-density-diagnostic]"
+          git push origin HEAD:agent/article-mist-descent
       - name: Validate corrected publication
-        if: steps.ready.outputs.ready == 'true'
+        if: steps.ready.outputs.ready == 'true' && steps.apply.outputs.status == '0'
         run: |
           node --check departments/weather/weather-module.js
           node --check departments/weather/weather-presets.js
@@ -42,10 +58,10 @@ jobs:
           node departments/weather/tests/weather-module.node.test.js
           node departments/weather/tests/weather-mist-visual-contract.test.js
       - name: Remove one-shot patch files
-        if: steps.ready.outputs.ready == 'true'
+        if: steps.ready.outputs.ready == 'true' && steps.apply.outputs.status == '0'
         run: rm scripts/apply-mist-density-boundary.cjs scripts/fix-mist-density-patcher.cjs .github/workflows/apply-mist-density-boundary.yml
       - name: Commit corrected implementation
-        if: steps.ready.outputs.ready == 'true'
+        if: steps.ready.outputs.ready == 'true' && steps.apply.outputs.status == '0'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
