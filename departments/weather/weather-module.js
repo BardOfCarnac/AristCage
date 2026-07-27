@@ -530,8 +530,6 @@ window.NCNWeatherDepartment = (() => {
       const sortedBanks = particles.mist.filter(bank => bank.active).sort((a, b) => b.z - a.z);
 
       sortedBanks.forEach(bank => {
-        const pass = mistLayer(bank.z);
-        const layerRect = scene.rects.get(pass);
         const floorY = -scene.bounds.halfHeight;
         const baseAlpha = settings.opacity * settings.density * bank.alpha;
         if (baseAlpha < 0.002) return;
@@ -552,6 +550,8 @@ window.NCNWeatherDepartment = (() => {
             scene.bounds.near + 0.05,
             scene.bounds.far - 0.05
           );
+          const pass = mistLayer(z);
+          const layerRect = scene.rects.get(pass);
           const chamberClip = normaliseRect(scene.camera?.apertureAt?.(z, scene.bounds.halfWidth))
             || Object.freeze({
               left: layerRect.left,

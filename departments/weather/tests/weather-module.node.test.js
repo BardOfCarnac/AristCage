@@ -204,7 +204,7 @@ function renderCounts() {
   weather.applyProfile({ enabled: true, preset: 'mist', intensity: 0.42, seed: 2045 });
   runtime.step(16, 40);
   const approved = weather.snapshot();
-  assert.equal(approved.particles.mist, 64, 'ordinary mist must use a dense field of smaller banks at normal quality');
+  assert.equal(approved.particles.mist, 85, 'ordinary mist must use a dense field of smaller banks at normal quality');
   assert.equal(approved.diagnostics.mistRenderer, 'floor-mist-test-01-banks');
   assert.equal(approved.diagnostics.floorVeil, false);
   assert.equal(approved.diagnostics.generalHaze, false);

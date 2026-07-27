@@ -39,6 +39,7 @@ for (const token of [
   'frontEnergy: false',
   'const DEPTH_CONVENTION = "smaller-positive-z-is-nearer"',
   'function buildMistPuffs(settings, scene)',
+  'const pass = mistLayer(z)',
   'scene.camera?.apertureAt?.(z, scene.bounds.halfWidth)',
   'shiftedClipRect(puff.chamberClip',
   'chamberClipped: true',

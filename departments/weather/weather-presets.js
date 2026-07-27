@@ -37,7 +37,7 @@ window.NCNWeatherPresets = (() => {
       depthFlow: -0.018,
       verticalFill: 0.10,
       bankScale: 0.88,
-      bankMultiplier: 1.18
+      bankMultiplier: 1.45
     }),
     "heavy-mist": preset({
       mist: 0.98,
