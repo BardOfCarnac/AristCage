@@ -37,6 +37,7 @@ window.NCNWeatherDepartment = (() => {
     "electrical-disturbance": Object.freeze({ channel: "fault", purpose: "ambient", layer: "near" }),
     "light-flash": Object.freeze({ channel: "environment", purpose: "ambient", layer: "rear" })
   });
+  const DEPTH_CONVENTION = "smaller-positive-z-is-nearer";
 
   const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, Number(value) || 0));
   const clamp01 = value => clamp(value, 0, 1);
@@ -128,7 +129,8 @@ window.NCNWeatherDepartment = (() => {
       lastZones: { reading: false, controls: 0 },
       geometry: { frames: 0, cameraReads: 0, layerMeasurements: 0, zoneReads: 0 },
       qualityChanges: 0,
-      fpsUpdates: 0
+      fpsUpdates: 0,
+      depthFrameSerial: 0
     };
 
     let random = seededRandom(state.seed);
@@ -136,6 +138,8 @@ window.NCNWeatherDepartment = (() => {
     let runtimeHandle = null;
     let resumeGuard = true;
     let particles = { mist: [], dust: [], rain: [] };
+    let currentDepthFrame = null;
+    let depthFrameEpoch = 0;
     const canvases = new Map();
     const contexts = new Map();
     const layerRects = new Map();
@@ -143,6 +147,16 @@ window.NCNWeatherDepartment = (() => {
 
     function ensureAlive() {
       if (state.destroyed) throw new Error("Destroyed weather module cannot be used.");
+    }
+
+    function invalidateDepthFrame() {
+      depthFrameEpoch += 1;
+      currentDepthFrame = null;
+    }
+
+    function primitiveFrameToken(frame) {
+      const candidate = frame?.frameToken ?? frame?.token ?? frame?.frameId ?? frame?.id;
+      return ["string", "number", "bigint"].includes(typeof candidate) ? candidate : null;
     }
 
     function presetByName(name) {
@@ -473,93 +487,222 @@ window.NCNWeatherDepartment = (() => {
       return `rgba(${Math.round(red)}, ${Math.round(green)}, ${Math.round(blue)}, ${alpha})`;
     }
 
-    function passColour(alpha) {
+    function mistPalette() {
       const smoke = clamp01(state.config.smoke);
       const heat = clamp01(state.config.electrical);
       const baseRed = mix(214, 92, smoke);
       const baseGreen = mix(18, 2, smoke);
       const baseBlue = mix(30, 12, smoke);
-      return energyColour(
-        mix(baseRed, 255, heat),
-        mix(baseGreen, 104, heat),
-        mix(baseBlue, 52, heat),
-        alpha
-      );
+      const glowRed = mix(255, 166, smoke);
+      const glowGreen = mix(38, 8, smoke);
+      const glowBlue = mix(35, 18, smoke);
+      return Object.freeze({
+        body: Object.freeze([
+          mix(baseRed, 255, heat),
+          mix(baseGreen, 104, heat),
+          mix(baseBlue, 52, heat)
+        ]),
+        glow: Object.freeze([
+          mix(glowRed, 255, heat),
+          mix(glowGreen, 126, heat),
+          mix(glowBlue, 70, heat)
+        ])
+      });
     }
 
-    function redColour(alpha) {
-      const smoke = clamp01(state.config.smoke);
-      const heat = clamp01(state.config.electrical);
-      const baseRed = mix(255, 166, smoke);
-      const baseGreen = mix(38, 8, smoke);
-      const baseBlue = mix(35, 18, smoke);
-      return energyColour(
-        mix(baseRed, 255, heat),
-        mix(baseGreen, 126, heat),
-        mix(baseBlue, 70, heat),
-        alpha
-      );
+    function passColour(alpha, channels = mistPalette().body) {
+      return energyColour(channels[0], channels[1], channels[2], alpha);
     }
 
-    function drawMistBank(targetContext, bank, settings, scene) {
-      const pass = mistLayer(bank.z);
-      const floorY = -scene.bounds.halfHeight;
-      const baseAlpha = settings.opacity * settings.density * bank.alpha;
-      if (baseAlpha < 0.002) return;
-      const depthVisibility = clamp(scene.bounds.near / bank.z, 0.20, 1);
-      const pulse = 0.80 + Math.sin(state.elapsedMs * 0.00027 * bank.speed + bank.phase) * 0.16;
-      const localAlpha = baseAlpha * pulse * mix(0.52, 1.0, depthVisibility);
+    function redColour(alpha, channels = mistPalette().glow) {
+      return energyColour(channels[0], channels[1], channels[2], alpha);
+    }
 
-      for (let index = 0; index < bank.puffs; index += 1) {
-        const normal = bank.puffs === 1 ? 0.5 : index / (bank.puffs - 1);
-        const wobble = Math.sin(state.elapsedMs * 0.00033 * bank.speed + bank.phase + index * 1.7);
-        const x = bank.x + (normal - 0.5) * bank.width * 1.35 + wobble * bank.width * 0.12 * settings.turbulence;
-        const z = bank.z + Math.sin(bank.phase2 + index * 2.1) * bank.depth * 0.28;
-        const lift = bank.lift + settings.height * (0.18 + 0.26 * Math.sin(bank.phase + index * 1.3) ** 2);
-        const centre = project(x, floorY + lift, z, pass, scene);
-        const left = project(x - bank.width * (0.30 + 0.09 * index), floorY + lift, z, pass, scene);
-        const right = project(x + bank.width * (0.30 + 0.09 * index), floorY + lift, z, pass, scene);
-        const upper = project(x, floorY + lift + settings.height * (0.40 + 0.25 * bank.alpha), z, pass, scene);
-        const depthA = project(x, floorY + lift * 0.6, clamp(z - bank.depth * 0.32, scene.bounds.near + 0.05, scene.bounds.far), pass, scene);
-        const depthB = project(x, floorY + lift * 0.6, clamp(z + bank.depth * 0.32, scene.bounds.near + 0.05, scene.bounds.far), pass, scene);
-        const radiusX = Math.max(4, Math.abs(right.x - left.x) * 0.60);
-        const verticalHeight = Math.abs(upper.y - centre.y);
-        const floorDepthHeight = Math.abs(depthA.y - depthB.y) * 0.42;
-        const radiusY = Math.max(2.5, verticalHeight + floorDepthHeight);
-        const alpha = localAlpha * (0.22 + 0.14 * Math.sin(index * 2.4 + bank.phase) ** 2);
+    function buildMistPuffs(settings, scene) {
+      const puffs = [];
+      const palette = mistPalette();
+      const sortedBanks = particles.mist.filter(bank => bank.active).sort((a, b) => b.z - a.z);
 
-        targetContext.save();
-        targetContext.translate?.(centre.x, centre.y);
-        targetContext.scale?.(radiusX, radiusY);
-        const gradient = targetContext.createRadialGradient?.(0, 0, 0.08, 0, 0, 1);
-        if (gradient) {
-          const softMid = mix(0.30, 0.54, settings.softness);
-          const softEdge = mix(0.62, 0.88, settings.softness);
-          gradient.addColorStop?.(0, passColour(alpha));
-          gradient.addColorStop?.(softMid, passColour(alpha * 0.72));
-          gradient.addColorStop?.(softEdge, passColour(alpha * 0.22));
-          gradient.addColorStop?.(1, passColour(0));
-          targetContext.fillStyle = gradient;
+      sortedBanks.forEach(bank => {
+        const pass = mistLayer(bank.z);
+        const layerRect = scene.rects.get(pass);
+        const floorY = -scene.bounds.halfHeight;
+        const baseAlpha = settings.opacity * settings.density * bank.alpha;
+        if (baseAlpha < 0.002) return;
+        const depthVisibility = clamp(scene.bounds.near / bank.z, 0.20, 1);
+        const pulse = 0.80 + Math.sin(state.elapsedMs * 0.00027 * bank.speed + bank.phase) * 0.16;
+        const localAlpha = baseAlpha * pulse * mix(0.52, 1.0, depthVisibility);
+
+        for (let index = 0; index < bank.puffs; index += 1) {
+          const normal = bank.puffs === 1 ? 0.5 : index / (bank.puffs - 1);
+          const wobble = Math.sin(state.elapsedMs * 0.00033 * bank.speed + bank.phase + index * 1.7);
+          const x = bank.x + (normal - 0.5) * bank.width * 1.35 + wobble * bank.width * 0.12 * settings.turbulence;
+          const z = bank.z + Math.sin(bank.phase2 + index * 2.1) * bank.depth * 0.28;
+          const lift = bank.lift + settings.height * (0.18 + 0.26 * Math.sin(bank.phase + index * 1.3) ** 2);
+          const centre = project(x, floorY + lift, z, pass, scene);
+          const left = project(x - bank.width * (0.30 + 0.09 * index), floorY + lift, z, pass, scene);
+          const right = project(x + bank.width * (0.30 + 0.09 * index), floorY + lift, z, pass, scene);
+          const upper = project(x, floorY + lift + settings.height * (0.40 + 0.25 * bank.alpha), z, pass, scene);
+          const depthA = project(x, floorY + lift * 0.6, clamp(z - bank.depth * 0.32, scene.bounds.near + 0.05, scene.bounds.far), pass, scene);
+          const depthB = project(x, floorY + lift * 0.6, clamp(z + bank.depth * 0.32, scene.bounds.near + 0.05, scene.bounds.far), pass, scene);
+          const radiusX = Math.max(4, Math.abs(right.x - left.x) * 0.60);
+          const verticalHeight = Math.abs(upper.y - centre.y);
+          const floorDepthHeight = Math.abs(depthA.y - depthB.y) * 0.42;
+          const radiusY = Math.max(2.5, verticalHeight + floorDepthHeight);
+          const alpha = localAlpha * (0.22 + 0.14 * Math.sin(index * 2.4 + bank.phase) ** 2);
+          puffs.push(Object.freeze({
+            z,
+            layer: pass,
+            localX: centre.x,
+            localY: centre.y,
+            pageX: centre.x + layerRect.left,
+            pageY: centre.y + layerRect.top,
+            radiusX,
+            radiusY,
+            alpha,
+            softMid: mix(0.30, 0.54, settings.softness),
+            softEdge: mix(0.62, 0.88, settings.softness),
+            illuminated: index === 0,
+            bodyColour: palette.body,
+            glowColour: palette.glow
+          }));
+        }
+      });
+
+      puffs.sort((a, b) => b.z - a.z);
+      return Object.freeze(puffs);
+    }
+
+    function drawMistPuff(targetContext, puff, x = puff.localX, y = puff.localY) {
+      targetContext.save?.();
+      targetContext.translate?.(x, y);
+      targetContext.scale?.(puff.radiusX, puff.radiusY);
+      const gradient = targetContext.createRadialGradient?.(0, 0, 0.08, 0, 0, 1);
+      if (gradient) {
+        gradient.addColorStop?.(0, passColour(puff.alpha, puff.bodyColour));
+        gradient.addColorStop?.(puff.softMid, passColour(puff.alpha * 0.72, puff.bodyColour));
+        gradient.addColorStop?.(puff.softEdge, passColour(puff.alpha * 0.22, puff.bodyColour));
+        gradient.addColorStop?.(1, passColour(0, puff.bodyColour));
+        targetContext.fillStyle = gradient;
+        targetContext.beginPath?.();
+        targetContext.arc?.(0, 0, 1, 0, Math.PI * 2);
+        targetContext.fill?.();
+      }
+
+      if (puff.illuminated) {
+        targetContext.globalCompositeOperation = "lighter";
+        const red = targetContext.createRadialGradient?.(0, 0.38, 0.05, 0, 0.38, 1);
+        if (red) {
+          red.addColorStop?.(0, redColour(puff.alpha * 0.18, puff.glowColour));
+          red.addColorStop?.(0.50, redColour(puff.alpha * 0.07, puff.glowColour));
+          red.addColorStop?.(1, redColour(0, puff.glowColour));
+          targetContext.fillStyle = red;
           targetContext.beginPath?.();
-          targetContext.arc?.(0, 0, 1, 0, Math.PI * 2);
+          targetContext.arc?.(0, 0.38, 1, 0, Math.PI * 2);
           targetContext.fill?.();
         }
-
-        if (index === 0) {
-          targetContext.globalCompositeOperation = "lighter";
-          const red = targetContext.createRadialGradient?.(0, 0.38, 0.05, 0, 0.38, 1);
-          if (red) {
-            red.addColorStop?.(0, redColour(alpha * 0.18));
-            red.addColorStop?.(0.50, redColour(alpha * 0.07));
-            red.addColorStop?.(1, redColour(0));
-            targetContext.fillStyle = red;
-            targetContext.beginPath?.();
-            targetContext.arc?.(0, 0.38, 1, 0, Math.PI * 2);
-            targetContext.fill?.();
-          }
-        }
-        targetContext.restore();
       }
+      targetContext.restore?.();
+    }
+
+    function depthViewport(value) {
+      if (!value) return null;
+      const rect = normaliseRect(value);
+      if (!rect) throw new TypeError("Weather depth-frame viewport must provide finite left, top, width and height values.");
+      return rect;
+    }
+
+    function puffIntersectsViewport(puff, viewport) {
+      if (!viewport) return true;
+      return puff.pageX + puff.radiusX >= viewport.left
+        && puff.pageX - puff.radiusX <= viewport.right
+        && puff.pageY + puff.radiusY >= viewport.top
+        && puff.pageY - puff.radiusY <= viewport.bottom;
+    }
+
+    function cutoutPage(targetContext, descriptor, viewport) {
+      if (!descriptor?.rect || descriptor.attenuation <= 0) return;
+      const padding = 12;
+      const originX = viewport?.left || 0;
+      const originY = viewport?.top || 0;
+      const left = descriptor.rect.left - originX - padding;
+      const top = descriptor.rect.top - originY - padding;
+      const width = descriptor.rect.width + padding * 2;
+      const height = descriptor.rect.height + padding * 2;
+      targetContext.save?.();
+      targetContext.globalCompositeOperation = "destination-out";
+      targetContext.fillStyle = `rgba(0,0,0,${clamp01(descriptor.attenuation)})`;
+      if (typeof targetContext.roundRect === "function") {
+        targetContext.beginPath?.();
+        targetContext.roundRect(left, top, width, height, 16);
+        targetContext.fill?.();
+      } else targetContext.fillRect?.(left, top, width, height);
+      targetContext.restore?.();
+    }
+
+    function publishDepthFrame(runtimeFrame, scene, puffs) {
+      const epoch = depthFrameEpoch;
+      const serial = ++state.depthFrameSerial;
+      const runtimeToken = primitiveFrameToken(runtimeFrame);
+      const token = `${state.moduleId}:depth:${epoch}:${serial}`;
+      const reading = scene.reading ? Object.freeze({ rect: scene.reading.rect, attenuation: scene.reading.attenuation }) : null;
+      const controls = Object.freeze(scene.controls.map(item => Object.freeze({ rect: item.rect, attenuation: item.attenuation })));
+      const depths = puffs.map(puff => puff.z);
+      const depthRange = Object.freeze({
+        nearest: depths.length ? Math.min(...depths) : null,
+        farthest: depths.length ? Math.max(...depths) : null
+      });
+      let handle = null;
+
+      const renderForeground = (targetContext, options = {}) => {
+        if (!targetContext || typeof targetContext !== "object") throw new TypeError("Weather depth-frame rendering requires a 2D context.");
+        const nearerThan = Number(options.nearerThan);
+        if (!Number.isFinite(nearerThan)) throw new TypeError("Weather depth-frame rendering requires a finite nearerThan chamber depth.");
+        if (state.destroyed || state.suspended || !state.enabled || depthFrameEpoch !== epoch || currentDepthFrame !== handle) return 0;
+        const viewport = depthViewport(options.viewport);
+        const originX = viewport?.left || 0;
+        const originY = viewport?.top || 0;
+        let rendered = 0;
+
+        targetContext.save?.();
+        if (viewport && typeof targetContext.rect === "function" && typeof targetContext.clip === "function") {
+          targetContext.beginPath?.();
+          targetContext.rect(0, 0, viewport.width, viewport.height);
+          targetContext.clip();
+        }
+        for (const puff of puffs) {
+          if (!(puff.z < nearerThan) || !puffIntersectsViewport(puff, viewport)) continue;
+          drawMistPuff(targetContext, puff, puff.pageX - originX, puff.pageY - originY);
+          rendered += 1;
+        }
+        if (options.includeAttenuation !== false) {
+          if (reading) cutoutPage(targetContext, reading, viewport);
+          controls.forEach(item => cutoutPage(targetContext, item, viewport));
+        }
+        targetContext.restore?.();
+        return rendered;
+      };
+
+      handle = Object.freeze({
+        token,
+        runtimeToken,
+        frameNumber: state.frameCount,
+        elapsedMs: state.elapsedMs,
+        depthConvention: DEPTH_CONVENTION,
+        puffCount: puffs.length,
+        depthRange,
+        renderForeground
+      });
+      currentDepthFrame = handle;
+      return handle;
+    }
+
+    function getDepthFrame(frameToken = null) {
+      if (!state.initialised || state.destroyed || state.suspended || !state.enabled || !currentDepthFrame) return null;
+      if (frameToken !== null && frameToken !== undefined
+        && frameToken !== currentDepthFrame.token
+        && frameToken !== currentDepthFrame.runtimeToken) return null;
+      return currentDepthFrame;
     }
 
     function particleOpacity(particle) {
@@ -610,10 +753,11 @@ window.NCNWeatherDepartment = (() => {
       });
     }
 
-    function render(intensity, scene, settings) {
+    function render(intensity, scene, settings, runtimeFrame) {
+      const puffs = buildMistPuffs(settings, scene);
+      publishDepthFrame(runtimeFrame, scene, puffs);
       clearCanvases();
-      const sortedBanks = particles.mist.filter(bank => bank.active).sort((a, b) => b.z - a.z);
-      sortedBanks.forEach(bank => drawMistBank(contexts.get(mistLayer(bank.z)), bank, settings, scene));
+      puffs.forEach(puff => drawMistPuff(contexts.get(puff.layer), puff));
       ["dust", "rain"].forEach(type => particles[type].forEach(particle => {
         if (particle.active) drawParticle(contexts.get(particle.layer), particle, intensity, scene);
       }));
@@ -696,7 +840,7 @@ window.NCNWeatherDepartment = (() => {
       TYPES.forEach(type => deactivateSurplus(type, counts[type]));
       particles.mist.forEach(bank => updateMistBank(bank, deltaSeconds, scene.bounds, settings));
       ["dust", "rain"].forEach(type => particles[type].forEach(particle => updateParticle(particle, deltaSeconds, scene.bounds)));
-      render(intensity, scene, settings);
+      render(intensity, scene, settings, frame);
       const active = TYPES.reduce((sum, type) => sum + activeCount(type), 0);
       const settling = Boolean(state.transition) || Math.abs(state.currentIntensity - state.targetIntensity) > 0.002;
       return active > 0 || settling || state.targetIntensity > 0.002;
@@ -724,6 +868,7 @@ window.NCNWeatherDepartment = (() => {
 
     function setPreset(name) {
       ensureAlive();
+      invalidateDepthFrame();
       const selected = presetByName(name);
       state.preset = selected.key;
       state.targetPreset = selected.key;
@@ -735,12 +880,14 @@ window.NCNWeatherDepartment = (() => {
 
     function setIntensity(value) {
       ensureAlive();
+      invalidateDepthFrame();
       state.targetIntensity = clamp01(value);
       if (state.initialised && state.enabled && !state.suspended) runtimeHandle?.wake?.("weather:intensity");
       return state.targetIntensity;
     }
 
     function clearDisabledState(reason = "weather-disabled") {
+      invalidateDepthFrame();
       state.preset = "clear";
       state.targetPreset = "clear";
       state.config = clonePreset(PRESETS.clear);
@@ -775,6 +922,7 @@ window.NCNWeatherDepartment = (() => {
 
     function transitionTo(name, options = {}) {
       ensureAlive();
+      invalidateDepthFrame();
       const selected = presetByName(name);
       const duration = Math.max(0, Number(options.duration) || 0);
       state.targetPreset = selected.key;
@@ -792,6 +940,7 @@ window.NCNWeatherDepartment = (() => {
 
     function setWind(value = {}) {
       ensureAlive();
+      invalidateDepthFrame();
       if (Number.isFinite(Number(value))) state.wind.x = clamp(Number(value), -1, 1);
       else {
         state.wind.x = clamp(value.x, -1, 1);
@@ -804,6 +953,7 @@ window.NCNWeatherDepartment = (() => {
 
     function setQuality(value = "auto") {
       ensureAlive();
+      invalidateDepthFrame();
       const key = String(value || "auto").toLowerCase();
       if (!["auto", "reduced", "low", "medium", "high"].includes(key)) throw new RangeError(`Unknown weather quality: ${value}`);
       const override = key === "auto" ? null : key;
@@ -819,6 +969,7 @@ window.NCNWeatherDepartment = (() => {
 
     function setSeed(value) {
       ensureAlive();
+      invalidateDepthFrame();
       state.seed = hashSeed(value);
       random = seededRandom(state.seed);
       state.spawnSerial = 0;
@@ -862,6 +1013,7 @@ window.NCNWeatherDepartment = (() => {
     function suspend() {
       if (!state.initialised || state.destroyed || state.suspended) return false;
       state.suspended = true;
+      invalidateDepthFrame();
       runtimeHandle?.suspend?.();
       clearCanvases();
       setCanvasVisibility(false);
@@ -871,6 +1023,7 @@ window.NCNWeatherDepartment = (() => {
     function resume() {
       if (!state.initialised || state.destroyed || !state.suspended) return false;
       state.suspended = false;
+      invalidateDepthFrame();
       resumeGuard = true;
       if (state.enabled) {
         setCanvasVisibility(true);
@@ -883,6 +1036,7 @@ window.NCNWeatherDepartment = (() => {
 
     function reset() {
       if (state.destroyed) return false;
+      invalidateDepthFrame();
       state.enabled = false;
       state.suspended = false;
       state.transitionAttenuation = 1;
@@ -961,7 +1115,14 @@ window.NCNWeatherDepartment = (() => {
           floorVeil: false,
           generalHaze: false,
           frontEnergy: false,
-          approvedMist: APPROVED_MIST
+          approvedMist: APPROVED_MIST,
+          depthFrame: Object.freeze({
+            available: Boolean(getDepthFrame()),
+            token: currentDepthFrame?.token || null,
+            runtimeToken: currentDepthFrame?.runtimeToken ?? null,
+            puffCount: currentDepthFrame?.puffCount || 0,
+            convention: DEPTH_CONVENTION
+          })
         }),
         lastDelta: state.lastDelta,
         frameCount: state.frameCount,
@@ -987,6 +1148,7 @@ window.NCNWeatherDepartment = (() => {
       setWind,
       setQuality,
       setSeed,
+      getDepthFrame,
       requestAtmosphericEffect: requestEffect
     });
   }

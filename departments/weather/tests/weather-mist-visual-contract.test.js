@@ -34,7 +34,17 @@ for (const token of [
   'mistRenderer: "floor-mist-test-01-banks"',
   'floorVeil: false',
   'generalHaze: false',
-  'frontEnergy: false'
+  'frontEnergy: false',
+  'const DEPTH_CONVENTION = "smaller-positive-z-is-nearer"',
+  'function buildMistPuffs(settings, scene)',
+  'const z = bank.z + Math.sin(bank.phase2 + index * 2.1) * bank.depth * 0.28',
+  'puffs.sort((a, b) => b.z - a.z)',
+  'function publishDepthFrame(runtimeFrame, scene, puffs)',
+  'function getDepthFrame(frameToken = null)',
+  'if (!(puff.z < nearerThan)',
+  'renderForeground',
+  'getDepthFrame,',
+  'depthFrame: Object.freeze({'
 ]) {
   assert.ok(source.includes(token), `Approved Floor Mist visual contract is missing: ${token}`);
 }
@@ -49,7 +59,12 @@ for (const rejected of [
   'sprite.width = 48',
   'sprite.width = 192',
   'imageSmoothingEnabled',
-  'rgba(206, 188, 188'
+  'rgba(206, 188, 188',
+  'depthSlices',
+  'sliceCount',
+  'NCNOptical',
+  'articleId',
+  'getArticle'
 ]) {
   assert.equal(source.includes(rejected), false, `Unapproved mist extra, white body or reconstruction remains: ${rejected}`);
 }
@@ -67,4 +82,4 @@ for (const hazeValue of ['haze: 0.12', 'haze: 0.23', 'haze: 0.48', 'haze: 0.17',
   assert.equal(presets.includes(hazeValue), false, `Weather preset still requests unapproved haze: ${hazeValue}`);
 }
 
-console.log('Approved Floor Mist banks use the RedWire energy palette without haze extras.');
+console.log('Approved Floor Mist banks retain exact puff-depth frame publication without haze or fixed slices.');

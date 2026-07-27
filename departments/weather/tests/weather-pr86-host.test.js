@@ -57,6 +57,24 @@ window.NCNWeatherPR86HostTests = (() => {
       await wait(options.settleDelay || 160);
       check("initial/repeated reduced quality follows host", candidate.snapshot().quality === "reduced", candidate.snapshot());
       check("RedWire weather is visibly active", candidate.snapshot().resources.visibleCanvases === 4);
+      const depthFrame = candidate.getDepthFrame();
+      check("Weather publishes an immutable exact-depth frame",
+        Boolean(depthFrame) && Object.isFrozen(depthFrame)
+        && depthFrame.depthConvention === "smaller-positive-z-is-nearer",
+        depthFrame);
+      check("Weather depth frame exposes no private puff collection",
+        !Object.prototype.hasOwnProperty.call(depthFrame, "puffs"), depthFrame);
+      const depthProbe = document.createElement("canvas").getContext("2d");
+      const depthBefore = candidate.snapshot();
+      const reproducedPuffs = depthFrame.renderForeground(depthProbe, {
+        nearerThan: depthFrame.depthRange.farthest + 0.01
+      });
+      const depthAfter = candidate.snapshot();
+      check("read-only depth pass reproduces the current puff count",
+        reproducedPuffs === depthFrame.puffCount, { reproducedPuffs, puffCount: depthFrame.puffCount });
+      check("read-only depth pass does not advance Weather",
+        depthAfter.frameCount === depthBefore.frameCount
+        && depthAfter.particles.fingerprint === depthBefore.particles.fingerprint);
 
       window.NCNViewerRuntime.setQuality("full");
       candidate.setIntensity(0.43);
@@ -73,6 +91,9 @@ window.NCNWeatherPR86HostTests = (() => {
 
       candidate.suspend("host-contract-test");
       const spawnAtSuspend = candidate.snapshot().particles.spawned;
+      check("suspension invalidates the public depth frame", candidate.getDepthFrame() === null);
+      check("stale depth frame becomes inert",
+        depthFrame.renderForeground(depthProbe, { nearerThan: depthFrame.depthRange.farthest + 1 }) === 0);
       check("suspension hides weather canvases", candidate.snapshot().resources.visibleCanvases === 0);
       await wait(120);
       check("suspension stops spawning", candidate.snapshot().particles.spawned === spawnAtSuspend);
