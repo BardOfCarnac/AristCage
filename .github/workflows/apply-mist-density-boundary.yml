@@ -57,14 +57,11 @@ jobs:
           node --check tests/weather-density-boundary.browser.js
           node departments/weather/tests/weather-module.node.test.js
           node departments/weather/tests/weather-mist-visual-contract.test.js
-      - name: Remove one-shot patch files
-        if: steps.ready.outputs.ready == 'true' && steps.apply.outputs.status == '0'
-        run: rm scripts/apply-mist-density-boundary.cjs scripts/fix-mist-density-patcher.cjs .github/workflows/apply-mist-density-boundary.yml
       - name: Commit corrected implementation
         if: steps.ready.outputs.ready == 'true' && steps.apply.outputs.status == '0'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add departments/weather/weather-presets.js departments/weather/weather-module.js departments/weather/tests/weather-module.node.test.js departments/weather/tests/weather-mist-visual-contract.test.js
           git commit -m "Densify mist and clip it to the chamber [mist-density-boundary-applied]"
           git push origin HEAD:agent/article-mist-descent
