@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   apply-heavy-mist:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/agent/article-mist-descent' && !contains(github.event.head_commit.message, '[heavy-mist-applied]') }}
+    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'agent/article-mist-descent' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
