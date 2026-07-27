@@ -89,7 +89,10 @@ async function openPanel(page, name) {
   await page.waitForFunction(expected => (
     typeof NCN_STATE !== "undefined" && NCN_STATE.activePanel === expected
   ), name, { timeout: 10_000 });
-  await page.waitForSelector("#feed > .entry.panel", { state: "visible", timeout: 10_000 });
+  await page.waitForSelector(
+    "#feed > .entry.panel, #desktop-inspector > .entry.panel",
+    { state: "visible", timeout: 10_000 }
+  );
 }
 
 async function closePanel(page, name) {
@@ -100,7 +103,9 @@ async function closePanel(page, name) {
 }
 
 async function verifyFilterContract(page) {
-  const values = await page.locator("#feed > .entry.panel .ncn-select-value").allTextContents();
+  const values = await page.locator(
+    "#feed > .entry.panel .ncn-select-value, #desktop-inspector > .entry.panel .ncn-select-value"
+  ).allTextContents();
   assert.deepEqual(
     values.map(value => value.trim().toLowerCase()),
     ["empty", "empty", "empty", "empty", "now"],
@@ -173,7 +178,12 @@ async function runViewport(viewportName, viewport) {
     await closePanel(page, "filter");
 
     await openPanel(page, "submit");
-    assert.ok(await page.locator("#feed > .entry.panel .submit-form").count(), `${viewportName}: Submit panel should render its form`);
+    assert.ok(
+      await page.locator(
+        "#feed > .entry.panel .submit-form, #desktop-inspector > .entry.panel .submit-form"
+      ).count(),
+      `${viewportName}: Submit panel should render its form`
+    );
     await capture(page, viewportName, "submit", records);
     await closePanel(page, "submit");
 
