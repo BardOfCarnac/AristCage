@@ -69,9 +69,8 @@ window.NCNApplications = (() => {
       }
     }
     if (version) {
-      const showVersion = current.name !== 'dripfeed';
-      version.hidden = !showVersion;
-      version.textContent = showVersion ? current.version : '';
+      version.hidden = false;
+      version.textContent = current.name === 'dripfeed' ? 'buy sell be seen' : current.version;
     }
     requestRailMeasurement();
   }
