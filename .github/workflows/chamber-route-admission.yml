@@ -1,0 +1,40 @@
+name: Chamber Route Admission Proposal
+
+on:
+  pull_request:
+    paths:
+      - "departments/chamber-movement/route-admission-planner.js"
+      - "departments/chamber-movement/tests/route-admission-planner.test.js"
+      - "docs/CHAMBER-ROUTE-ADMISSION.md"
+      - ".github/workflows/chamber-route-admission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check planner syntax
+        run: node --check departments/chamber-movement/route-admission-planner.js
+      - name: Run deterministic admission suite
+        run: node departments/chamber-movement/tests/route-admission-planner.test.js
+      - name: Confirm proposal is not production-installed
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          if (html.includes('route-admission-planner.js')) {
+            throw new Error('The review planner must not be installed into production by this PR.');
+          }
+          const source = fs.readFileSync('departments/chamber-movement/route-admission-planner.js', 'utf8');
+          for (const forbidden of ['requestAnimationFrame(', 'setInterval(', 'setTimeout(']) {
+            if (source.includes(forbidden)) throw new Error(`Planner owns forbidden recurring work: ${forbidden}`);
+          }
+          console.log('Planner remains an uninstalled, loop-free integration proposal.');
+          NODE
