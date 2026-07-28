@@ -1,0 +1,52 @@
+name: Dripfeed Surface Preparation
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "js/dripfeed-mechanics.js"
+      - "js/dripfeed-surface-controller.js"
+      - "css/dripfeed-surface-prep.css"
+      - "tests/dripfeed-mechanics.test.js"
+      - "docs/DRIPFEED-SURFACE-HANDOFF.md"
+      - ".github/workflows/dripfeed-surface-prep.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check Dripfeed surface syntax
+        run: |
+          node --check js/dripfeed-mechanics.js
+          node --check js/dripfeed-surface-controller.js
+          node --check tests/dripfeed-mechanics.test.js
+      - name: Run deterministic Dripfeed mechanics harness
+        run: node tests/dripfeed-mechanics.test.js
+      - name: Check load order
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const model = html.indexOf('js/dripfeed-model.js');
+          const mechanics = html.indexOf('js/dripfeed-mechanics.js');
+          const app = html.indexOf('js/dripfeed-app.js');
+          const surface = html.indexOf('js/dripfeed-surface-controller.js');
+          const switcher = html.indexOf('js/application-switcher.js');
+          if (model < 0 || mechanics < model || app < mechanics || surface < app || switcher < surface) {
+            throw new Error('Dripfeed mechanics must load after the model; the surface controller must load after the app and before application switching.');
+          }
+          for (const path of ['js/dripfeed-mechanics.js', 'js/dripfeed-surface-controller.js', 'css/dripfeed-surface-prep.css']) {
+            if ((html.match(new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length !== 1) {
+              throw new Error(`${path} must load exactly once.`);
+            }
+          }
+          console.log('Dripfeed surface load order is correct.');
+          NODE
