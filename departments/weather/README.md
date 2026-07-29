@@ -6,7 +6,15 @@ This directory publishes the replaceable `weather` department. It does not insta
 
 The default RedWire mist is the agreed **Floor Mist / Chamber Test 01 — Low mist** bank renderer, adapted to the four host-supplied depth layers and shared runtime.
 
-Its baseline visual constants are density `0.62`, height `0.34`, opacity `0.58`, lateral drift `+0.18`, depth flow `-0.12`, turbulence `0.42`, softness `0.66` and deterministic seed `2045`.
+Its baseline renderer constants are density `0.62`, height `0.34`, opacity `0.58`, lateral drift `+0.18`, depth flow `-0.12`, turbulence `0.42`, softness `0.66` and deterministic seed `2045`.
+
+Each bank uses three to five overlapping elliptical radial puffs. The ordinary `mist` preset restores the broad-bank presentation of the accepted chamber prototype with:
+
+- vertical fill `0.04`;
+- bank scale `1.52`;
+- bank multiplier `1.58`.
+
+Against the deterministic base ranges, the effective ordinary footprint is approximately `0.94–2.40` chamber units wide and `0.58–1.75` deep. The accepted bank population is retained, but neighbouring puffs overlap into broad local banks rather than reading as separated patches.
 
 The following experimental extras remain excluded:
 
@@ -15,7 +23,13 @@ The following experimental extras remain excluded:
 - front floor-energy line;
 - sprite reconstructions.
 
-Weather uses only the RedWire energy palette. Ordinary mist has a red body with brighter local red illumination; smoke darkens the same banks; electrical or heated Weather may lift those reds toward orange.
+Weather uses only the RedWire energy palette. Ordinary mist has a red body with brighter local red illumination; smoke darkens the same banks; electrical or heated Weather may lift those reds toward orange. No general chamber colour wash is used.
+
+## Reading-surface presentation
+
+The RedWire application requests ordinary mist at intensity `0.46`. Reading-zone attenuation is `0.48`, leaving enough low near mist visible for the bottom of a reading surface to remain inside the atmosphere. Control-zone attenuation remains `0.68`.
+
+These are Integration-owned host profile values passed through Weather's existing public `applyProfile()` contract. They add no article dependency, do not alter Optical geometry and do not introduce a second compositor. Dripfeed disables Weather completely.
 
 ## Load order and capability boundary
 
@@ -57,7 +71,7 @@ frame.renderForeground(context2d, {
 
 Weather still iterates each puff only once. It combines every qualifying polygon into one clip before drawing that puff, so overlapping Integration regions cannot multiply opacity. Regions do not alter Weather simulation state.
 
-The frame exposes no private bank or puff collection. Rendering uses the same elapsed time, camera projection, colour, softness, clipping and draw order as the ordinary frame. A handle becomes inert as soon as Weather state invalidates it or Weather is disabled, suspended, reset or destroyed.
+The frame exposes no private bank or puff collection. Rendering uses the same elapsed time, camera projection, colour, softness, clipping, attenuation and draw order as the ordinary frame. A handle becomes inert as soon as Weather state invalidates it or Weather is disabled, suspended, reset or destroyed.
 
 ## Synchronous completed-frame publication
 
@@ -80,10 +94,12 @@ This contract adds no caller-specific atmospheric state and does not expose the 
 
 Weather may request only `electrical-disturbance` on `fault` and `light-flash` on `environment`, both with ambient purpose.
 
-RedWire requests ordinary mist at its baseline profile. Dripfeed disables Weather completely. Suspension stops the shared-runtime task, invalidates the published frame, clears and hides all Weather canvases, and releases frame subscribers. Reset and destruction deactivate particles, cancel Weather-owned Effects handles and remove owned resources without altering the integration slot.
+Suspension stops the shared-runtime task, invalidates the published frame, clears and hides all Weather canvases, and releases frame subscribers. Reset and destruction deactivate particles, cancel Weather-owned Effects handles and remove owned resources without altering the integration slot.
 
 ## Validation
 
-Department tests protect deterministic replay, approved bank construction, exact immutable puff-depth frames, one-pass overlapping-region composition, synchronous completed-frame publication, stale-handle rejection, Effects policy, quality changes, suspension and cleanup.
+Weather-owned tests protect deterministic replay, approved broad-bank construction, palette and renderer boundaries, exact immutable puff-depth frames, one-pass overlapping-region composition, synchronous completed-frame publication, stale-handle rejection, Effects policy, quality changes, suspension and cleanup.
 
-Rendered desktop and mobile inspection remains the Integration gate before merge.
+Integration-owned `tests/environment-profile-contract.test.js` protects the RedWire intensity and attenuation profile, diagnostics reproduction and Dripfeed's disabled-Weather policy through `NCNEnvironment.profile()`.
+
+Rendered desktop and mobile inspection remains the Integration gate before merge, including ordinary settled mist, reading-surface overlap, article dismissal, moving chamber cells and the RedWire → Dripfeed → RedWire round trip.
