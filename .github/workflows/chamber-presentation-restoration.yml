@@ -4,8 +4,11 @@ on:
   pull_request:
     paths:
       - "index.html"
+      - "js/weather-frame-bridge.js"
       - "js/chamber-motion-presentation.js"
+      - "tests/weather-frame-bridge.test.js"
       - "tests/chamber-motion-presentation.test.js"
+      - "tests/chamber-motion-presentation-init-race.test.js"
       - "tests/chamber-motion-presentation-render.mjs"
       - "docs/CHAMBER-PRESENTATION-RESTORATION.md"
       - ".github/workflows/chamber-presentation-restoration.yml"
@@ -24,27 +27,38 @@ jobs:
           node-version: 24
       - name: Check restoration syntax
         run: |
+          node --check js/weather-frame-bridge.js
           node --check js/chamber-motion-presentation.js
+          node --check tests/weather-frame-bridge.test.js
           node --check tests/chamber-motion-presentation.test.js
+          node --check tests/chamber-motion-presentation-init-race.test.js
           node --check tests/chamber-motion-presentation-render.mjs
-      - name: Run deterministic restoration harness
+      - name: Run synchronized Weather bridge contract
+        run: node tests/weather-frame-bridge.test.js
+      - name: Run deterministic exact-depth presentation harness
         run: node tests/chamber-motion-presentation.test.js
+      - name: Preserve destroy during readiness
+        run: node tests/chamber-motion-presentation-init-race.test.js
       - name: Check page load order
         run: |
           node <<'NODE'
           const fs = require('fs');
           const html = fs.readFileSync('index.html', 'utf8');
+          const weather = html.indexOf('departments/weather/weather-module.js');
+          const bridge = html.indexOf('js/weather-frame-bridge.js');
           const integration = html.indexOf('js/integration-departments.js');
           const activity = html.indexOf('js/chamber-motion-activity.js');
           const presentation = html.indexOf('js/chamber-motion-presentation.js');
           const probe = html.indexOf('js/integration-browser-probe.js');
-          if (integration < 0 || activity < integration || presentation < activity || probe < presentation) {
-            throw new Error('Chamber presentation must load after accepted department installation/activity and before the browser probe.');
+          if (weather < 0 || bridge < weather || integration < bridge || activity < integration || presentation < activity || probe < presentation) {
+            throw new Error('Weather frame bridge and chamber presentation load order is invalid.');
           }
-          if ((html.match(/js\/chamber-motion-presentation\.js/g) || []).length !== 1) {
-            throw new Error('Chamber presentation must be loaded exactly once.');
+          for (const path of ['js/weather-frame-bridge.js', 'js/chamber-motion-presentation.js']) {
+            if ((html.match(new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length !== 1) {
+              throw new Error(`${path} must be loaded exactly once.`);
+            }
           }
-          console.log('Chamber presentation load order is correct.');
+          console.log('Synchronized Weather/chamber load order is correct.');
           NODE
 
   rendered-smoke:
@@ -59,7 +73,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.54.1
           npx playwright install --with-deps chromium
-      - name: Verify restored presentation on desktop and mobile
+      - name: Verify exact-depth desktop and mobile composition
         run: |
           set -euo pipefail
           mkdir -p artifacts
@@ -75,6 +89,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: chamber-presentation-restoration
+          name: chamber-presentation-exact-depth
           path: artifacts/
           if-no-files-found: ignore
