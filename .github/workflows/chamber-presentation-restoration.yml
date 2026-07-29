@@ -16,6 +16,7 @@ on:
       - "docs/CHAMBER-PRESENTATION-RESTORATION.md"
       - ".github/workflows/chamber-presentation-restoration.yml"
       - ".github/chamber103-correction.patch.gz.b64"
+      - ".github/chamber103-correction.part*"
   workflow_dispatch:
 
 permissions:
@@ -34,15 +35,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          payload=.github/chamber103-correction.patch.gz.b64
-          if [[ ! -f "$payload" ]]; then
-            echo "No staged correction payload remains."
+          shopt -s nullglob
+          parts=(.github/chamber103-correction.part*)
+          if (( ${#parts[@]} == 0 )); then
+            echo "No staged correction chunks remain."
             exit 0
           fi
-          base64 --decode "$payload" | gzip --decompress > /tmp/chamber103-correction.patch
+          cat "${parts[@]}" | base64 --decode | gzip --decompress > /tmp/chamber103-correction.patch
           git apply --check /tmp/chamber103-correction.patch
           git apply /tmp/chamber103-correction.patch
-          rm "$payload"
+          rm -f .github/chamber103-correction.patch.gz.b64 "${parts[@]}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
