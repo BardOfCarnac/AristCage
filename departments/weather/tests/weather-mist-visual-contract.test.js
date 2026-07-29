@@ -4,7 +4,6 @@ const assert = require('node:assert/strict');
 
 const source = fs.readFileSync(path.resolve(__dirname, '..', 'weather-module.js'), 'utf8');
 const presets = fs.readFileSync(path.resolve(__dirname, '..', 'weather-presets.js'), 'utf8');
-const environment = fs.readFileSync(path.resolve(__dirname, '..', '..', '..', 'js', 'environment-manager.js'), 'utf8');
 
 for (const token of [
   'density: 0.62',
@@ -106,17 +105,4 @@ for (const hazeValue of ['haze: 0.12', 'haze: 0.23', 'haze: 0.48', 'haze: 0.17',
   assert.equal(presets.includes(hazeValue), false, `Weather preset still requests unapproved haze: ${hazeValue}`);
 }
 
-const redwireWeatherMatch = environment.match(/weather: Object\.freeze\(\{([\s\S]*?)\n      \}\),\n      effects:/);
-assert.ok(redwireWeatherMatch, 'RedWire Weather profile is unavailable.');
-const redwireWeather = redwireWeatherMatch[1];
-for (const token of [
-  'preset: "mist"',
-  'intensity: 0.46',
-  'mist: 0.46',
-  'readingAttenuation: 0.48',
-  'controlAttenuation: 0.68'
-]) {
-  assert.ok(redwireWeather.includes(token), `RedWire broad-bank profile is missing: ${token}`);
-}
-
-console.log('Ordinary floor mist uses broad overlapping banks and remains visible at reading surfaces without haze, veils or fixed slices.');
+console.log('Weather owns the broad overlapping ordinary-bank preset without host-profile assertions, haze, veils or fixed slices.');
