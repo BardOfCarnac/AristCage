@@ -39,14 +39,19 @@ An opened reader carries:
 <article data-spatial-surface="reading"></article>
 ```
 
+Both wall publications are derived from the **same active category and search filter**. The latent surface is not an unfiltered archive. A post that does not match the current filter is absent from both published surfaces until that filter changes.
+
 ## Semantic events
 
 All events bubble from `#dripfeed-root`.
 
 | Event | Meaning |
 |---|---|
-| `dripfeed:walls-change` | Packing or membership changed; refresh host surface measurements. |
-| `dripfeed:open-transmission` | A tile has been selected for the reading plane. Includes `sourceElement` and `sourceRect`. |
+| `dripfeed:walls-change` | Packing or membership changed; refresh host surface measurements. Counts describe the currently filtered live and latent publications. |
+| `dripfeed:open-transmission-start` | A reading transition is being requested. Includes the source element and source rectangle for pre-transition geometry. This does not mean the open was accepted. |
+| `dripfeed:open-transmission-ready` | The reader transition was accepted and the real reading surface now exists. Includes `readingSurface`. |
+| `dripfeed:open-transmission` | Backward-compatible success event, emitted at the same truthful point as `open-transmission-ready`. |
+| `dripfeed:open-transmission-cancelled` | The request was rejected, interrupted, or failed. No opened-memory mutation has occurred. |
 | `dripfeed:close-transmission` | The current reader has closed. |
 | `dripfeed:filter-change` | Category selection changed. |
 | `dripfeed:repack` | The user deliberately advanced the stable board seed. |
@@ -54,6 +59,8 @@ All events bubble from `#dripfeed-root`.
 | `dripfeed:dismiss` | A post was explicitly filed to the latent set. |
 
 The host should translate these semantic events into its own spatial runtime operations. It should not alter post membership or tile geometry directly.
+
+The host may use `open-transmission-start` to prepare a movement from the tile's source rectangle, but it must wait for `open-transmission-ready` before treating the reading plane as occupied. A rejected or interrupted request is never published as successfully opened.
 
 ## Mechanics now owned by Dripfeed
 
@@ -63,6 +70,7 @@ The host should translate these semantic events into its own spatial runtime ope
 - deliberate `REPACK`, which advances the cycle and seed;
 - exposure memory: loaded, seen, opened and dismissed are distinct states;
 - an opened post remains live during the current cycle and becomes latent on the next deliberate repack;
+- live publication may contain fewer than six posts when no more eligible posts remain;
 - dismissal is the only hard user exclusion;
 - stable post-level voices: Wire, Neuro, Tag, Blackletter and Stencil;
 - stable image treatments: full, ghost, band, split and inset;
@@ -77,7 +85,7 @@ The integration agent should:
 2. Keep `.dripfeed-filter-rail` on the foreground UI plane in one non-wrapping row.
 3. Register the `live` surface immediately behind the first suitable chamber occluder.
 4. Register the `latent` surface one shallow interval behind `live`.
-5. Register the reader on the existing forward reading plane.
+5. Register the reader on the existing forward reading plane after `dripfeed:open-transmission-ready`.
 6. Route the live wall through the production article scroll mapping.
 7. Use real chamber geometry for top and bottom occlusion.
 8. Preserve Dripfeed's grid positions, dimensions, image treatments and font classes.
@@ -96,6 +104,10 @@ The host must not:
 - add per-tile random Z scatter;
 - restore an opaque page rectangle behind the wall.
 
+## Lifecycle cleanup
+
+Exposure observation is installed on a retained animation-frame handle. Re-rendering, deactivation and destruction cancel the pending frame, disconnect any observer and clear all exposure timers. Integration should use the existing application lifecycle rather than removing Dripfeed DOM behind the publication's back.
+
 ## Validation
 
 Run:
@@ -103,7 +115,11 @@ Run:
 ```bash
 node --check js/dripfeed-mechanics.js
 node --check js/dripfeed-surface-controller.js
+node --check js/dripfeed-surface-contract-fix.js
+node --check tests/dripfeed-mechanics.test.js
+node --check tests/dripfeed-mounted-contract.test.js
 node tests/dripfeed-mechanics.test.js
+node tests/dripfeed-mounted-contract.test.js
 ```
 
-The unit harness verifies exact square-cell geometry, deterministic packing, envelope compliance, non-overlap, exposure semantics and persistent profile selection.
+The deterministic harness verifies exact square-cell geometry, deterministic packing, envelope compliance, non-overlap, exposure semantics and persistent profile selection. The mounted contract harness verifies filtered membership across both walls, opened-to-latent repacking, truthful reader events, interrupted opens and zero observer/timer/frame residue after cleanup.
