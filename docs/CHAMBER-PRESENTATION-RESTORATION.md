@@ -1,71 +1,94 @@
-# Chamber presentation restoration
+# Chamber presentation and Weather composition
 
-This change restores two approved presentation behaviours that existed in the earlier chamber prototypes but were lost when Chamber Movement and Weather were separated into departments.
+This integration restores the approved wall-matched moving cells and composes the live Weather field around them without changing Chamber Movement choreography or Weather simulation.
 
-## Restored behaviours
+## Wall-matched moving cells
 
-### Wall-matched moving cells
-
-The accepted movement geometry and choreography are unchanged. A host-owned presentation canvas reads `chamber-motion.getActiveGeometry()` and renders those temporary solids with the settled `LayeredChamber` optical treatment:
+The host reads `chamber-motion.getActiveGeometry()` and draws temporary solids with the settled `LayeredChamber` treatment:
 
 - opaque chamber-black faces;
-- the same red energy palette;
-- the same depth opacity and line-width equations;
+- the same five-stop red energy palette;
+- operating energy `0.61`;
+- the same depth brightness, opacity and line-width equations;
 - the same low additive optical pass;
 - no privileged bright edge, coloured face or block glow.
 
-The earlier production canvas is visually suppressed while this bridge is installed, but remains intact underneath as a reversible fallback.
+The incumbent movement canvas remains present as a reversible fallback but is hidden only after the replacement canvases, contexts and runtime task have installed successfully.
 
-### Weather occlusion
+## Weather-owned frame contract
 
-Weather particles are not moved, repelled or disturbed. After Weather draws and before the frame is presented, the bridge removes the projected moving-solid silhouettes from the Weather layers behind Chamber Movement (`far`, `rear`, and `middle`). The `near` Weather layer remains above the moving solids, preserving smoke and mist that should appear in front.
+Weather now publishes its own narrow synchronous contract:
 
-This restores the old occlusion-only reading: atmosphere may appear before and after the cells, but does not visibly pass through their opaque volume.
+```js
+const unsubscribe = weather.subscribeAfterRender(({ type, depthFrame, token }) => {
+  // type is "render" after all four Weather canvases are complete,
+  // or "invalidate" immediately after the current frame becomes inert.
+});
+```
 
-## Runtime ownership
+The completed immutable depth frame is the same field used by the ordinary Weather render. Weather retains ownership of particles, presets, timing and canvases. Integration no longer replaces the Weather factory or identifies a private runtime task name.
 
-The bridge registers two tasks on the existing shared runtime:
+Subscriptions are cleared when Weather is disabled, suspended, reset or destroyed. Existing frame handles become inert at the same point. Consumers may resubscribe after Weather resumes.
 
-| Task | Group | Priority | Purpose |
-|---|---|---:|---|
-| `chamber-motion:wall-matched-presentation` | `chamber` | 29 | Runs immediately after Chamber Movement updates its poses |
-| `chamber-motion:weather-occlusion` | `environment` | 10 | Runs after Weather has rendered its frame |
+## Frame-bound near-layer composition
 
-There is no private `requestAnimationFrame`, interval, or permanent loop. Both tasks sleep when `getActiveGeometry()` is empty and are awakened by Chamber Movement lifecycle events.
+The established scene order already places `weather:far`, `weather:rear` and `weather:middle` behind `chamber-motion`; opaque block faces hide those layers naturally.
 
-## Scope deliberately excluded
+For `weather:near`, Integration:
 
-- no choreography, route or timing changes;
-- no new movement families;
-- no Weather displacement or wake simulation;
-- no changes to protected Optical or Dripfeed renderers;
-- no changes to panel scheduling or the Dev controls;
-- no replacement of the accepted Chamber Movement or Weather departments.
+1. captures the pristine completed near canvas together with its exact Weather frame token and service identity;
+2. restores that backup only while `weather.getDepthFrame(token)` returns the same live handle and Weather remains enabled, unsuspended and active in RedWire;
+3. removes the current projected cell silhouettes from the near canvas;
+4. draws the wall-matched cells;
+5. asks the same Weather frame to draw foreground puffs once through all qualifying cell regions.
 
-## Historical references
+Backups are discarded on frame invalidation, disable, suspension, reset, service replacement and application switching. Leaving RedWire clears only Integration-owned output and never restores an old Weather frame. Returning to RedWire waits for a new Weather render.
 
-The recovered prototypes remain the visual source of truth:
+## Truthful depth semantics
 
-- Grid Brick Demo v8: wall-matched moving cells;
-- Grid Brick Demo v10: wall restoration without persistent cavities;
-- Weather/Block Interaction v5: occlusion-only atmosphere interaction.
+The current comparison is **piecewise conservative cell-depth**, not exact continuous solid-surface depth.
+
+Each moving cell supplies:
+
+- its projected padded hull;
+- the depth of its nearest corner plus a small contact allowance.
+
+Weather processes every puff once and combines all qualifying cell polygons into one clip before drawing that puff. This preserves per-cell depth variation while preventing overlapping or padded cell hulls from multiplying opacity or creating bright internal seams.
+
+A future continuous per-pixel surface-depth implementation may replace this approximation, but this PR does not claim that result.
+
+## Transactional installation
+
+Installation acquires resources in a rollback transaction. Failure during canvas/context creation, incumbent suppression, runtime registration, Weather subscription or event attachment leaves:
+
+- no replacement canvases;
+- the incumbent renderer visible;
+- no runtime task;
+- no Weather subscriber;
+- no service or window listeners;
+- `initialised === false`, `installationState === "failed"`, and an explicit failure reason.
+
+Destroy during asynchronous departmental readiness remains inert and cannot remount resources afterwards.
+
+## Runtime
+
+- Weather owns one shared-runtime environment task and invokes subscribers synchronously after its completed draw.
+- Chamber presentation owns one shared-runtime chamber task for pose refreshes.
+- There is no independent Weather-occlusion task, private animation loop, interval or timer.
 
 ## Validation
 
-`tests/chamber-motion-presentation.test.js` verifies:
+Deterministic checks cover:
 
-- the old bright-edged canvas is suppressed;
-- the new renderer uses opaque black faces and chamber optical strokes;
-- no old privileged bright edge is used;
-- the additive wall glow pass is retained;
-- far/rear/middle Weather canvases receive `destination-out` occlusion;
-- near Weather remains available in front;
-- both tasks are shared-runtime tasks and clean up completely.
+- the Weather-owned after-render and invalidation contract;
+- stale-handle rejection;
+- one-pass rendering through overlapping foreground regions;
+- chamber-black faces and chamber-matched optical strokes;
+- RedWire → Dripfeed → RedWire interruption without stale pixels;
+- immediate backup invalidation;
+- transactional rollback at every acquisition stage;
+- destruction during asynchronous readiness.
 
-`tests/chamber-motion-presentation-render.mjs` runs the real page in Chromium at desktop and mobile sizes. It opens Filter, samples the rendered wall-matched canvas, requires movement beyond extraction, confirms repeated Weather occlusion passes, verifies the old renderer remains hidden, closes Filter, and checks clean settlement.
+The rendered Chromium proof uses full-quality heavy mist on desktop and mobile. It requires non-transparent foreground mist over real wall pixels inside projected moving-cell bounds, checks for abnormal overlap opacity, captures human-inspectable images during extraction, turning and inward travel, exercises an active RedWire → Dripfeed interruption, and retains clean-settlement and browser-error checks.
 
-A human rendered pass is still required before merge, particularly to judge line parity at different depths and the near-layer transition when a cluster travels very close to the viewer.
-
-## Revalidation after article-mist integration
-
-This draft is being revalidated against the current `main` after PR #98 merged the denser ordinary/heavy Weather field, exact per-puff chamber clipping and article-mist composition. The pull-request browser run therefore exercises the wall-matched block presentation and Weather occlusion against the current integrated Weather renderer rather than the earlier sparse field.
+Human visual judgement remains the final gate for the conservative depth handoff at the most oblique poses.

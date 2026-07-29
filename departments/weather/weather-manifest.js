@@ -2,7 +2,7 @@
 window.NCNWeatherDepartmentManifest = Object.freeze({
   apiVersion: 1,
   department: "weather",
-  version: "1.1.0-pr86",
+  version: "1.2.0-pr86",
   dependencies: Object.freeze(["visual-director", "effects"]),
   layers: Object.freeze([
     "weather:far",
@@ -23,6 +23,7 @@ window.NCNWeatherDepartmentManifest = Object.freeze({
     "setIntensity",
     "transitionTo",
     "getDepthFrame",
+    "subscribeAfterRender",
     "snapshot"
   ]),
   owns: Object.freeze([
@@ -30,12 +31,13 @@ window.NCNWeatherDepartmentManifest = Object.freeze({
     "bounded reusable weather particle pools",
     "data-driven weather presets and transitions",
     "reading and control-zone attenuation",
-    "immutable read-only depth-frame rendering views"
+    "immutable read-only depth-frame rendering views",
+    "synchronous completed-frame publication and invalidation"
   ]),
   protectedRoots: Object.freeze([]),
   animationLoop: "shared-runtime",
   replaces: "weather",
   reducedMotion: true,
   deterministicTesting: true,
-  notes: "Departmental publication only. It exposes exact puff-depth frame views but does not install itself or inspect Optical/article state."
+  notes: "Departmental publication only. It exposes exact puff-depth frame views and a synchronous after-render subscription, but does not install itself or inspect Optical/article state."
 });
