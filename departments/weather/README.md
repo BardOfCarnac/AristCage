@@ -9,7 +9,7 @@ RedWire, Dripfeed, Optical or chamber structures.
 The default RedWire mist is the agreed **Floor Mist / Chamber Test 01 — Low mist**
 bank renderer, adapted only to the four host-supplied depth layers and shared runtime.
 
-Its visual constants are:
+Its renderer constants are:
 
 - density `0.62`
 - height `0.34`
@@ -19,19 +19,39 @@ Its visual constants are:
 - turbulence `0.42`
 - softness `0.66`
 - deterministic seed `2045`
-- 36 active banks at ordinary desktop quality and the RedWire baseline intensity
 
-Each bank uses three to five overlapping elliptical radial puffs. Bank dimensions,
-lift, alpha and speed retain the ranges from the approved test. The host's four weather
-layers divide the original far pass into `far` and `rear`, while preserving the original
-middle and near boundaries.
+Each bank uses three to five overlapping elliptical radial puffs. The ordinary `mist`
+preset restores the broad-bank presentation of the accepted chamber prototype by using:
 
-The following experimental extras are expressly excluded:
+- vertical fill `0.04`
+- bank scale `1.52`
+- bank multiplier `1.0`
+
+Against the renderer's deterministic base ranges this produces an effective ordinary
+footprint of approximately `0.94–2.40` chamber units wide and `0.58–1.75` deep. The
+field therefore gains continuity through overlapping broad banks rather than through a
+larger population of small isolated puffs.
+
+The host's four weather layers divide the original far pass into `far` and `rear`, while
+preserving the original middle and near boundaries.
+
+The following experimental extras remain expressly excluded:
 
 - continuous floor veil
 - generic or vertical red haze
 - front floor-energy line
 - sprite reconstructions, pixelated or otherwise
+
+## Reading-surface presentation
+
+The RedWire application requests ordinary mist at intensity `0.46`. Reading-zone
+attenuation is `0.48`, leaving enough of the low near field visible for the bottom of an
+article to sit inside the atmosphere instead of cutting a nearly empty rectangle through
+it. Control-zone attenuation remains `0.68`.
+
+These are host profile values passed through Weather's existing public `applyProfile()`
+contract. They do not add an article dependency, alter Optical geometry or introduce a
+second compositor.
 
 ## Energy-palette colour policy
 
@@ -130,8 +150,8 @@ values cannot override this policy.
 
 ## Profiles, suspension and cleanup
 
-RedWire requests `mist` at intensity `0.42` with seed `2045`; that baseline maps to the
-approved visual values above. Dripfeed disables Weather completely.
+RedWire requests the broad-bank `mist` profile described above. Dripfeed disables
+Weather completely.
 
 Suspension stops the shared-runtime task, clears all canvases and hides them. Disable,
 reset and destruction deactivate all banks and particles, cancel Weather-owned Effects
@@ -143,10 +163,10 @@ handles and remove all owned canvases without altering the integration slot.
   replay, approved bank count/specification, exact immutable puff-depth frames, the
   absence of simulation mutation during external rendering, quality changes, Effects
   policy, suspension and cleanup.
-- `tests/weather-mist-visual-contract.test.js` protects the agreed mist constants,
-  energy-palette colour policy, exact puff-depth publication and bank construction
-  while rejecting fixed depth slices, white mist, the floor veil, generic haze,
-  front-energy line and sprite reconstructions.
+- `tests/weather-mist-visual-contract.test.js` protects the renderer constants, broad
+  ordinary-bank profile, RedWire reading attenuation, energy-palette colour policy and
+  exact puff-depth publication while rejecting fixed depth slices, white mist, the floor
+  veil, generic haze, front-energy line and sprite reconstructions.
 - `tests/weather-pr86-host.test.js` performs the protected application round trip
   without replacing the incumbent slot.
 
