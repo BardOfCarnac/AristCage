@@ -15,42 +15,12 @@ on:
       - "tests/chamber-motion-presentation-render.mjs"
       - "docs/CHAMBER-PRESENTATION-RESTORATION.md"
       - ".github/workflows/chamber-presentation-restoration.yml"
-      - ".github/chamber103-correction.patch.gz.b64"
-      - ".github/chamber103-correction.part*"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply-correction:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-      - name: Apply staged Integration correction
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          parts=(.github/chamber103-correction.part*)
-          if (( ${#parts[@]} == 0 )); then
-            echo "No staged correction chunks remain."
-            exit 0
-          fi
-          cat "${parts[@]}" | base64 --decode | gzip --decompress > /tmp/chamber103-correction.patch
-          git apply --check /tmp/chamber103-correction.patch
-          git apply /tmp/chamber103-correction.patch
-          rm -f .github/chamber103-correction.patch.gz.b64 "${parts[@]}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Address Integration review for synchronized Weather composition"
-          git push origin "HEAD:${{ github.head_ref }}"
-
   validate:
     runs-on: ubuntu-latest
     steps:
