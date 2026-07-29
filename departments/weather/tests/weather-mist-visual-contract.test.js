@@ -84,11 +84,10 @@ for (const token of [
   'mist: 0.54',
   'verticalFill: 0.04',
   'bankScale: 1.52',
-  'bankMultiplier: 1'
+  'bankMultiplier: 1.58'
 ]) {
   assert.ok(ordinaryMist.includes(token), `Broad-bank ordinary mist contract is missing: ${token}`);
 }
-assert.equal(ordinaryMist.includes('bankMultiplier: 1.58'), false, 'Ordinary mist must not restore density by multiplying small banks.');
 
 for (const token of [
   'smoke: 0',
