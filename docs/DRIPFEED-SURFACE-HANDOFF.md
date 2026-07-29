@@ -22,6 +22,7 @@ app.getSurfaceSnapshot()
 //   columns,
 //   liveCount,
 //   latentCount,
+//   excludedCount,
 //   surfaces
 // }
 ```
@@ -41,26 +42,33 @@ An opened reader carries:
 
 Both wall publications are derived from the **same active category and search filter**. The latent surface is not an unfiltered archive. A post that does not match the current filter is absent from both published surfaces until that filter changes.
 
+Publication membership is explicit:
+
+- eligible and current-cycle posts are live;
+- eligible posts opened in an earlier cycle are latent;
+- dismissed posts are excluded from both walls until restored.
+
 ## Semantic events
 
 All events bubble from `#dripfeed-root`.
 
 | Event | Meaning |
 |---|---|
-| `dripfeed:walls-change` | Packing or membership changed; refresh host surface measurements. Counts describe the currently filtered live and latent publications. |
-| `dripfeed:open-transmission-start` | A reading transition is being requested. Includes the source element and source rectangle for pre-transition geometry. This does not mean the open was accepted. |
-| `dripfeed:open-transmission-ready` | The reader transition was accepted and the real reading surface now exists. Includes `readingSurface`. |
+| `dripfeed:walls-change` | Packing or membership changed; refresh host surface measurements. Counts describe the currently filtered live, latent and excluded sets. |
+| `dripfeed:open-transmission-start` | A reading transition is being requested. Includes a request token, source element and source rectangle for pre-transition geometry. This does not mean the open was accepted. |
+| `dripfeed:open-transmission-ready` | The reader transition was accepted and the real reading surface now exists. Includes the same token and `readingSurface`. |
 | `dripfeed:open-transmission` | Backward-compatible success event, emitted at the same truthful point as `open-transmission-ready`. |
-| `dripfeed:open-transmission-cancelled` | The request was rejected, interrupted, or failed. No opened-memory mutation has occurred. |
-| `dripfeed:close-transmission` | The current reader has closed. |
+| `dripfeed:open-transmission-cancelled` | The request was rejected, interrupted or failed. Partial reader state has been cleared and no opened-memory mutation has occurred. |
+| `dripfeed:close-transmission` | A previously ready reading publication has closed. A close is never emitted for a request that did not reach ready. |
 | `dripfeed:filter-change` | Category selection changed. |
 | `dripfeed:repack` | The user deliberately advanced the stable board seed. |
 | `dripfeed:seen` | A tile was at least 60% visible for 900 ms. |
-| `dripfeed:dismiss` | A post was explicitly filed to the latent set. |
+| `dripfeed:dismiss` | A post was explicitly excluded from both live and latent publications. |
+| `dripfeed:restore` | A dismissed post was restored to eligibility under the current cycle. |
 
 The host should translate these semantic events into its own spatial runtime operations. It should not alter post membership or tile geometry directly.
 
-The host may use `open-transmission-start` to prepare a movement from the tile's source rectangle, but it must wait for `open-transmission-ready` before treating the reading plane as occupied. A rejected or interrupted request is never published as successfully opened.
+The host may use `open-transmission-start` to prepare movement from the tile's source rectangle, but it must wait for `open-transmission-ready` before treating the reading plane as occupied. Every emitted close has one preceding unmatched ready event. Rejected, interrupted and failed requests publish cancellation only.
 
 ## Mechanics now owned by Dripfeed
 
@@ -71,7 +79,7 @@ The host may use `open-transmission-start` to prepare a movement from the tile's
 - exposure memory: loaded, seen, opened and dismissed are distinct states;
 - an opened post remains live during the current cycle and becomes latent on the next deliberate repack;
 - live publication may contain fewer than six posts when no more eligible posts remain;
-- dismissal is the only hard user exclusion;
+- dismissal is the only hard user exclusion and removes a post from both published walls;
 - stable post-level voices: Wire, Neuro, Tag, Blackletter and Stencil;
 - stable image treatments: full, ghost, band, split and inset;
 - user-selected headline voice in the transmission composer;
@@ -106,7 +114,11 @@ The host must not:
 
 ## Lifecycle cleanup
 
-Exposure observation is installed on a retained animation-frame handle. Re-rendering, deactivation and destruction cancel the pending frame, disconnect any observer and clear all exposure timers. Integration should use the existing application lifecycle rather than removing Dripfeed DOM behind the publication's back.
+Exposure observation is installed on a retained animation-frame handle. Re-rendering, deactivation and destruction cancel the pending frame, disconnect any observer and clear all exposure timers.
+
+Reader publication is tokenised. Ready state is retained only after the real reading surface exists, and is cleared exactly once on close or destruction. Interruption during opening cannot emit a close. A thrown open performs an immediate guarded transition cleanup plus a final local reset before cancellation is published, leaving no active post, reader card, flight stage, source class, overlay state or reading-depth state.
+
+Integration should use the existing application lifecycle rather than removing Dripfeed DOM behind the publication's back.
 
 ## Validation
 
@@ -114,12 +126,12 @@ Run:
 
 ```bash
 node --check js/dripfeed-mechanics.js
+node --check js/dripfeed-reader-transition.js
 node --check js/dripfeed-surface-controller.js
-node --check js/dripfeed-surface-contract-fix.js
 node --check tests/dripfeed-mechanics.test.js
 node --check tests/dripfeed-mounted-contract.test.js
 node tests/dripfeed-mechanics.test.js
 node tests/dripfeed-mounted-contract.test.js
 ```
 
-The deterministic harness verifies exact square-cell geometry, deterministic packing, envelope compliance, non-overlap, exposure semantics and persistent profile selection. The mounted contract harness verifies filtered membership across both walls, opened-to-latent repacking, truthful reader events, interrupted opens and zero observer/timer/frame residue after cleanup.
+The deterministic harness verifies exact square-cell geometry, deterministic packing, envelope compliance, non-overlap, exposure semantics and persistent profile selection. The mounted harness loads the real reader transition followed by the single production surface controller and verifies filtered wall membership, opened-to-latent repacking, dismissal exclusion and restore, ready-gated close events, interruption during opening, injected failure after reader markup exists, and zero observer/timer/frame residue after cleanup.
