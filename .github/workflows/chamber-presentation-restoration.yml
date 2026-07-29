@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "index.html"
+      - "departments/weather/weather-module.js"
       - "js/weather-frame-bridge.js"
       - "js/chamber-motion-presentation.js"
       - "tests/weather-frame-bridge.test.js"
@@ -60,6 +61,21 @@ jobs:
           }
           console.log('Synchronized Weather/chamber load order is correct.');
           NODE
+      - name: Export correction source
+        uses: actions/upload-artifact@v4
+        with:
+          name: chamber-presentation-source-export
+          path: |
+            departments/weather/weather-module.js
+            js/chamber-motion-presentation.js
+            js/weather-frame-bridge.js
+            tests/weather-frame-bridge.test.js
+            tests/chamber-motion-presentation.test.js
+            tests/chamber-motion-presentation-init-race.test.js
+            tests/chamber-motion-presentation-render.mjs
+            docs/CHAMBER-PRESENTATION-RESTORATION.md
+            index.html
+          if-no-files-found: error
 
   rendered-smoke:
     runs-on: ubuntu-latest
