@@ -1,89 +1,34 @@
 # NCN Weather Department — PR-86 publication
 
-This directory publishes the replaceable `weather` department. It does not install
-itself, modify application roots, replace the incumbent slot, or touch protected
-RedWire, Dripfeed, Optical or chamber structures.
+This directory publishes the replaceable `weather` department. It does not install itself, modify application roots, replace the incumbent slot, or touch protected RedWire, Dripfeed, Optical or chamber structures.
 
 ## Approved everyday mist
 
-The default RedWire mist is the agreed **Floor Mist / Chamber Test 01 — Low mist**
-bank renderer, adapted only to the four host-supplied depth layers and shared runtime.
+The default RedWire mist is the agreed **Floor Mist / Chamber Test 01 — Low mist** bank renderer, adapted to the four host-supplied depth layers and shared runtime.
 
-Its visual constants are:
+Its baseline visual constants are density `0.62`, height `0.34`, opacity `0.58`, lateral drift `+0.18`, depth flow `-0.12`, turbulence `0.42`, softness `0.66` and deterministic seed `2045`.
 
-- density `0.62`
-- height `0.34`
-- opacity `0.58`
-- lateral drift `+0.18`
-- depth flow `-0.12`
-- turbulence `0.42`
-- softness `0.66`
-- deterministic seed `2045`
-- 36 active banks at ordinary desktop quality and the RedWire baseline intensity
+The following experimental extras remain excluded:
 
-Each bank uses three to five overlapping elliptical radial puffs. Bank dimensions,
-lift, alpha and speed retain the ranges from the approved test. The host's four weather
-layers divide the original far pass into `far` and `rear`, while preserving the original
-middle and near boundaries.
+- continuous floor veil;
+- generic or vertical red haze;
+- front floor-energy line;
+- sprite reconstructions.
 
-The following experimental extras are expressly excluded:
+Weather uses only the RedWire energy palette. Ordinary mist has a red body with brighter local red illumination; smoke darkens the same banks; electrical or heated Weather may lift those reds toward orange.
 
-- continuous floor veil
-- generic or vertical red haze
-- front floor-energy line
-- sprite reconstructions, pixelated or otherwise
-
-## Energy-palette colour policy
-
-Weather uses only the RedWire energy palette:
-
-- ordinary mist has a red body with brighter red local illumination;
-- the `smoke` preset darkens the same banks into deep crimson and maroon values;
-- electrical or heated weather may lift those reds toward orange;
-- the chamber is never covered by a general colour wash to achieve this effect.
-
-The bank colour changes locally inside each radial puff. It does not reintroduce haze,
-a floor veil or the front floor-energy line. Blue-white remains the responsibility of
-rare electrical Effects rather than the normal mist body.
-
-## Load order for intake
+## Load order and capability boundary
 
 1. `weather-manifest.js`
 2. `weather-presets.js`
 3. `weather-module.js`
-4. `weather-module.css` when the integration agent stages visual testing
+4. `weather-module.css` during staged visual testing
 
-The candidate is exposed as:
-
-```js
-NCNWeatherDepartmentManifest
-NCNWeatherDepartment.createWeather
-createNCNWeatherDepartment
-createWeather
-```
-
-## Capability boundary
-
-The factory uses only:
-
-- `context.layers.weather.far`
-- `context.layers.weather.rear`
-- `context.layers.weather.middle`
-- `context.layers.weather.near`
-- `context.runtime` for its sole recurring task
-- `context.director` for environment and fault envelopes
-- `context.integration.requireService("effects")`
-- `context.views` for reading and control-zone attenuation
-- `context.chamber` for read-only projection geometry
-
-Construction is inert. `init()` creates one canvas in each supplied layer and registers
-one task in runtime group `environment`. There is no private animation loop, interval
-or per-bank timer.
+The factory uses only the supplied Weather layers, one shared-runtime `environment` task, the Visual Director, the declared Effects dependency, read-only chamber geometry and view attenuation zones. It creates no private animation loop, interval or per-bank timer.
 
 ## Immutable depth-frame surface
 
-Weather publishes a read-only view of the exact mist field used by its most recent
-ordinary render:
+Weather publishes a frozen read-only view of the exact mist puffs used by its most recent completed render:
 
 ```js
 const frame = weather.getDepthFrame(optionalFrameToken);
@@ -94,60 +39,51 @@ frame.renderForeground(context2d, {
 });
 ```
 
-The chamber convention is explicit: **smaller positive `z` is nearer**. Foreground
-selection therefore uses each visible puff's actual depth, `puffZ < chamberZ`; it does
-not use the containing bank's centre or a fixed slice count.
+The chamber convention is explicit: **smaller positive `z` is nearer**. Scalar foreground selection uses `puffZ < chamberZ`.
 
-The frame handle is frozen and exposes only metadata, a token and the rendering method.
-Private bank and puff collections are never returned. `renderForeground()`:
+Integration may also submit multiple projected regions in one call:
 
-- uses the same elapsed time, camera projection, colour, softness and puff positions as
-  the normal Weather frame;
-- performs no simulation update, spawn, reset or particle mutation;
-- preserves the ordinary puff draw order after depth filtering;
-- treats `viewport` only as a viewport-relative CSS-pixel rendering bound, equivalent
-  to `getBoundingClientRect()` coordinates, with the target context origin corresponding to
-  the viewport's top-left;
-- reproduces the current reading/control attenuation unless
-  `includeAttenuation: false` is explicitly supplied;
-- allocates no canvas, timer or article-specific resource.
+```js
+frame.renderForeground(context2d, {
+  regions: [
+    {
+      nearerThan: cellNearestDepth,
+      polygons: [[{ x, y }, { x, y }, { x, y }]]
+    }
+  ],
+  viewport: { left, top, width, height }
+});
+```
 
-The surface knows nothing about articles or Optical. Integration may apply its own
-pre-existing silhouette clip before calling the method. A frame becomes inert when a
-new Weather state invalidates it, or when Weather is disabled, suspended, reset or
-destroyed. Exact per-puff ordering is the reference contract; a banded implementation
-is not prescribed and may only be introduced later as a proven internal optimisation.
+Weather still iterates each puff only once. It combines every qualifying polygon into one clip before drawing that puff, so overlapping Integration regions cannot multiply opacity. Regions do not alter Weather simulation state.
 
-## Effects boundary
+The frame exposes no private bank or puff collection. Rendering uses the same elapsed time, camera projection, colour, softness, clipping and draw order as the ordinary frame. A handle becomes inert as soon as Weather state invalidates it or Weather is disabled, suspended, reset or destroyed.
 
-Weather may request only:
+## Synchronous completed-frame publication
 
-- `electrical-disturbance` on `fault`
-- `light-flash` on `environment`
+Weather owns the public synchronization point:
 
-Both requests are forced to the `ambient` purpose. Caller-supplied channel and purpose
-values cannot override this policy.
+```js
+const unsubscribe = weather.subscribeAfterRender(payload => {
+  // payload.type === "render" after all Weather canvases are complete
+  // payload.type === "invalidate" before the current frame becomes stale
+});
+```
 
-## Profiles, suspension and cleanup
+A render payload contains the completed immutable `depthFrame`, its Weather token, runtime token and frame number. Listener order follows subscription order. Listener failures are isolated and do not interrupt Weather.
 
-RedWire requests `mist` at intensity `0.42` with seed `2045`; that baseline maps to the
-approved visual values above. Dripfeed disables Weather completely.
+Disable, suspension, reset and destruction invalidate the current frame and clear subscribers. The returned release function exposes `active()` so an Integration consumer can detect lifecycle clearing and resubscribe after Weather resumes.
 
-Suspension stops the shared-runtime task, clears all canvases and hides them. Disable,
-reset and destruction deactivate all banks and particles, cancel Weather-owned Effects
-handles and remove all owned canvases without altering the integration slot.
+This contract adds no caller-specific atmospheric state and does not expose the private Weather render task name.
+
+## Effects, profiles and cleanup
+
+Weather may request only `electrical-disturbance` on `fault` and `light-flash` on `environment`, both with ambient purpose.
+
+RedWire requests ordinary mist at its baseline profile. Dripfeed disables Weather completely. Suspension stops the shared-runtime task, invalidates the published frame, clears and hides all Weather canvases, and releases frame subscribers. Reset and destruction deactivate particles, cancel Weather-owned Effects handles and remove owned resources without altering the integration slot.
 
 ## Validation
 
-- `tests/weather-module.node.test.js` covers shared-runtime behaviour, deterministic
-  replay, approved bank count/specification, exact immutable puff-depth frames, the
-  absence of simulation mutation during external rendering, quality changes, Effects
-  policy, suspension and cleanup.
-- `tests/weather-mist-visual-contract.test.js` protects the agreed mist constants,
-  energy-palette colour policy, exact puff-depth publication and bank construction
-  while rejecting fixed depth slices, white mist, the floor veil, generic haze,
-  front-energy line and sprite reconstructions.
-- `tests/weather-pr86-host.test.js` performs the protected application round trip
-  without replacing the incumbent slot.
+Department tests protect deterministic replay, approved bank construction, exact immutable puff-depth frames, one-pass overlapping-region composition, synchronous completed-frame publication, stale-handle rejection, Effects policy, quality changes, suspension and cleanup.
 
-Rendered desktop and mobile inspection remains the integration gate before merge.
+Rendered desktop and mobile inspection remains the Integration gate before merge.
