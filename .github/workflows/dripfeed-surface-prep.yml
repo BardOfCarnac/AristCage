@@ -5,8 +5,8 @@ on:
     paths:
       - "index.html"
       - "js/dripfeed-mechanics.js"
+      - "js/dripfeed-reader-transition.js"
       - "js/dripfeed-surface-controller.js"
-      - "js/dripfeed-surface-contract-fix.js"
       - "css/dripfeed-surface-prep.css"
       - "tests/dripfeed-mechanics.test.js"
       - "tests/dripfeed-mounted-contract.test.js"
@@ -28,13 +28,13 @@ jobs:
       - name: Check Dripfeed surface syntax
         run: |
           node --check js/dripfeed-mechanics.js
+          node --check js/dripfeed-reader-transition.js
           node --check js/dripfeed-surface-controller.js
-          node --check js/dripfeed-surface-contract-fix.js
           node --check tests/dripfeed-mechanics.test.js
           node --check tests/dripfeed-mounted-contract.test.js
       - name: Run deterministic Dripfeed mechanics harness
         run: node tests/dripfeed-mechanics.test.js
-      - name: Run mounted Dripfeed publication contract
+      - name: Run mounted Dripfeed production-stack contract
         run: node tests/dripfeed-mounted-contract.test.js
       - name: Check load order
         run: |
@@ -43,22 +43,24 @@ jobs:
           const html = fs.readFileSync('index.html', 'utf8');
           const model = html.indexOf('js/dripfeed-model.js');
           const mechanics = html.indexOf('js/dripfeed-mechanics.js');
+          const reader = html.indexOf('js/dripfeed-reader-transition.js');
           const app = html.indexOf('js/dripfeed-app.js');
           const surface = html.indexOf('js/dripfeed-surface-controller.js');
-          const contract = html.indexOf('js/dripfeed-surface-contract-fix.js');
+          const obsoleteFix = html.indexOf('js/dripfeed-surface-contract-fix.js');
           const switcher = html.indexOf('js/application-switcher.js');
-          if (model < 0 || mechanics < model || app < mechanics || surface < app || contract < surface || switcher < contract) {
-            throw new Error('Dripfeed mechanics, surface publication and mounted contract correction must load in order before application switching.');
+          if (model < 0 || mechanics < model || reader < mechanics || app < reader || surface < app || switcher < surface) {
+            throw new Error('Dripfeed mechanics, reader transition, app and unified surface publication must load in production order before application switching.');
           }
+          if (obsoleteFix >= 0) throw new Error('The obsolete surface-contract-fix wrapper must not be loaded.');
           for (const path of [
             'js/dripfeed-mechanics.js',
+            'js/dripfeed-reader-transition.js',
             'js/dripfeed-surface-controller.js',
-            'js/dripfeed-surface-contract-fix.js',
             'css/dripfeed-surface-prep.css'
           ]) {
             if ((html.match(new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length !== 1) {
               throw new Error(`${path} must load exactly once.`);
             }
           }
-          console.log('Dripfeed surface load order is correct.');
+          console.log('Dripfeed unified surface load order is correct.');
           NODE
