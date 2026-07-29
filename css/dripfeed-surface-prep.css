@@ -1,0 +1,329 @@
+/*==================================================
+  DRIPFEED SURFACE PREPARATION
+
+  Dripfeed-owned presentation only. The chamber integration may position and
+  occlude the published walls, but should leave these tile and typography rules
+  intact.
+==================================================*/
+
+#dripfeed-root {
+  --cols: 3;
+  background: transparent !important;
+}
+
+#dripfeed-root .dripfeed-app,
+#dripfeed-root .demo-stage,
+#dripfeed-root .listing-wall {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#dripfeed-root .dripfeed-app {
+  width: 100%;
+  max-width: 1580px;
+}
+
+#dripfeed-root .dripfeed-filter-rail {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-width: 0;
+  background: transparent;
+}
+
+#dripfeed-root .dripfeed-filter-rail .filter-chips {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  gap: 5px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+
+#dripfeed-root .dripfeed-filter-rail .filter-chips::-webkit-scrollbar {
+  display: none;
+}
+
+#dripfeed-root .dripfeed-filter-rail .filter-chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+#dripfeed-root .filter-transmit {
+  flex: 0 0 auto;
+}
+
+#dripfeed-root .demo-stage {
+  border: 0 !important;
+  isolation: isolate;
+}
+
+#dripfeed-root .demo-stage::before,
+#dripfeed-root .demo-stage::after {
+  display: none !important;
+}
+
+#dripfeed-root .listing-wall {
+  grid-auto-flow: row;
+  align-content: start;
+}
+
+#dripfeed-root .tile-banner {
+  grid-column: span 3;
+  grid-row: span 1;
+}
+
+#dripfeed-root .tile-poster {
+  grid-column: span 2;
+  grid-row: span 3;
+}
+
+#dripfeed-root .listing-tile {
+  background: transparent;
+  box-shadow: none;
+  --headline-lines: 3;
+  --body-lines: 2;
+}
+
+#dripfeed-root .listing-tile.text-only {
+  background: transparent;
+}
+
+#dripfeed-root .listing-tile.text-only .tile-shade {
+  background:
+    radial-gradient(ellipse at 34% 76%, rgba(8, 2, 2, .82), rgba(8, 2, 2, .34) 47%, transparent 76%),
+    linear-gradient(145deg, rgba(240, 68, 57, .055), transparent 58%);
+}
+
+#dripfeed-root .listing-tile.has-image {
+  background: rgba(2, 2, 2, .08);
+}
+
+#dripfeed-root .tile-copy h2 {
+  max-width: none;
+  -webkit-line-clamp: var(--headline-lines);
+  text-wrap: balance;
+}
+
+#dripfeed-root .tile-copy p {
+  -webkit-line-clamp: var(--body-lines);
+}
+
+#dripfeed-root .tile-banner .tile-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr auto;
+  column-gap: 14px;
+}
+
+#dripfeed-root .tile-banner .tile-header,
+#dripfeed-root .tile-banner .tile-state-line {
+  grid-column: 1 / -1;
+}
+
+#dripfeed-root .tile-banner .tile-copy {
+  align-self: end;
+}
+
+#dripfeed-root .tile-banner .tile-footer,
+#dripfeed-root .tile-banner .photo-credit {
+  align-self: end;
+}
+
+#dripfeed-root .tile-poster .tile-copy {
+  margin-top: auto;
+}
+
+#dripfeed-root .tile-banner .tile-copy p {
+  display: none;
+}
+
+#dripfeed-root .tile-square .tile-copy p {
+  opacity: .84;
+}
+
+#dripfeed-root .image-full .tile-media {
+  inset: 0;
+  opacity: 1;
+}
+
+#dripfeed-root .image-ghost .tile-media {
+  inset: 0;
+  opacity: .46;
+  filter: grayscale(.14) saturate(.55) contrast(1.25) brightness(.66);
+  transform: scale(1.04);
+}
+
+#dripfeed-root .image-ghost .tile-shade {
+  background: linear-gradient(115deg, rgba(2, 2, 2, .86), rgba(2, 2, 2, .25) 68%, transparent);
+}
+
+#dripfeed-root .image-band .tile-media {
+  inset: 8% 0 48%;
+  border-block: 1px solid rgba(240, 68, 57, .45);
+  background-position: center 42%;
+}
+
+#dripfeed-root .image-band .tile-shade {
+  background: linear-gradient(to top, rgba(2, 2, 2, .96) 0 46%, rgba(2, 2, 2, .22) 69%, rgba(2, 2, 2, .72));
+}
+
+#dripfeed-root .image-split .tile-media {
+  inset: 0 48% 0 0;
+  border-right: 1px solid rgba(240, 68, 57, .48);
+  background-position: center;
+}
+
+#dripfeed-root .image-split .tile-shade {
+  background: linear-gradient(90deg, rgba(2, 2, 2, .08) 0 43%, rgba(2, 2, 2, .91) 56% 100%);
+}
+
+#dripfeed-root .image-split .tile-content {
+  padding-left: 52%;
+}
+
+#dripfeed-root .image-inset .tile-media {
+  inset: 10% 8% 43%;
+  border: 1px solid rgba(240, 68, 57, .55);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .7);
+}
+
+#dripfeed-root .image-inset .tile-shade {
+  background: linear-gradient(to top, rgba(2, 2, 2, .97) 0 48%, rgba(2, 2, 2, .4) 67%, rgba(2, 2, 2, .76));
+}
+
+#dripfeed-root .font-wire .tile-copy h2,
+#dripfeed-root .font-wire.reader-card h2,
+#dripfeed-root .font-wire.review-card h3 {
+  font-family: "Arial Narrow", "Roboto Condensed", "Saira Condensed", sans-serif;
+  font-weight: 900;
+  letter-spacing: -.025em;
+  line-height: .92;
+  text-transform: uppercase;
+}
+
+#dripfeed-root .font-neuro .tile-copy h2,
+#dripfeed-root .font-neuro.reader-card h2,
+#dripfeed-root .font-neuro.review-card h3 {
+  font-family: "Saira", "Eurostile", "Microgramma", "Trebuchet MS", sans-serif;
+  font-weight: 750;
+  letter-spacing: .075em;
+  line-height: .88;
+  text-transform: uppercase;
+  transform: scaleX(1.045);
+  transform-origin: left center;
+  text-shadow: .055em 0 rgba(255, 93, 158, .34), 0 .08em 0 rgba(0, 0, 0, .9);
+}
+
+#dripfeed-root .font-tag .tile-copy h2,
+#dripfeed-root .font-tag.reader-card h2,
+#dripfeed-root .font-tag.review-card h3 {
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+  font-weight: 900;
+  letter-spacing: -.045em;
+  line-height: .87;
+  text-transform: none;
+  transform: rotate(-1.1deg) skewX(-3deg);
+  transform-origin: left center;
+  text-shadow: .06em .08em 0 rgba(240, 68, 57, .5), 0 .16em .2em #000;
+}
+
+#dripfeed-root .font-blackletter .tile-copy h2,
+#dripfeed-root .font-blackletter.reader-card h2,
+#dripfeed-root .font-blackletter.review-card h3 {
+  font-family: "UnifrakturCook", "Old English Text MT", "Lucida Blackletter", Georgia, serif;
+  font-weight: 800;
+  letter-spacing: .015em;
+  line-height: .83;
+  text-transform: none;
+  text-align: center;
+  text-shadow: 0 .08em 0 #000, 0 0 .22em rgba(240, 68, 57, .35);
+}
+
+#dripfeed-root .font-stencil .tile-copy h2,
+#dripfeed-root .font-stencil.reader-card h2,
+#dripfeed-root .font-stencil.review-card h3 {
+  font-family: "Stencil Std", "DIN Stencil", Impact, "Arial Black", sans-serif;
+  font-weight: 900;
+  letter-spacing: .085em;
+  line-height: .89;
+  text-transform: uppercase;
+  text-shadow: .075em .075em 0 rgba(240, 68, 57, .42), 0 .16em .2em #000;
+}
+
+#dripfeed-root .font-neuro .tile-copy h2,
+#dripfeed-root .font-stencil .tile-copy h2 {
+  font-size: clamp(.72rem, 6.25cqi, 1.78rem);
+}
+
+#dripfeed-root .font-tag .tile-copy h2,
+#dripfeed-root .font-blackletter .tile-copy h2 {
+  font-size: clamp(.78rem, 7.2cqi, 2.05rem);
+}
+
+#dripfeed-root .tile-banner.font-tag .tile-copy h2,
+#dripfeed-root .tile-banner.font-blackletter .tile-copy h2 {
+  font-size: clamp(.8rem, 5.1cqi, 1.65rem);
+}
+
+#dripfeed-root .latent-tile {
+  pointer-events: none;
+}
+
+#dripfeed-root .live-tile.seen .listing-id::after {
+  content: " / SEEN";
+  color: rgba(255, 145, 77, .72);
+}
+
+#dripfeed-root .font-choice-note {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: .58rem;
+  letter-spacing: .04em;
+  line-height: 1.35;
+}
+
+#dripfeed-root .reader-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (min-width: 720px) {
+  #dripfeed-root { --cols: 4; }
+}
+
+@media (min-width: 1180px) {
+  #dripfeed-root { --cols: 6; }
+}
+
+@media (max-width: 719px) {
+  #dripfeed-root .dripfeed-app {
+    padding-inline: 6px;
+  }
+
+  #dripfeed-root .dripfeed-filter-rail {
+    position: relative;
+  }
+
+  #dripfeed-root .tile-content {
+    gap: 4px;
+  }
+
+  #dripfeed-root .image-split .tile-content {
+    padding-left: 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #dripfeed-root .listing-tile,
+  #dripfeed-root .tile-media,
+  #dripfeed-root .listing-wall {
+    transition-duration: .01ms !important;
+  }
+}

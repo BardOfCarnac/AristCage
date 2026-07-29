@@ -4,8 +4,14 @@ on:
   pull_request:
     paths:
       - "index.html"
+      - "departments/weather/weather-manifest.js"
+      - "departments/weather/weather-module.js"
+      - "departments/weather/README.md"
       - "js/chamber-motion-presentation.js"
+      - "tests/weather-after-render-contract.test.js"
       - "tests/chamber-motion-presentation.test.js"
+      - "tests/chamber-motion-presentation-transaction.test.js"
+      - "tests/chamber-motion-presentation-init-race.test.js"
       - "tests/chamber-motion-presentation-render.mjs"
       - "docs/CHAMBER-PRESENTATION-RESTORATION.md"
       - ".github/workflows/chamber-presentation-restoration.yml"
@@ -22,34 +28,50 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Check restoration syntax
+      - name: Check synchronized presentation syntax
         run: |
+          node --check departments/weather/weather-module.js
           node --check js/chamber-motion-presentation.js
+          node --check tests/weather-after-render-contract.test.js
           node --check tests/chamber-motion-presentation.test.js
+          node --check tests/chamber-motion-presentation-transaction.test.js
+          node --check tests/chamber-motion-presentation-init-race.test.js
           node --check tests/chamber-motion-presentation-render.mjs
-      - name: Run deterministic restoration harness
+      - name: Run Weather-owned frame contract
+        run: node tests/weather-after-render-contract.test.js
+      - name: Run frame-bound chamber presentation harness
         run: node tests/chamber-motion-presentation.test.js
-      - name: Check page load order
+      - name: Prove transactional installation rollback
+        run: node tests/chamber-motion-presentation-transaction.test.js
+      - name: Preserve destroy during readiness
+        run: node tests/chamber-motion-presentation-init-race.test.js
+      - name: Check direct publication and page load order
         run: |
           node <<'NODE'
           const fs = require('fs');
           const html = fs.readFileSync('index.html', 'utf8');
+          const weather = html.indexOf('departments/weather/weather-module.js');
           const integration = html.indexOf('js/integration-departments.js');
           const activity = html.indexOf('js/chamber-motion-activity.js');
           const presentation = html.indexOf('js/chamber-motion-presentation.js');
           const probe = html.indexOf('js/integration-browser-probe.js');
-          if (integration < 0 || activity < integration || presentation < activity || probe < presentation) {
-            throw new Error('Chamber presentation must load after accepted department installation/activity and before the browser probe.');
+          if (weather < 0 || integration < weather || activity < integration || presentation < activity || probe < presentation) {
+            throw new Error('Weather publication and chamber presentation load order is invalid.');
           }
+          if (html.includes('js/weather-frame-bridge.js')) throw new Error('The temporary Weather factory bridge must not be loaded.');
           if ((html.match(/js\/chamber-motion-presentation\.js/g) || []).length !== 1) {
-            throw new Error('Chamber presentation must be loaded exactly once.');
+            throw new Error('Chamber presentation must load exactly once.');
           }
-          console.log('Chamber presentation load order is correct.');
+          const weatherSource = fs.readFileSync('departments/weather/weather-module.js', 'utf8');
+          for (const token of ['function subscribeAfterRender(listener)', 'notifyAfterRender(runtimeFrame, depthFrame)', 'afterRenderContract: Object.freeze']) {
+            if (!weatherSource.includes(token)) throw new Error(`Weather publication is missing ${token}.`);
+          }
+          console.log('Direct Weather frame publication and chamber load order are correct.');
           NODE
 
   rendered-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,7 +81,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.54.1
           npx playwright install --with-deps chromium
-      - name: Verify restored presentation on desktop and mobile
+      - name: Verify frame-bound desktop and mobile composition
         run: |
           set -euo pipefail
           mkdir -p artifacts
@@ -71,10 +93,10 @@ jobs:
             sleep 1
           done
           node tests/chamber-motion-presentation-render.mjs
-      - name: Upload rendered evidence
+      - name: Upload mid-motion rendered evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: chamber-presentation-restoration
+          name: chamber-presentation-frame-bound
           path: artifacts/
           if-no-files-found: ignore
