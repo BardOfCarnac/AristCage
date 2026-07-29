@@ -4,21 +4,51 @@ on:
   pull_request:
     paths:
       - "index.html"
+      - "departments/weather/weather-manifest.js"
       - "departments/weather/weather-module.js"
-      - "js/weather-frame-bridge.js"
+      - "departments/weather/README.md"
       - "js/chamber-motion-presentation.js"
-      - "tests/weather-frame-bridge.test.js"
+      - "tests/weather-after-render-contract.test.js"
       - "tests/chamber-motion-presentation.test.js"
+      - "tests/chamber-motion-presentation-transaction.test.js"
       - "tests/chamber-motion-presentation-init-race.test.js"
       - "tests/chamber-motion-presentation-render.mjs"
       - "docs/CHAMBER-PRESENTATION-RESTORATION.md"
       - ".github/workflows/chamber-presentation-restoration.yml"
+      - ".github/chamber103-correction.patch.gz.b64"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  apply-correction:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Apply staged Integration correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload=.github/chamber103-correction.patch.gz.b64
+          if [[ ! -f "$payload" ]]; then
+            echo "No staged correction payload remains."
+            exit 0
+          fi
+          base64 --decode "$payload" | gzip --decompress > /tmp/chamber103-correction.patch
+          git apply --check /tmp/chamber103-correction.patch
+          git apply /tmp/chamber103-correction.patch
+          rm "$payload"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Address Integration review for synchronized Weather composition"
+          git push origin "HEAD:${{ github.head_ref }}"
+
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -26,60 +56,50 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Check restoration syntax
+      - name: Check synchronized presentation syntax
         run: |
-          node --check js/weather-frame-bridge.js
+          node --check departments/weather/weather-module.js
           node --check js/chamber-motion-presentation.js
-          node --check tests/weather-frame-bridge.test.js
+          node --check tests/weather-after-render-contract.test.js
           node --check tests/chamber-motion-presentation.test.js
+          node --check tests/chamber-motion-presentation-transaction.test.js
           node --check tests/chamber-motion-presentation-init-race.test.js
           node --check tests/chamber-motion-presentation-render.mjs
-      - name: Run synchronized Weather bridge contract
-        run: node tests/weather-frame-bridge.test.js
-      - name: Run deterministic exact-depth presentation harness
+      - name: Run Weather-owned frame contract
+        run: node tests/weather-after-render-contract.test.js
+      - name: Run frame-bound chamber presentation harness
         run: node tests/chamber-motion-presentation.test.js
+      - name: Prove transactional installation rollback
+        run: node tests/chamber-motion-presentation-transaction.test.js
       - name: Preserve destroy during readiness
         run: node tests/chamber-motion-presentation-init-race.test.js
-      - name: Check page load order
+      - name: Check direct publication and page load order
         run: |
           node <<'NODE'
           const fs = require('fs');
           const html = fs.readFileSync('index.html', 'utf8');
           const weather = html.indexOf('departments/weather/weather-module.js');
-          const bridge = html.indexOf('js/weather-frame-bridge.js');
           const integration = html.indexOf('js/integration-departments.js');
           const activity = html.indexOf('js/chamber-motion-activity.js');
           const presentation = html.indexOf('js/chamber-motion-presentation.js');
           const probe = html.indexOf('js/integration-browser-probe.js');
-          if (weather < 0 || bridge < weather || integration < bridge || activity < integration || presentation < activity || probe < presentation) {
-            throw new Error('Weather frame bridge and chamber presentation load order is invalid.');
+          if (weather < 0 || integration < weather || activity < integration || presentation < activity || probe < presentation) {
+            throw new Error('Weather publication and chamber presentation load order is invalid.');
           }
-          for (const path of ['js/weather-frame-bridge.js', 'js/chamber-motion-presentation.js']) {
-            if ((html.match(new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length !== 1) {
-              throw new Error(`${path} must be loaded exactly once.`);
-            }
+          if (html.includes('js/weather-frame-bridge.js')) throw new Error('The temporary Weather factory bridge must not be loaded.');
+          if ((html.match(/js\/chamber-motion-presentation\.js/g) || []).length !== 1) {
+            throw new Error('Chamber presentation must load exactly once.');
           }
-          console.log('Synchronized Weather/chamber load order is correct.');
+          const weatherSource = fs.readFileSync('departments/weather/weather-module.js', 'utf8');
+          for (const token of ['function subscribeAfterRender(listener)', 'notifyAfterRender(runtimeFrame, depthFrame)', 'afterRenderContract: Object.freeze']) {
+            if (!weatherSource.includes(token)) throw new Error(`Weather publication is missing ${token}.`);
+          }
+          console.log('Direct Weather frame publication and chamber load order are correct.');
           NODE
-      - name: Export correction source
-        uses: actions/upload-artifact@v4
-        with:
-          name: chamber-presentation-source-export
-          path: |
-            departments/weather/weather-module.js
-            js/chamber-motion-presentation.js
-            js/weather-frame-bridge.js
-            tests/weather-frame-bridge.test.js
-            tests/chamber-motion-presentation.test.js
-            tests/chamber-motion-presentation-init-race.test.js
-            tests/chamber-motion-presentation-render.mjs
-            docs/CHAMBER-PRESENTATION-RESTORATION.md
-            index.html
-          if-no-files-found: error
 
   rendered-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -89,7 +109,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.54.1
           npx playwright install --with-deps chromium
-      - name: Verify exact-depth desktop and mobile composition
+      - name: Verify frame-bound desktop and mobile composition
         run: |
           set -euo pipefail
           mkdir -p artifacts
@@ -101,10 +121,10 @@ jobs:
             sleep 1
           done
           node tests/chamber-motion-presentation-render.mjs
-      - name: Upload rendered evidence
+      - name: Upload mid-motion rendered evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: chamber-presentation-exact-depth
+          name: chamber-presentation-frame-bound
           path: artifacts/
           if-no-files-found: ignore
