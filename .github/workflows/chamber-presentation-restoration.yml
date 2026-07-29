@@ -154,61 +154,66 @@ jobs:
               '  assert.ok(invalidation,"suspension synchronously invalidates the published frame");\n  assert.strictEqual(invalidationObservations.at(-1),null,"invalidation is delivered immediately after the old handle becomes inert");\n  assert.equal(service.getDepthFrame(invalidation.token),null,"the invalidated token is no longer current");\n  assert.equal(unsubscribe.active(),false,"Weather clears subscribers on suspension");'
           )
 
-          replace_exact(
-              "js/chamber-motion-presentation.js",
-              '''    nextSurface.append(nextWall);
-              nextSurface.append(nextForeground);
-              surface = nextSurface;
-              wallCanvas = nextWall;
-              foregroundCanvas = nextForeground;
-              wallDrawing = nextWallDrawing;
-              foregroundDrawing = nextForegroundDrawing;
-              registerCleanup(transaction, () => {
-                nextWall.remove?.();
-                nextForeground.remove?.();
-                if (wallCanvas === nextWall) { wallCanvas = null; wallDrawing = null; }
-                if (foregroundCanvas === nextForeground) { foregroundCanvas = null; foregroundDrawing = null; }
-                if (surface === nextSurface) surface = null;
-              });''',
-              '''    registerCleanup(transaction, () => {
-                nextWall.remove?.();
-                nextForeground.remove?.();
-                if (wallCanvas === nextWall) { wallCanvas = null; wallDrawing = null; }
-                if (foregroundCanvas === nextForeground) { foregroundCanvas = null; foregroundDrawing = null; }
-                if (surface === nextSurface) surface = null;
-              });
-              nextSurface.append(nextWall);
-              nextSurface.append(nextForeground);
-              surface = nextSurface;
-              wallCanvas = nextWall;
-              foregroundCanvas = nextForeground;
-              wallDrawing = nextWallDrawing;
-              foregroundDrawing = nextForegroundDrawing;'''
-          )
-          replace_exact(
-              "js/chamber-motion-presentation.js",
-              '''      presentationTask = runtime.register("chamber-motion:wall-matched-presentation", presentationStep, {
-                group: "chamber",
-                priority: 29,
-                maxFps: 30,
-                enabled: true,
-                wake: false
-              });
-              registerCleanup(transaction, () => presentationTask?.unregister?.());''',
-              '''      presentationTask = runtime.register("chamber-motion:wall-matched-presentation", presentationStep, {
-                group: "chamber",
-                priority: 29,
-                maxFps: 30,
-                enabled: true,
-                wake: false
-              });
-              if (!presentationTask
-                || typeof presentationTask.wake !== "function"
-                || typeof presentationTask.unregister !== "function") {
-                throw new Error("Shared viewer runtime did not return a conforming chamber presentation task handle.");
-              }
-              registerCleanup(transaction, () => presentationTask.unregister());'''
-          )
+          presentation_old = "\n".join([
+              '    nextSurface.append(nextWall);',
+              '    nextSurface.append(nextForeground);',
+              '    surface = nextSurface;',
+              '    wallCanvas = nextWall;',
+              '    foregroundCanvas = nextForeground;',
+              '    wallDrawing = nextWallDrawing;',
+              '    foregroundDrawing = nextForegroundDrawing;',
+              '    registerCleanup(transaction, () => {',
+              '      nextWall.remove?.();',
+              '      nextForeground.remove?.();',
+              '      if (wallCanvas === nextWall) { wallCanvas = null; wallDrawing = null; }',
+              '      if (foregroundCanvas === nextForeground) { foregroundCanvas = null; foregroundDrawing = null; }',
+              '      if (surface === nextSurface) surface = null;',
+              '    });'
+          ])
+          presentation_new = "\n".join([
+              '    registerCleanup(transaction, () => {',
+              '      nextWall.remove?.();',
+              '      nextForeground.remove?.();',
+              '      if (wallCanvas === nextWall) { wallCanvas = null; wallDrawing = null; }',
+              '      if (foregroundCanvas === nextForeground) { foregroundCanvas = null; foregroundDrawing = null; }',
+              '      if (surface === nextSurface) surface = null;',
+              '    });',
+              '    nextSurface.append(nextWall);',
+              '    nextSurface.append(nextForeground);',
+              '    surface = nextSurface;',
+              '    wallCanvas = nextWall;',
+              '    foregroundCanvas = nextForeground;',
+              '    wallDrawing = nextWallDrawing;',
+              '    foregroundDrawing = nextForegroundDrawing;'
+          ])
+          replace_exact("js/chamber-motion-presentation.js", presentation_old, presentation_new)
+
+          runtime_old = "\n".join([
+              '      presentationTask = runtime.register("chamber-motion:wall-matched-presentation", presentationStep, {',
+              '        group: "chamber",',
+              '        priority: 29,',
+              '        maxFps: 30,',
+              '        enabled: true,',
+              '        wake: false',
+              '      });',
+              '      registerCleanup(transaction, () => presentationTask?.unregister?.());'
+          ])
+          runtime_new = "\n".join([
+              '      presentationTask = runtime.register("chamber-motion:wall-matched-presentation", presentationStep, {',
+              '        group: "chamber",',
+              '        priority: 29,',
+              '        maxFps: 30,',
+              '        enabled: true,',
+              '        wake: false',
+              '      });',
+              '      if (!presentationTask',
+              '        || typeof presentationTask.wake !== "function"',
+              '        || typeof presentationTask.unregister !== "function") {',
+              '        throw new Error("Shared viewer runtime did not return a conforming chamber presentation task handle.");',
+              '      }',
+              '      registerCleanup(transaction, () => presentationTask.unregister());'
+          ])
+          replace_exact("js/chamber-motion-presentation.js", runtime_old, runtime_new)
 
           replace_exact(
               "tests/chamber-motion-presentation-transaction.test.js",
