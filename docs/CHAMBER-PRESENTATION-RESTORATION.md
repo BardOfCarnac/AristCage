@@ -1,71 +1,93 @@
-# Chamber presentation restoration
+# Chamber presentation — synchronized exact-depth Weather
 
-This change restores two approved presentation behaviours that existed in the earlier chamber prototypes but were lost when Chamber Movement and Weather were separated into departments.
+This change refines the merged wall-matched Chamber Movement presentation without changing movement choreography or Weather simulation.
 
-## Restored behaviours
+## Layer model
 
-### Wall-matched moving cells
+The production environment already places the layers in this order:
 
-The accepted movement geometry and choreography are unchanged. A host-owned presentation canvas reads `chamber-motion.getActiveGeometry()` and renders those temporary solids with the settled `LayeredChamber` optical treatment:
+```text
+weather:far
+weather:rear
+weather:middle
+chamber-motion
+weather:near
+```
 
-- opaque chamber-black faces;
-- the same red energy palette;
-- the same depth opacity and line-width equations;
+Opaque chamber-black moving faces therefore hide far, rear and middle Weather naturally. Those canvases no longer need repeated destructive masking.
+
+The difficult case is `weather:near`: some near-layer puffs are actually behind a moving cell while others are genuinely in front. This revision handles that case using Weather's immutable exact-depth frame.
+
+## Synchronous Weather frame contract
+
+`js/weather-frame-bridge.js` decorates the accepted Weather factory at the public runtime-registration boundary. It adds one service method:
+
+```js
+const unsubscribe = weather.subscribeAfterRender(({ frame, depthFrame }) => {
+  // Called synchronously after Weather has completed every canvas redraw.
+});
+```
+
+The bridge does not alter Weather's renderer, particles, presets, timing or canvas ownership. It wraps the callback supplied through the department's public runtime context and notifies subscribers only after that callback has completed.
+
+## Exact front/behind composition
+
+After every Weather redraw the chamber presentation:
+
+1. copies the pristine `weather:near` canvas into an unmounted backup canvas;
+2. restores that backup before each moving-block pose update;
+3. removes the current projected moving-solid silhouette from `weather:near`;
+4. draws the opaque wall-matched block in the chamber-motion layer;
+5. clips to each moving solid and asks the same Weather depth frame to render only puffs nearer than that solid.
+
+The backup/restore step prevents destructive-mask trails as blocks move between Weather frames. The exact-depth foreground pass uses Weather's established `smaller-positive-z-is-nearer` convention and the same puffs that generated the persistent field.
+
+Mist is not displaced or resimulated. It simply appears behind or in front of a moving cell according to its published chamber depth.
+
+## Wall visual treatment
+
+Moving faces retain the settled chamber treatment:
+
+- opaque chamber-black fill;
+- the same five-stop red energy palette;
+- operating energy `0.61`;
+- the same depth brightness, opacity and line-width equations;
 - the same low additive optical pass;
 - no privileged bright edge, coloured face or block glow.
 
-The earlier production canvas is visually suppressed while this bridge is installed, but remains intact underneath as a reversible fallback.
+## Lifecycle correction
 
-### Weather occlusion
-
-Weather particles are not moved, repelled or disturbed. After Weather draws and before the frame is presented, the bridge removes the projected moving-solid silhouettes from the Weather layers behind Chamber Movement (`far`, `rear`, and `middle`). The `near` Weather layer remains above the moving solids, preserving smoke and mist that should appear in front.
-
-This restores the old occlusion-only reading: atmosphere may appear before and after the cells, but does not visibly pass through their opaque volume.
+The presentation rechecks `destroyed` immediately after awaiting departmental readiness. Destroying the bridge during installation can no longer allow the asynchronous continuation to mount canvases, hide the incumbent renderer or register tasks afterwards.
 
 ## Runtime ownership
 
-The bridge registers two tasks on the existing shared runtime:
+Only one shared-runtime task remains:
 
 | Task | Group | Priority | Purpose |
 |---|---|---:|---|
-| `chamber-motion:wall-matched-presentation` | `chamber` | 29 | Runs immediately after Chamber Movement updates its poses |
-| `chamber-motion:weather-occlusion` | `environment` | 10 | Runs after Weather has rendered its frame |
+| `chamber-motion:wall-matched-presentation` | `chamber` | 29 | Follow live block poses and refresh the near-layer composition from the most recent Weather frame |
 
-There is no private `requestAnimationFrame`, interval, or permanent loop. Both tasks sleep when `getActiveGeometry()` is empty and are awakened by Chamber Movement lifecycle events.
+Weather redraw synchronization is callback-driven rather than a second independently timed task. There is no private animation loop, interval or timer.
 
-## Scope deliberately excluded
+## Deliberately unchanged
 
-- no choreography, route or timing changes;
-- no new movement families;
-- no Weather displacement or wake simulation;
-- no changes to protected Optical or Dripfeed renderers;
-- no changes to panel scheduling or the Dev controls;
-- no replacement of the accepted Chamber Movement or Weather departments.
-
-## Historical references
-
-The recovered prototypes remain the visual source of truth:
-
-- Grid Brick Demo v8: wall-matched moving cells;
-- Grid Brick Demo v10: wall restoration without persistent cavities;
-- Weather/Block Interaction v5: occlusion-only atmosphere interaction.
+- Chamber Movement paths, phases, duration and admission;
+- Filter/Submit scheduling;
+- Weather particle motion, density and presets;
+- article-mist descent;
+- protected Optical and Dripfeed renderers;
+- application switching and reduced-motion policy.
 
 ## Validation
 
-`tests/chamber-motion-presentation.test.js` verifies:
+The deterministic tests verify:
 
-- the old bright-edged canvas is suppressed;
-- the new renderer uses opaque black faces and chamber optical strokes;
-- no old privileged bright edge is used;
-- the additive wall glow pass is retained;
-- far/rear/middle Weather canvases receive `destination-out` occlusion;
-- near Weather remains available in front;
-- both tasks are shared-runtime tasks and clean up completely.
+- Weather subscribers run synchronously after the Weather render callback;
+- the wall renderer remains chamber-matched;
+- only the near Weather canvas is masked;
+- exact-depth foreground mist is rendered over moving cells;
+- the near canvas is restored from a pristine frame before each new silhouette;
+- there is only one shared-runtime presentation task;
+- destroy during departmental readiness cannot remount resources.
 
-`tests/chamber-motion-presentation-render.mjs` runs the real page in Chromium at desktop and mobile sizes. It opens Filter, samples the rendered wall-matched canvas, requires movement beyond extraction, confirms repeated Weather occlusion passes, verifies the old renderer remains hidden, closes Filter, and checks clean settlement.
-
-A human rendered pass is still required before merge, particularly to judge line parity at different depths and the near-layer transition when a cluster travels very close to the viewer.
-
-## Revalidation after article-mist integration
-
-This draft is being revalidated against the current `main` after PR #98 merged the denser ordinary/heavy Weather field, exact per-puff chamber clipping and article-mist composition. The pull-request browser run therefore exercises the wall-matched block presentation and Weather occlusion against the current integrated Weather renderer rather than the earlier sparse field.
+The Chromium proof runs full-quality heavy mist on desktop and mobile, opens Filter, observes movement beyond extraction, requires repeated synchronized near-layer composition and verifies visible exact-depth foreground mist before clean settlement.
