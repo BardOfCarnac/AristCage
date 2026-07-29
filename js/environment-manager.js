@@ -17,9 +17,11 @@ window.NCNEnvironment = (() => {
       weather: Object.freeze({
         enabled: true,
         preset: "mist",
-        intensity: 0.42,
-        mist: 0.42,
-        wind: 0
+        intensity: 0.46,
+        mist: 0.46,
+        wind: 0,
+        readingAttenuation: 0.48,
+        controlAttenuation: 0.68
       }),
       effects: Object.freeze({ ambient: true, interaction: true }),
       chamberMotion: Object.freeze({
@@ -228,9 +230,11 @@ window.NCNEnvironment = (() => {
       const desired = current.desired || current;
       const next = {
         enabled: !desired.enabled,
-        mist: desired.enabled ? 0 : 0.42,
-        intensity: desired.enabled ? 0 : 0.42,
+        mist: desired.enabled ? 0 : 0.46,
+        intensity: desired.enabled ? 0 : 0.46,
         wind: 0,
+        readingAttenuation: 0.48,
+        controlAttenuation: 0.68,
         preset: desired.enabled ? "clear" : "mist"
       };
       if (!window.NCNIntegration?.applyProfile?.("weather", next, { reason: "diagnostics" })) {
