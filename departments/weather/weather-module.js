@@ -144,14 +144,80 @@ window.NCNWeatherDepartment = (() => {
     const contexts = new Map();
     const layerRects = new Map();
     const activeEffectHandles = new Set();
+    const afterRenderSubscriptions = new Set();
+    let afterRenderGeneration = 0;
 
     function ensureAlive() {
       if (state.destroyed) throw new Error("Destroyed weather module cannot be used.");
     }
 
-    function invalidateDepthFrame() {
+    function invalidateDepthFrame(reason = "weather-frame-invalidated") {
+      const previous = currentDepthFrame;
       depthFrameEpoch += 1;
       currentDepthFrame = null;
+      if (previous) {
+        const payload = Object.freeze({
+          type: "invalidate",
+          reason,
+          token: previous.token,
+          runtimeToken: previous.runtimeToken,
+          frameNumber: previous.frameNumber,
+          generation: afterRenderGeneration
+        });
+        [...afterRenderSubscriptions].forEach(record => {
+          if (!record.active) return;
+          try { record.listener(payload); } catch (error) { console.error("[NCN Weather] frame invalidation listener failed", error); }
+        });
+      }
+    }
+
+    function clearAfterRenderSubscriptions(reason = "weather-frame-invalidated") {
+      afterRenderGeneration += 1;
+      afterRenderSubscriptions.forEach(record => {
+        record.active = false;
+        record.reason = reason;
+      });
+      afterRenderSubscriptions.clear();
+    }
+
+    function subscribeAfterRender(listener) {
+      ensureAlive();
+      if (typeof listener !== "function") throw new TypeError("Weather after-render subscribers must be functions.");
+      const record = { listener, active: true, generation: afterRenderGeneration, reason: null };
+      afterRenderSubscriptions.add(record);
+      const unsubscribe = () => {
+        if (!record.active) return false;
+        record.active = false;
+        record.reason = "subscriber-release";
+        return afterRenderSubscriptions.delete(record);
+      };
+      unsubscribe.active = () => record.active && afterRenderSubscriptions.has(record);
+      unsubscribe.generation = () => record.generation;
+      return unsubscribe;
+    }
+
+    function notifyAfterRender(runtimeFrame, depthFrame) {
+      if (!depthFrame || state.destroyed || state.suspended || !state.enabled) return 0;
+      const payload = Object.freeze({
+        type: "render",
+        frame: runtimeFrame || null,
+        depthFrame,
+        token: depthFrame.token,
+        runtimeToken: depthFrame.runtimeToken,
+        frameNumber: depthFrame.frameNumber,
+        generation: afterRenderGeneration
+      });
+      let delivered = 0;
+      [...afterRenderSubscriptions].forEach(record => {
+        if (!record.active) return;
+        try {
+          record.listener(payload);
+          delivered += 1;
+        } catch (error) {
+          console.error("[NCN Weather] after-render listener failed", error);
+        }
+      });
+      return delivered;
     }
 
     function primitiveFrameToken(frame) {
@@ -698,14 +764,53 @@ window.NCNWeatherDepartment = (() => {
 
       const renderForeground = (targetContext, options = {}) => {
         if (!targetContext || typeof targetContext !== "object") throw new TypeError("Weather depth-frame rendering requires a 2D context.");
-        const nearerThan = Number(options.nearerThan);
-        if (!Number.isFinite(nearerThan)) throw new TypeError("Weather depth-frame rendering requires a finite nearerThan chamber depth.");
         if (state.destroyed || state.suspended || !state.enabled || depthFrameEpoch !== epoch || currentDepthFrame !== handle) return 0;
         const viewport = depthViewport(options.viewport);
         const originX = viewport?.left || 0;
         const originY = viewport?.top || 0;
-        let rendered = 0;
+        const rawRegions = Array.isArray(options.regions) ? options.regions : null;
+        const nearerThan = Number(options.nearerThan);
+        if (!rawRegions && !Number.isFinite(nearerThan)) throw new TypeError("Weather depth-frame rendering requires a finite nearerThan chamber depth or regions.");
 
+        const regions = rawRegions ? rawRegions.map((region, index) => {
+          const threshold = Number(region?.nearerThan);
+          if (!Number.isFinite(threshold)) throw new TypeError(`Weather foreground region ${index} requires a finite nearerThan depth.`);
+          const polygons = Array.from(region?.polygons || []).map((polygon, polygonIndex) => {
+            const points = Array.from(polygon || []).map(point => ({ x: Number(point?.x), y: Number(point?.y) }));
+            if (points.length < 3 || points.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y))) {
+              throw new TypeError(`Weather foreground region ${index} polygon ${polygonIndex} is invalid.`);
+            }
+            const xs = points.map(point => point.x);
+            const ys = points.map(point => point.y);
+            return {
+              points,
+              bounds: { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) }
+            };
+          });
+          if (!polygons.length) throw new TypeError(`Weather foreground region ${index} requires at least one polygon.`);
+          return { nearerThan: threshold, polygons };
+        }) : null;
+
+        const tracePolygons = polygons => {
+          targetContext.beginPath?.();
+          polygons.forEach(polygon => {
+            const points = polygon.points;
+            targetContext.moveTo?.(points[0].x - originX, points[0].y - originY);
+            for (let index = 1; index < points.length; index += 1) {
+              targetContext.lineTo?.(points[index].x - originX, points[index].y - originY);
+            }
+            targetContext.closePath?.();
+          });
+        };
+
+        const puffIntersectsPolygonBounds = (puff, polygon) => (
+          puff.pageX + puff.radiusX >= polygon.bounds.left
+          && puff.pageX - puff.radiusX <= polygon.bounds.right
+          && puff.pageY + puff.radiusY >= polygon.bounds.top
+          && puff.pageY - puff.radiusY <= polygon.bounds.bottom
+        );
+
+        let rendered = 0;
         targetContext.save?.();
         if (viewport && typeof targetContext.rect === "function" && typeof targetContext.clip === "function") {
           targetContext.beginPath?.();
@@ -713,7 +818,20 @@ window.NCNWeatherDepartment = (() => {
           targetContext.clip();
         }
         for (const puff of puffs) {
-          if (!(puff.z < nearerThan) || !puffIntersectsViewport(puff, viewport)) continue;
+          if (!puffIntersectsViewport(puff, viewport)) continue;
+          let qualifyingPolygons = null;
+          if (regions) {
+            qualifyingPolygons = regions
+              .filter(region => puff.z < region.nearerThan)
+              .flatMap(region => region.polygons.filter(polygon => puffIntersectsPolygonBounds(puff, polygon)));
+            if (!qualifyingPolygons.length) continue;
+          } else if (!(puff.z < nearerThan)) continue;
+
+          targetContext.save?.();
+          if (qualifyingPolygons?.length && typeof targetContext.clip === "function") {
+            tracePolygons(qualifyingPolygons);
+            targetContext.clip();
+          }
           drawMistPuff(
             targetContext,
             puff,
@@ -721,6 +839,7 @@ window.NCNWeatherDepartment = (() => {
             puff.pageY - originY,
             shiftedClipRect(puff.chamberClip, originX, originY)
           );
+          targetContext.restore?.();
           rendered += 1;
         }
         if (options.includeAttenuation !== false) {
@@ -804,7 +923,7 @@ window.NCNWeatherDepartment = (() => {
 
     function render(intensity, scene, settings, runtimeFrame) {
       const puffs = buildMistPuffs(settings, scene);
-      publishDepthFrame(runtimeFrame, scene, puffs);
+      const depthFrame = publishDepthFrame(runtimeFrame, scene, puffs);
       clearCanvases();
       puffs.forEach(puff => {
         const layer = scene.rects.get(puff.layer);
@@ -825,6 +944,7 @@ window.NCNWeatherDepartment = (() => {
         if (scene.reading) cutout(targetContext, scene.reading.rect, scene.reading.attenuation, layer);
         scene.controls.forEach(zone => cutout(targetContext, zone.rect, zone.attenuation, layer));
       });
+      notifyAfterRender(runtimeFrame, depthFrame);
     }
 
     function effectDefinition(name) {
@@ -945,7 +1065,8 @@ window.NCNWeatherDepartment = (() => {
     }
 
     function clearDisabledState(reason = "weather-disabled") {
-      invalidateDepthFrame();
+      invalidateDepthFrame(reason);
+      clearAfterRenderSubscriptions(reason);
       state.preset = "clear";
       state.targetPreset = "clear";
       state.config = clonePreset(PRESETS.clear);
@@ -1071,7 +1192,8 @@ window.NCNWeatherDepartment = (() => {
     function suspend() {
       if (!state.initialised || state.destroyed || state.suspended) return false;
       state.suspended = true;
-      invalidateDepthFrame();
+      invalidateDepthFrame("weather-suspended");
+      clearAfterRenderSubscriptions("weather-suspended");
       runtimeHandle?.suspend?.();
       clearCanvases();
       setCanvasVisibility(false);
@@ -1081,7 +1203,7 @@ window.NCNWeatherDepartment = (() => {
     function resume() {
       if (!state.initialised || state.destroyed || !state.suspended) return false;
       state.suspended = false;
-      invalidateDepthFrame();
+      invalidateDepthFrame("weather-resumed");
       resumeGuard = true;
       if (state.enabled) {
         setCanvasVisibility(true);
@@ -1094,7 +1216,8 @@ window.NCNWeatherDepartment = (() => {
 
     function reset() {
       if (state.destroyed) return false;
-      invalidateDepthFrame();
+      invalidateDepthFrame("weather-reset");
+      clearAfterRenderSubscriptions("weather-reset");
       state.enabled = false;
       state.suspended = false;
       state.transitionAttenuation = 1;
@@ -1116,6 +1239,7 @@ window.NCNWeatherDepartment = (() => {
       contexts.clear();
       layerRects.clear();
       particles = { mist: [], dust: [], rain: [] };
+      clearAfterRenderSubscriptions(reason);
       effects = null;
       state.initialised = false;
       state.destroyed = true;
@@ -1179,7 +1303,9 @@ window.NCNWeatherDepartment = (() => {
             token: currentDepthFrame?.token || null,
             runtimeToken: currentDepthFrame?.runtimeToken ?? null,
             puffCount: currentDepthFrame?.puffCount || 0,
-            convention: DEPTH_CONVENTION
+            convention: DEPTH_CONVENTION,
+            afterRenderSubscribers: afterRenderSubscriptions.size,
+            afterRenderGeneration
           })
         }),
         lastDelta: state.lastDelta,
@@ -1207,6 +1333,13 @@ window.NCNWeatherDepartment = (() => {
       setQuality,
       setSeed,
       getDepthFrame,
+      subscribeAfterRender,
+      afterRenderContract: Object.freeze({
+        timing: "synchronous-after-completed-weather-canvas-render",
+        payload: "immutable-current-depth-frame",
+        staleHandles: "invalid-after-disable-suspend-reset-destroy",
+        subscriberLifecycle: "cleared-on-disable-suspend-reset-destroy"
+      }),
       requestAtmosphericEffect: requestEffect
     });
   }
