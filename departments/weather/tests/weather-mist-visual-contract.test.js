@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 
 const source = fs.readFileSync(path.resolve(__dirname, '..', 'weather-module.js'), 'utf8');
 const presets = fs.readFileSync(path.resolve(__dirname, '..', 'weather-presets.js'), 'utf8');
+const environment = fs.readFileSync(path.resolve(__dirname, '..', '..', '..', 'js', 'environment-manager.js'), 'utf8');
 
 for (const token of [
   'density: 0.62',
@@ -76,6 +77,19 @@ for (const rejected of [
   assert.equal(source.includes(rejected), false, `Unapproved mist extra, white body or reconstruction remains: ${rejected}`);
 }
 
+const ordinaryMistMatch = presets.match(/\n    mist: preset\(\{([\s\S]*?)\n    \}\),\n    "heavy-mist": preset\(\{/);
+assert.ok(ordinaryMistMatch, 'Ordinary mist preset block is unavailable.');
+const ordinaryMist = ordinaryMistMatch[1];
+for (const token of [
+  'mist: 0.54',
+  'verticalFill: 0.04',
+  'bankScale: 1.52',
+  'bankMultiplier: 1'
+]) {
+  assert.ok(ordinaryMist.includes(token), `Broad-bank ordinary mist contract is missing: ${token}`);
+}
+assert.equal(ordinaryMist.includes('bankMultiplier: 1.58'), false, 'Ordinary mist must not restore density by multiplying small banks.');
+
 for (const token of [
   'smoke: 0',
   'smoke: preset({',
@@ -93,4 +107,17 @@ for (const hazeValue of ['haze: 0.12', 'haze: 0.23', 'haze: 0.48', 'haze: 0.17',
   assert.equal(presets.includes(hazeValue), false, `Weather preset still requests unapproved haze: ${hazeValue}`);
 }
 
-console.log('Ordinary floor mist remains stable while heavy mist adds deterministic chamber volume without haze or fixed slices.');
+const redwireWeatherMatch = environment.match(/weather: Object\.freeze\(\{([\s\S]*?)\n      \}\),\n      effects:/);
+assert.ok(redwireWeatherMatch, 'RedWire Weather profile is unavailable.');
+const redwireWeather = redwireWeatherMatch[1];
+for (const token of [
+  'preset: "mist"',
+  'intensity: 0.46',
+  'mist: 0.46',
+  'readingAttenuation: 0.48',
+  'controlAttenuation: 0.68'
+]) {
+  assert.ok(redwireWeather.includes(token), `RedWire broad-bank profile is missing: ${token}`);
+}
+
+console.log('Ordinary floor mist uses broad overlapping banks and remains visible at reading surfaces without haze, veils or fixed slices.');
