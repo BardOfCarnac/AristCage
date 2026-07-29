@@ -25,12 +25,12 @@ preset restores the broad-bank presentation of the accepted chamber prototype by
 
 - vertical fill `0.04`
 - bank scale `1.52`
-- bank multiplier `1.0`
+- bank multiplier `1.58`
 
 Against the renderer's deterministic base ranges this produces an effective ordinary
 footprint of approximately `0.94–2.40` chamber units wide and `0.58–1.75` deep. The
-field therefore gains continuity through overlapping broad banks rather than through a
-larger population of small isolated puffs.
+accepted ordinary bank population is retained, but its puffs overlap into broad local
+banks rather than reading as separated patches.
 
 The host's four weather layers divide the original far pass into `far` and `rear`, while
 preserving the original middle and near boundaries.
