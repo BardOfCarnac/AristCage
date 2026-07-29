@@ -5,9 +5,12 @@ on:
     paths:
       - "index.html"
       - "departments/weather/weather-manifest.js"
+      - "departments/weather/weather-presets.js"
       - "departments/weather/weather-module.js"
       - "departments/weather/README.md"
+      - "js/environment-manager.js"
       - "js/chamber-motion-presentation.js"
+      - "tests/environment-profile-contract.test.js"
       - "tests/weather-after-render-contract.test.js"
       - "tests/chamber-motion-presentation.test.js"
       - "tests/chamber-motion-presentation-transaction.test.js"

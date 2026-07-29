@@ -76,6 +76,18 @@ for (const rejected of [
   assert.equal(source.includes(rejected), false, `Unapproved mist extra, white body or reconstruction remains: ${rejected}`);
 }
 
+const ordinaryMistMatch = presets.match(/\n    mist: preset\(\{([\s\S]*?)\n    \}\),\n    "heavy-mist": preset\(\{/);
+assert.ok(ordinaryMistMatch, 'Ordinary mist preset block is unavailable.');
+const ordinaryMist = ordinaryMistMatch[1];
+for (const token of [
+  'mist: 0.54',
+  'verticalFill: 0.04',
+  'bankScale: 1.52',
+  'bankMultiplier: 1.58'
+]) {
+  assert.ok(ordinaryMist.includes(token), `Broad-bank ordinary mist contract is missing: ${token}`);
+}
+
 for (const token of [
   'smoke: 0',
   'smoke: preset({',
@@ -93,4 +105,4 @@ for (const hazeValue of ['haze: 0.12', 'haze: 0.23', 'haze: 0.48', 'haze: 0.17',
   assert.equal(presets.includes(hazeValue), false, `Weather preset still requests unapproved haze: ${hazeValue}`);
 }
 
-console.log('Ordinary floor mist remains stable while heavy mist adds deterministic chamber volume without haze or fixed slices.');
+console.log('Weather owns the broad overlapping ordinary-bank preset without host-profile assertions, haze, veils or fixed slices.');
