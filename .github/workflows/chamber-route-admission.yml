@@ -1,4 +1,4 @@
-name: Chamber Route Admission Proposal
+name: Chamber Route Geometry Proposal
 
 on:
   pull_request:
@@ -20,21 +20,34 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Check planner syntax
+      - name: Check evaluator syntax
         run: node --check departments/chamber-movement/route-admission-planner.js
-      - name: Run deterministic admission suite
+      - name: Run rigid geometry and conflict suite
         run: node departments/chamber-movement/tests/route-admission-planner.test.js
-      - name: Confirm proposal is not production-installed
+      - name: Enforce departmental ownership boundary
         run: |
           node <<'NODE'
           const fs = require('fs');
+          const api = require('./departments/chamber-movement/route-admission-planner.js');
           const html = fs.readFileSync('index.html', 'utf8');
           if (html.includes('route-admission-planner.js')) {
-            throw new Error('The review planner must not be installed into production by this PR.');
+            throw new Error('The review evaluator must not be installed into production by this PR.');
+          }
+          for (const forbidden of [
+            'createRouteAdmissionPlanner', 'enqueue', 'drain', 'reserve', 'release', 'clear'
+          ]) {
+            if (Object.prototype.hasOwnProperty.call(api, forbidden)) {
+              throw new Error(`Host-owned policy leaked into Chamber Movement API: ${forbidden}`);
+            }
+          }
+          for (const forbidden of ['centralBounds', 'maxCentralConcurrent', 'preferredWaitMs', 'delayStepMs']) {
+            if (Object.prototype.hasOwnProperty.call(api.DEFAULT_TOLERANCES || {}, forbidden)) {
+              throw new Error(`Host-owned configuration leaked into Chamber Movement defaults: ${forbidden}`);
+            }
           }
           const source = fs.readFileSync('departments/chamber-movement/route-admission-planner.js', 'utf8');
           for (const forbidden of ['requestAnimationFrame(', 'setInterval(', 'setTimeout(']) {
-            if (source.includes(forbidden)) throw new Error(`Planner owns forbidden recurring work: ${forbidden}`);
+            if (source.includes(forbidden)) throw new Error(`Evaluator owns forbidden recurring work: ${forbidden}`);
           }
-          console.log('Planner remains an uninstalled, loop-free integration proposal.');
+          console.log('Pure route geometry remains uninstalled, stateless and free of host traffic policy.');
           NODE
