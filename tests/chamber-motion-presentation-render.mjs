@@ -12,15 +12,19 @@ async function sample(page) {
     const service = window.NCNIntegration?.getService?.("chamber-motion") || null;
     const geometry = service?.getActiveGeometry?.() || [];
     const canvas = document.querySelector("canvas[data-ncn-chamber-motion-canvas='wall-matched']");
+    const foreground = document.querySelector("canvas[data-ncn-chamber-motion-canvas='foreground-mist']");
     const original = document.querySelector("canvas[data-ncn-chamber-motion-canvas='production']");
     let inkSamples = 0;
-    if (canvas && !canvas.hidden && canvas.width > 0 && canvas.height > 0) {
-      const context = canvas.getContext("2d", { willReadFrequently: true });
-      const pixels = context?.getImageData?.(0, 0, canvas.width, canvas.height)?.data || [];
+    let foregroundSamples = 0;
+    for (const [target, key] of [[canvas, "wall"], [foreground, "foreground"]]) {
+      if (!target || target.hidden || target.width <= 0 || target.height <= 0) continue;
+      const context = target.getContext("2d", { willReadFrequently: true });
+      const pixels = context?.getImageData?.(0, 0, target.width, target.height)?.data || [];
       const stride = 4 * 32;
-      for (let index = 3; index < pixels.length; index += stride) {
-        if (pixels[index] > 0) inkSamples += 1;
-      }
+      let samples = 0;
+      for (let index = 3; index < pixels.length; index += stride) if (pixels[index] > 0) samples += 1;
+      if (key === "wall") inkSamples = samples;
+      else foregroundSamples = samples;
     }
     return {
       presentation,
@@ -32,6 +36,11 @@ async function sample(page) {
         width: canvas.width,
         height: canvas.height,
         inkSamples
+      } : null,
+      foregroundCanvas: foreground ? {
+        connected: foreground.isConnected,
+        hidden: foreground.hidden,
+        foregroundSamples
       } : null,
       original: original ? {
         hidden: original.hidden,
@@ -46,14 +55,16 @@ async function runViewport(name, viewport) {
   const pageErrors = [];
   page.on("pageerror", error => pageErrors.push(String(error?.stack || error)));
 
-  await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await page.goto(`${baseUrl}?weatherTest=heavy`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.waitForFunction(() => (
     window.NCNIntegratedDepartments?.isReady?.() === true
     && window.NCNChamberPresentation?.snapshot?.().initialised === true
+    && window.NCNIntegration?.getService?.("weather")?.subscribeAfterRender
   ), null, { timeout: 30_000 });
 
   const before = await sample(page);
   assert.equal(before.presentation?.style, "layered-chamber-settled-optical", `${name}: restored presentation style must be active`);
+  assert.equal(before.presentation?.weatherSynchronized, true, `${name}: Weather composition must use the synchronous render contract`);
   assert.equal(before.presentation?.noPrivateAnimationLoop, true, `${name}: presentation must use shared runtime only`);
   assert.equal(before.original?.visibility, "hidden", `${name}: old bright-edged renderer must be suppressed`);
 
@@ -74,9 +85,16 @@ async function runViewport(name, viewport) {
     && item.wallCanvas?.inkSamples > 0
   ));
   const phases = new Set(samples.flatMap(item => item.phases));
-  const occluded = samples.filter(item => (
-    Number(item.presentation?.occlusionPasses || 0) > 0
-    && Number(item.presentation?.maskedCanvasCount || 0) >= 3
+  const synchronized = samples.filter(item => (
+    Number(item.presentation?.weatherFrameCount || 0) > 0
+    && Number(item.presentation?.occlusionPasses || 0) > 0
+    && Number(item.presentation?.maskedCanvasCount || 0) === 1
+    && item.presentation?.occlusionMode === "native-rear-exact-near-depth"
+  ));
+  const foreground = samples.filter(item => (
+    Number(item.presentation?.foregroundPuffPasses || 0) > 0
+    && Number(item.presentation?.foregroundPuffCount || 0) > 0
+    && item.foregroundCanvas?.hidden === false
   ));
 
   const diagnostics = {
@@ -84,7 +102,8 @@ async function runViewport(name, viewport) {
     viewport,
     before,
     renderedSamples: rendered.length,
-    occlusionSamples: occluded.length,
+    synchronizedSamples: synchronized.length,
+    foregroundSamples: foreground.length,
     phases: [...phases],
     final: samples.at(-1),
     pageErrors,
@@ -98,7 +117,8 @@ async function runViewport(name, viewport) {
     phases.has("travelling-out") || phases.has("turning") || phases.has("travelling-in"),
     `${name}: restored presentation must follow movement beyond extraction`
   );
-  assert.ok(occluded.length >= 4, `${name}: Weather behind the blocks must receive repeated occlusion passes`);
+  assert.ok(synchronized.length >= 4, `${name}: near Weather must be re-composed synchronously against moving solids`);
+  assert.ok(foreground.length >= 1, `${name}: exact-depth mist in front of a moving block must be visibly composed`);
   assert.equal(samples.some(item => item.original?.visibility !== "hidden"), false, `${name}: old renderer must remain suppressed`);
   assert.equal(pageErrors.length, 0, `${name}: page must have no uncaught errors`);
 
@@ -108,7 +128,7 @@ async function runViewport(name, viewport) {
   });
   await page.waitForFunction(() => {
     const state = window.NCNChamberPresentation?.snapshot?.();
-    return state && state.lastGeometryCount === 0 && state.canvasVisible === false;
+    return state && state.lastGeometryCount === 0 && state.canvasVisible === false && state.foregroundCanvasVisible === false;
   }, null, { timeout: 10_000 });
 
   await page.close();
@@ -117,7 +137,7 @@ async function runViewport(name, viewport) {
 try {
   await runViewport("desktop", { width: 1440, height: 900 });
   await runViewport("mobile", { width: 390, height: 844 });
-  console.log("PASS: restored wall-matched blocks and Weather occlusion render on desktop and mobile");
+  console.log("PASS: exact-depth Weather and wall-matched chamber blocks render on desktop and mobile");
 } finally {
   await browser.close();
 }
