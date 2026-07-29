@@ -1,7 +1,7 @@
 /* Data-only presets shared by the PR-86 weather publication.
    Haze remains a compatibility field but is intentionally zero in every profile.
    Mist and smoke use only the RedWire energy palette inside the approved bank renderer.
-   Ordinary mist favours broad overlapping banks over a larger count of small puffs. */
+   Ordinary mist favours broad overlapping banks over small isolated puffs. */
 window.NCNWeatherPresets = (() => {
   const preset = values => Object.freeze({
     mist: 0,
@@ -38,7 +38,7 @@ window.NCNWeatherPresets = (() => {
       depthFlow: -0.018,
       verticalFill: 0.04,
       bankScale: 1.52,
-      bankMultiplier: 1
+      bankMultiplier: 1.58
     }),
     "heavy-mist": preset({
       mist: 0.98,
