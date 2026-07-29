@@ -6,8 +6,10 @@ on:
       - "index.html"
       - "js/dripfeed-mechanics.js"
       - "js/dripfeed-surface-controller.js"
+      - "js/dripfeed-surface-contract-fix.js"
       - "css/dripfeed-surface-prep.css"
       - "tests/dripfeed-mechanics.test.js"
+      - "tests/dripfeed-mounted-contract.test.js"
       - "docs/DRIPFEED-SURFACE-HANDOFF.md"
       - ".github/workflows/dripfeed-surface-prep.yml"
   workflow_dispatch:
@@ -27,9 +29,13 @@ jobs:
         run: |
           node --check js/dripfeed-mechanics.js
           node --check js/dripfeed-surface-controller.js
+          node --check js/dripfeed-surface-contract-fix.js
           node --check tests/dripfeed-mechanics.test.js
+          node --check tests/dripfeed-mounted-contract.test.js
       - name: Run deterministic Dripfeed mechanics harness
         run: node tests/dripfeed-mechanics.test.js
+      - name: Run mounted Dripfeed publication contract
+        run: node tests/dripfeed-mounted-contract.test.js
       - name: Check load order
         run: |
           node <<'NODE'
@@ -39,11 +45,17 @@ jobs:
           const mechanics = html.indexOf('js/dripfeed-mechanics.js');
           const app = html.indexOf('js/dripfeed-app.js');
           const surface = html.indexOf('js/dripfeed-surface-controller.js');
+          const contract = html.indexOf('js/dripfeed-surface-contract-fix.js');
           const switcher = html.indexOf('js/application-switcher.js');
-          if (model < 0 || mechanics < model || app < mechanics || surface < app || switcher < surface) {
-            throw new Error('Dripfeed mechanics must load after the model; the surface controller must load after the app and before application switching.');
+          if (model < 0 || mechanics < model || app < mechanics || surface < app || contract < surface || switcher < contract) {
+            throw new Error('Dripfeed mechanics, surface publication and mounted contract correction must load in order before application switching.');
           }
-          for (const path of ['js/dripfeed-mechanics.js', 'js/dripfeed-surface-controller.js', 'css/dripfeed-surface-prep.css']) {
+          for (const path of [
+            'js/dripfeed-mechanics.js',
+            'js/dripfeed-surface-controller.js',
+            'js/dripfeed-surface-contract-fix.js',
+            'css/dripfeed-surface-prep.css'
+          ]) {
             if ((html.match(new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length !== 1) {
               throw new Error(`${path} must load exactly once.`);
             }
