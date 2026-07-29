@@ -163,10 +163,13 @@ handles and remove all owned canvases without altering the integration slot.
   replay, approved bank count/specification, exact immutable puff-depth frames, the
   absence of simulation mutation during external rendering, quality changes, Effects
   policy, suspension and cleanup.
-- `tests/weather-mist-visual-contract.test.js` protects the renderer constants, broad
-  ordinary-bank profile, RedWire reading attenuation, energy-palette colour policy and
-  exact puff-depth publication while rejecting fixed depth slices, white mist, the floor
-  veil, generic haze, front-energy line and sprite reconstructions.
+- `tests/weather-mist-visual-contract.test.js` protects Weather-owned renderer constants,
+  the broad ordinary-bank preset, energy-palette colour policy and exact puff-depth
+  publication while rejecting fixed depth slices, white mist, the floor veil, generic
+  haze, front-energy line and sprite reconstructions.
+- `tests/environment-profile-contract.test.js` is Integration-owned and protects the
+  RedWire intensity and attenuation profile, diagnostics reproduction and Dripfeed's
+  disabled-Weather policy through the public `NCNEnvironment.profile()` surface.
 - `tests/weather-pr86-host.test.js` performs the protected application round trip
   without replacing the incumbent slot.
 
