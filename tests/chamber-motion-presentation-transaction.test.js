@@ -6,8 +6,8 @@ const source = fs.readFileSync("js/chamber-motion-presentation.js", "utf8");
 
 class Context2D { setTransform(){} clearRect(){} save(){} restore(){} drawImage(){} beginPath(){} moveTo(){} lineTo(){} closePath(){} fill(){} stroke(){} clip(){} }
 class Element {
-  constructor(tag="div") { this.tagName=tag.toUpperCase(); this.style={}; this.dataset={}; this.children=[]; this.parentElement=null; this.isConnected=true; this.hidden=false; this.width=800; this.height=600; }
-  append(child){child.parentElement=this;child.isConnected=true;this.children.push(child);}
+  constructor(tag="div") { this.tagName=tag.toUpperCase(); this.style={}; this.dataset={}; this.children=[]; this.parentElement=null; this.isConnected=true; this.hidden=false; this.width=800; this.height=600; this.appendCount=0; this.failOnAppend=0; }
+  append(child){this.appendCount+=1;if(this.failOnAppend===this.appendCount)throw new Error("canvas append failure");child.parentElement=this;child.isConnected=true;this.children.push(child);}
   remove(){this.isConnected=false;if(this.parentElement)this.parentElement.children=this.parentElement.children.filter(item=>item!==this);}
   setAttribute(){}
   getBoundingClientRect(){return {left:0,top:0,width:800,height:600,right:800,bottom:600};}
@@ -17,6 +17,7 @@ class Canvas extends Element { constructor(context=true){super("canvas");this.co
 async function runFailure(stage) {
   const surface=new Element();
   const original=new Canvas(); original.dataset.ncnChamberMotionCanvas="production"; surface.append(original);
+  if(stage==="canvas-append-second")surface.failOnAppend=surface.appendCount+2;
   let createdCanvases=0;
   const document={
     documentElement:{dataset:{}},
@@ -54,6 +55,7 @@ async function runFailure(stage) {
   const tasks=new Set();
   const runtime={register(){
     if(stage==="runtime-register")throw new Error("runtime registration failure");
+    if(stage==="runtime-register-null")return null;
     const handle={wake(){},unregister(){tasks.delete(handle);},snapshot:()=>({})};tasks.add(handle);return handle;
   }};
   const windowListeners=new Map();
@@ -88,6 +90,6 @@ async function runFailure(stage) {
 }
 
 (async()=>{
-  for(const stage of ["canvas-context","runtime-register","weather-subscribe","window-listener"])await runFailure(stage);
+  for(const stage of ["canvas-context","canvas-append-second","runtime-register","runtime-register-null","weather-subscribe","window-listener"])await runFailure(stage);
   console.log("PASS: chamber presentation installation is transactional at every acquisition stage");
 })().catch(error=>{console.error(error);process.exitCode=1;});

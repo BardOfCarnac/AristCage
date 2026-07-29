@@ -66,7 +66,7 @@ Weather owns the public synchronization point:
 ```js
 const unsubscribe = weather.subscribeAfterRender(payload => {
   // payload.type === "render" after all Weather canvases are complete
-  // payload.type === "invalidate" before the current frame becomes stale
+  // payload.type === "invalidate" immediately after the current frame becomes inert
 });
 ```
 

@@ -630,13 +630,6 @@
     const nextForegroundDrawing = nextForeground.getContext("2d", { alpha: true });
     if (!nextWallDrawing || !nextForegroundDrawing) throw new Error("Canvas 2D context is unavailable for chamber presentation.");
 
-    nextSurface.append(nextWall);
-    nextSurface.append(nextForeground);
-    surface = nextSurface;
-    wallCanvas = nextWall;
-    foregroundCanvas = nextForeground;
-    wallDrawing = nextWallDrawing;
-    foregroundDrawing = nextForegroundDrawing;
     registerCleanup(transaction, () => {
       nextWall.remove?.();
       nextForeground.remove?.();
@@ -644,6 +637,13 @@
       if (foregroundCanvas === nextForeground) { foregroundCanvas = null; foregroundDrawing = null; }
       if (surface === nextSurface) surface = null;
     });
+    nextSurface.append(nextWall);
+    nextSurface.append(nextForeground);
+    surface = nextSurface;
+    wallCanvas = nextWall;
+    foregroundCanvas = nextForeground;
+    wallDrawing = nextWallDrawing;
+    foregroundDrawing = nextForegroundDrawing;
 
     if (!suppressOriginalCanvas()) throw new Error("The incumbent chamber-motion presentation canvas is unavailable.");
     registerCleanup(transaction, () => {
@@ -695,7 +695,12 @@
         enabled: true,
         wake: false
       });
-      registerCleanup(transaction, () => presentationTask?.unregister?.());
+      if (!presentationTask
+        || typeof presentationTask.wake !== "function"
+        || typeof presentationTask.unregister !== "function") {
+        throw new Error("Shared viewer runtime did not return a conforming chamber presentation task handle.");
+      }
+      registerCleanup(transaction, () => presentationTask.unregister());
 
       weatherUnsubscribe = weather.subscribeAfterRender(afterWeatherRender);
       if (typeof weatherUnsubscribe !== "function") throw new Error("Weather after-render subscription did not return a release function.");

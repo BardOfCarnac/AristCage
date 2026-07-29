@@ -50,7 +50,11 @@ vm.runInThisContext(fs.readFileSync("departments/weather/weather-module.js","utf
   const service=window.createNCNWeatherDepartment(context);
   await service.init();
   const events=[];
-  const unsubscribe=service.subscribeAfterRender(payload=>events.push(payload));
+  const invalidationObservations=[];
+  const unsubscribe=service.subscribeAfterRender(payload=>{
+    events.push(payload);
+    if(payload.type==="invalidate")invalidationObservations.push(service.getDepthFrame(payload.token));
+  });
   assert.equal(unsubscribe.active(),true);
   service.setPreset("mist");
   service.setIntensity(1);
@@ -63,6 +67,7 @@ vm.runInThisContext(fs.readFileSync("departments/weather/weather-module.js","utf
   assert.ok(rendered?.depthFrame,"listener receives the completed immutable depth frame");
   assert.equal(rendered.depthFrame,service.getDepthFrame(rendered.token));
   assert.equal(service.afterRenderContract.timing,"synchronous-after-completed-weather-canvas-render");
+  assert.equal(service.afterRenderContract.invalidation,"synchronous-immediately-after-current-depth-frame-inert");
   assert.ok(layers.near.children[0].context.operations.length>0,"callback follows real canvas work");
 
   const target=new Context2D("foreground");
@@ -79,6 +84,8 @@ vm.runInThisContext(fs.readFileSync("departments/weather/weather-module.js","utf
   service.suspend();
   const invalidation=events.find(event=>event.type==="invalidate"&&event.reason==="weather-suspended");
   assert.ok(invalidation,"suspension synchronously invalidates the published frame");
+  assert.strictEqual(invalidationObservations.at(-1),null,"invalidation is delivered immediately after the old handle becomes inert");
+  assert.equal(service.getDepthFrame(invalidation.token),null,"the invalidated token is no longer current");
   assert.equal(unsubscribe.active(),false,"Weather clears subscribers on suspension");
   assert.equal(rendered.depthFrame.renderForeground(new Context2D("stale"),{nearerThan:99}),0,"stale handles cannot render");
 

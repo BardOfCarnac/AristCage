@@ -22,7 +22,7 @@ Weather now publishes its own narrow synchronous contract:
 ```js
 const unsubscribe = weather.subscribeAfterRender(({ type, depthFrame, token }) => {
   // type is "render" after all four Weather canvases are complete,
-  // or "invalidate" before the current frame becomes stale.
+  // or "invalidate" immediately after the current frame becomes inert.
 });
 ```
 

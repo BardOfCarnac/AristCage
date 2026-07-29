@@ -1336,6 +1336,7 @@ window.NCNWeatherDepartment = (() => {
       subscribeAfterRender,
       afterRenderContract: Object.freeze({
         timing: "synchronous-after-completed-weather-canvas-render",
+        invalidation: "synchronous-immediately-after-current-depth-frame-inert",
         payload: "immutable-current-depth-frame",
         staleHandles: "invalid-after-disable-suspend-reset-destroy",
         subscriberLifecycle: "cleared-on-disable-suspend-reset-destroy"
