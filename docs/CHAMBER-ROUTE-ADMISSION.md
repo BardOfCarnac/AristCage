@@ -1,98 +1,87 @@
-# Chamber Route Admission Planner — integration review
+# Chamber route geometry evaluator — integration review
 
-## Scope
+## Status
 
-This publication proposes the admission logic needed before Chamber Movement gains curved transfers, same-wall sorting, inspection cycles or cross-chamber routes.
+This contribution is intentionally **not installed by the site**. It does not alter the accepted `block-rearrangement.js` publication, current movement choreography, Filter/Submit activity, Weather interaction or Dev controls.
 
-It is intentionally **not installed by the site** and does not alter the accepted `block-rearrangement.js` publication. Current production movement remains unchanged until the integration agent approves a migration.
+The first review accepted the staged direction but rejected the original combined planner because it mixed Chamber Movement geometry with Integration scheduling policy. This revision implements the requested ownership split and collision-safety corrections.
 
-The accepted movement module already performs useful spatial checks:
+## Ownership boundary
 
-- source and target cell neighbourhoods cannot overlap active reservations;
-- four straight route segments are compared by segment distance;
-- admission is serialized before a sequence captures wall cells.
+### Chamber Movement publishes
 
-Those checks are sufficient for the current side-wall-to-rear choreography. They do not describe a curved route over time, cannot queue a blocked movement, and treat two paths crossing five seconds apart as though they collided.
+`route-admission-planner.js` now provides only pure geometry and conflict functions:
 
-## Proposed responsibilities
+- validated cubic candidate-route geometry;
+- orthonormal rigid bases;
+- full orientation interpolation using quaternion slerp;
+- immutable pose samples;
+- conservative swept-volume candidates;
+- timed surface-lock geometry supplied by the caller;
+- pure conflict evaluation against supplied reservations.
 
-`route-admission-planner.js` adds a renderer-independent planning layer which:
+It does not retain reservations or mutate host state.
 
-1. receives one or more complete candidate routes;
-2. samples each rigid cluster orientation and position before movement begins;
-3. converts the samples into conservative swept AABBs;
-4. attaches absolute time windows to every swept volume;
-5. reserves source cells, route volume and destination cells atomically;
-6. briefly waits for the preferred corridor before considering alternatives;
-7. queues pending requests by priority and FIFO order;
-8. never pre-empts or mutates an admitted route.
+### Integration owns
 
-The planner creates no animation loop and does not know how a block is rendered.
+A future host traffic coordinator must own:
 
-## Why swept AABBs
+- the monotonic clock and absolute candidate start time;
+- priority/FIFO queueing;
+- preferred-wait versus alternative-route policy;
+- aesthetic central-concurrency limits;
+- chamber-owned central-volume snapshots;
+- delayed `trigger()` resolution;
+- application and profile cancellation;
+- reservation-token custody and stale-token behaviour;
+- geometry/profile refresh during viewport or quality changes.
 
-Each route sample converts the cluster's oriented dimensions into an axis-aligned world-space box:
+No queue, token store, central-volume constant or admission clock remains in the departmental publication.
+
+## Complete rigid orientation
+
+Supplied `u`, `v` and `n` axes are finite-validated and orthonormalised with stable right-handedness. Source and target bases are converted to quaternions and interpolated with shortest-path spherical linear interpolation.
+
+This means routes correctly include twist or roll when the source and target normals are equal but their `u/v` axes differ. There is no endpoint orientation snap.
+
+## Finite-input contract
+
+The evaluator rejects rather than coerces malformed geometry. The following must all be finite:
+
+- every route control-point component;
+- all basis components;
+- cluster width, height and depth;
+- start time, duration and calculated end time;
+- source/target progress values;
+- tolerances and safety margin;
+- surface-lock coordinates, padding and time windows;
+- every supplied reservation sweep bound and time.
+
+Degenerate bases, non-positive dimensions, inverted bounds and invalid lock ranges also fail explicitly.
+
+## Conservative swept-volume guarantee
+
+Each candidate route is a cubic Bézier centre path. Adaptive de Casteljau subdivision is driven by:
+
+- maximum control-hull deviation from the interval chord; and
+- maximum quaternion angular span.
+
+For every resulting interval, the evaluator uses the cubic subcurve's four-point control hull. A cubic Bézier curve lies entirely inside that hull. The hull is expanded on every world axis by:
 
 ```text
-extent.x = |u.x| halfWidth + |v.x| halfHeight + |n.x| halfDepth + margin
-extent.y = |u.y| halfWidth + |v.y| halfHeight + |n.y| halfDepth + margin
-extent.z = |u.z| halfWidth + |v.z| halfHeight + |n.z| halfDepth + margin
+0.5 × hypot(cluster width, cluster height, cluster depth) + safety margin
 ```
 
-This includes the larger footprint produced while a rectangular cluster rotates. Adjacent sample boxes and a midpoint box are unioned into one swept interval. Sampling density is selected from both:
+The half-diagonal is a bounding sphere for the complete rigid cluster at **every** possible orientation. Therefore the expanded control hull encloses the complete moving cluster throughout the interval, including between diagnostic samples.
 
-- maximum time between samples; and
-- maximum spatial travel relative to the cluster's smallest dimension.
+`maxSubdivisionDepth` affects tightness and diagnostic density only. Reaching it cannot invalidate the guarantee because the unsplit subcurve still lies within its own control hull and the full cluster still lies inside the added sphere.
 
-The method is deliberately conservative. A false rejection produces a short wait; a false acceptance could produce visible clipping.
+This is intentionally more conservative than a union of sampled oriented AABBs. It may reject a visually close route, but it does not depend on a fixed sampling cap to claim safety.
 
-## Space and time
-
-Two swept volumes conflict only when both are true:
-
-- their world-space boxes overlap; and
-- their absolute time intervals overlap.
-
-The same centre corridor can therefore be reused later without being treated as permanently blocked.
-
-Surface locks are also timed:
-
-- the source cells remain locked through extraction;
-- destination cells are acquired before arrival and retained through settlement.
-
-All locks are checked before any reservation is committed.
-
-## Readable central concurrency
-
-The default central chamber volume permits at most two concurrent route reservations. This is an aesthetic capacity limit rather than a geometric claim that only two clusters fit.
-
-Three sequences may still be active overall when one is extracting at a wall, one is crossing the chamber and one is settling. The planner simply prevents the central space becoming visually unreadable.
-
-## Candidate preference
-
-A request supplies candidate routes in preference order. Admission attempts are ordered as follows:
-
-1. preferred corridor immediately;
-2. preferred corridor after short delay steps;
-3. alternative corridors from the earliest available time;
-4. preferred corridor through the remaining allowed delay window;
-5. no-safe-route.
-
-This avoids bizarre emergency detours when a familiar route will become available a fraction of a second later.
-
-## API sketch
+## Pure API
 
 ```js
-const planner = NCNChamberRouteAdmission.createRouteAdmissionPlanner({
-  sampleIntervalMs: 120,
-  delayStepMs: 240,
-  preferredWaitMs: 720,
-  maxDelayMs: 3600,
-  safetyMargin: 0.12,
-  maxCentralConcurrent: 2
-});
-
-const upper = NCNChamberRouteAdmission.createBezierRoute({
+const route = NCNChamberRouteGeometry.createBezierRoute({
   id: "left-to-rear-upper",
   corridor: "upper-centre",
   points: [source, departureControl, arrivalControl, target],
@@ -101,63 +90,48 @@ const upper = NCNChamberRouteAdmission.createBezierRoute({
   cluster: { width, height, depth }
 });
 
-const result = planner.reserve({
+// Integration supplies the absolute host time and timing policy.
+const candidate = NCNChamberRouteGeometry.createRouteCandidate({
   id: "movement-request-42",
-  priority: 20,
-  earliestStart: performance.now(),
+  route,
+  startAt: hostClockNow,
   duration: 7200,
-  routes: [upper, rearAlternative],
   sourceRegion: "left-wall",
   targetRegion: "rear-wall",
   sourceLock: { region: "left-wall", minU, maxU, minV, maxV, paddingCells: 1 },
   targetLock: { region: "rear-wall", minU, maxU, minV, maxV, paddingCells: 1 }
 });
+
+const result = NCNChamberRouteGeometry.evaluateCandidate(
+  candidate,
+  integrationOwnedImmutableReservations
+);
 ```
 
-An accepted result includes immutable route poses and swept volumes suitable for a developer visualiser.
+The evaluator returns only a decision and conflict description. It does not reserve, queue, delay, release or pre-empt anything.
 
-## Queue policy
+## Validation added for this review
 
-`enqueue()` records a request without changing active reservations. `drain(now)` examines queued requests in:
+The deterministic suite covers:
 
-1. descending priority;
-2. original FIFO order for equal priority.
-
-A high-priority request never interrupts an admitted route. It only receives the first newly available safe slot.
+- equal-normal 90° `u/v` twist;
+- equal-normal 180° `u/v` twist;
+- continuous unit, orthogonal axes at every sample;
+- stable positive determinant/handedness;
+- no endpoint orientation snap;
+- orthonormalisation of skewed supplied axes;
+- NaN and Infinity rejection across routes, bases, dimensions, timing, locks and supplied reservations;
+- a highly curved route using a tiny cluster and rapid 180° rotation;
+- dense between-sample checks proving every real cluster corner remains within the published sweep;
+- simultaneous crossing rejection and later time-separated acceptance;
+- pure timed surface-lock conflicts;
+- absence of queue, reservation-store and central-capacity APIs.
 
 ## Recommended integration sequence
 
-### Stage 1 — Dev-only visualisation
-
-Load the planner only in diagnostics and draw:
-
-- route control curves;
-- sampled oriented boxes;
-- swept AABBs;
-- source and destination locks;
-- absolute time bands;
-- conflict reasons.
-
-Do not yet drive production blocks from it.
-
-### Stage 2 — Shadow admission
-
-For every existing side-to-rear request, generate an equivalent planner candidate while continuing to use the accepted movement module's own reservation decision. Compare decisions and log disagreement.
-
-### Stage 3 — Existing route authority
-
-Let the planner reserve the existing choreography, then pass the admitted start time and route token into Chamber Movement. Release the token on complete, settle, cancel or error.
-
-### Stage 4 — New route families
-
-Only after the existing route is stable under planner authority should curved transfer, sort, inspect and cross-chamber candidates be enabled.
-
-## Deliberately unresolved for integration review
-
-- Exact corridor control points for each viewport and chamber geometry.
-- Whether waiting reservations belong inside Chamber Movement or in the host activity coordinator.
-- How a delayed admission is surfaced through the current `trigger()` promise contract.
-- Whether route tokens should be owned by the departmental publication or a host-owned traffic service.
-- How the Dev panel should display future reservations without obscuring the chamber.
-
-These are integration decisions. The PR provides the collision, timing and queue mechanics without silently choosing an owner.
+1. Add an Integration-owned Dev visualiser using the immutable poses and sweeps.
+2. Generate shadow candidates for the accepted side-to-rear route.
+3. Record every disagreement between the accepted static admission decision and this evaluator.
+4. Define the host traffic coordinator and reservation-token lifecycle separately.
+5. Allow planner authority only after shadow agreement and desktop/mobile rendered review.
+6. Add curved, sort, inspect or cross-chamber route families only after the existing route is stable.
