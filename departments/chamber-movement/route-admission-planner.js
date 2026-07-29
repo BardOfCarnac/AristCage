@@ -1,205 +1,422 @@
 /*==================================================
-  NCN CHAMBER ROUTE ADMISSION PLANNER
+  NCN CHAMBER ROUTE GEOMETRY EVALUATOR
 
-  Standalone planning publication for review. It does not install itself and
-  does not alter the accepted chamber movement choreography.
+  Pure Chamber Movement publication for integration review. It does not install
+  itself, own a queue, read a clock, reserve host state, or alter choreography.
 
   Responsibilities:
-  - sample complete candidate routes before movement begins;
-  - reserve conservative swept volumes in both space and time;
-  - atomically reserve source cells, route corridor and destination cells;
-  - prefer a short wait on the requested corridor before trying alternatives;
-  - queue requests by priority without pre-empting active reservations.
+  - validate complete rigid route geometry;
+  - orthonormalise supplied bases and interpolate full orientation by quaternion slerp;
+  - build mathematically conservative swept-volume candidates;
+  - evaluate one immutable candidate against supplied immutable reservations.
 ==================================================*/
-(function attachRouteAdmissionPlanner(globalScope, factory) {
+(function attachRouteGeometryEvaluator(globalScope, factory) {
   const api = factory();
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  if (globalScope) {
-    globalScope.NCNChamberRouteAdmission = Object.freeze(api);
-  }
-})(typeof globalThis !== "undefined" ? globalThis : this, function routeAdmissionFactory() {
+  if (globalScope) globalScope.NCNChamberRouteGeometry = Object.freeze(api);
+})(typeof globalThis !== "undefined" ? globalThis : this, function routeGeometryFactory() {
   "use strict";
 
-  const VERSION = "0.1.0-review";
-  const EPSILON = 0.000001;
-  const DEFAULT_CONFIG = Object.freeze({
-    sampleIntervalMs: 120,
-    delayStepMs: 240,
-    preferredWaitMs: 720,
-    maxDelayMs: 3600,
+  const VERSION = "0.2.0-review";
+  const EPSILON = 1e-9;
+  const ROUTE_DATA = new WeakMap();
+  const DEFAULT_TOLERANCES = Object.freeze({
+    positionTolerance: 0.03,
+    angularToleranceRad: Math.PI / 24,
     safetyMargin: 0.12,
-    maxCentralConcurrent: 2,
-    centralBounds: Object.freeze({
-      min: Object.freeze([-1.15, -1.25, 3.25]),
-      max: Object.freeze([1.15, 1.25, 9.75])
-    })
+    maxSubdivisionDepth: 18
   });
 
-  const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, Number(value) || 0));
-  const mix = (a, b, amount) => a + (b - a) * amount;
+  function finiteNumber(value, label) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) throw new TypeError(`${label} must be finite.`);
+    return number;
+  }
+
+  function positiveFinite(value, label) {
+    const number = finiteNumber(value, label);
+    if (number <= 0) throw new RangeError(`${label} must be greater than zero.`);
+    return number;
+  }
+
+  function unitInterval(value, label) {
+    const number = finiteNumber(value, label);
+    if (number < 0 || number > 1) throw new RangeError(`${label} must be between 0 and 1.`);
+    return number;
+  }
+
+  function vector3(value, label) {
+    if (!Array.isArray(value) || value.length !== 3) throw new TypeError(`${label} must be a three-component vector.`);
+    return value.map((item, axis) => finiteNumber(item, `${label}[${axis}]`));
+  }
+
   const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
   const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-  const scale = (vector, amount) => [vector[0] * amount, vector[1] * amount, vector[2] * amount];
+  const scale = (v, amount) => [v[0] * amount, v[1] * amount, v[2] * amount];
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-  const length3 = vector => Math.sqrt(Math.max(0, dot(vector, vector)));
-  const normalize = vector => {
-    const magnitude = length3(vector);
-    return magnitude > EPSILON ? scale(vector, 1 / magnitude) : [0, 0, 0];
-  };
   const cross = (a, b) => [
     a[1] * b[2] - a[2] * b[1],
     a[2] * b[0] - a[0] * b[2],
     a[0] * b[1] - a[1] * b[0]
   ];
+  const length3 = v => Math.sqrt(dot(v, v));
+  const distance3 = (a, b) => length3(sub(a, b));
 
-  function freezeVector(value, fallback = [0, 0, 0]) {
-    const source = Array.isArray(value) && value.length === 3 ? value : fallback;
-    const vector = source.map(item => Number(item) || 0);
-    return Object.freeze(vector);
+  function normalizeStrict(value, label) {
+    const magnitude = length3(value);
+    if (!Number.isFinite(magnitude) || magnitude <= EPSILON) throw new RangeError(`${label} must be non-degenerate.`);
+    return scale(value, 1 / magnitude);
   }
 
-  function freezeBasis(value) {
-    const source = value || {};
-    const u = normalize(freezeVector(source.u, [1, 0, 0]));
-    const vCandidate = normalize(freezeVector(source.v, [0, 1, 0]));
-    const nCandidate = normalize(freezeVector(source.n, cross(u, vCandidate)));
-    const n = length3(nCandidate) > EPSILON ? nCandidate : [0, 0, 1];
-    const v = normalize(cross(n, u));
-    return Object.freeze({ u: Object.freeze(u), v: Object.freeze(v), n: Object.freeze(n) });
+  function freezeVector(value) {
+    return Object.freeze([...value]);
   }
 
-  function rotateAroundAxis(vector, axis, angle) {
-    const unitAxis = normalize(axis);
-    if (length3(unitAxis) < EPSILON || Math.abs(angle) < EPSILON) return [...vector];
-    const cosine = Math.cos(angle);
-    const sine = Math.sin(angle);
-    return add(
-      add(scale(vector, cosine), scale(cross(unitAxis, vector), sine)),
-      scale(unitAxis, dot(unitAxis, vector) * (1 - cosine))
-    );
-  }
-
-  function interpolateBasis(sourceInput, targetInput, progress) {
-    const source = freezeBasis(sourceInput);
-    const target = freezeBasis(targetInput);
-    const amount = clamp(progress, 0, 1);
-    const sourceNormal = normalize(source.n);
-    const targetNormal = normalize(target.n);
-    const cosine = clamp(dot(sourceNormal, targetNormal), -1, 1);
-    const angle = Math.acos(cosine);
-    let axis = cross(sourceNormal, targetNormal);
-    if (length3(axis) < EPSILON) {
-      axis = normalize(add(source.v, target.v));
-      if (length3(axis) < EPSILON) axis = [0, 1, 0];
+  function orthonormalizeBasis(value, label = "basis") {
+    if (!value || typeof value !== "object") throw new TypeError(`${label} is required.`);
+    const rawU = vector3(value.u, `${label}.u`);
+    const rawV = vector3(value.v, `${label}.v`);
+    const rawN = vector3(value.n, `${label}.n`);
+    const u = normalizeStrict(rawU, `${label}.u`);
+    let vResidual = sub(rawV, scale(u, dot(rawV, u)));
+    if (length3(vResidual) <= EPSILON) vResidual = cross(rawN, u);
+    let v = normalizeStrict(vResidual, `${label}.v orthogonal component`);
+    let n = normalizeStrict(cross(u, v), `${label} handed normal`);
+    if (dot(n, rawN) < 0) {
+      v = scale(v, -1);
+      n = scale(n, -1);
     }
-    if (amount >= 1 - EPSILON) return target;
-    const u = normalize(rotateAroundAxis(source.u, axis, angle * amount));
-    const n = normalize(rotateAroundAxis(source.n, axis, angle * amount));
-    const v = normalize(cross(n, u));
-    return Object.freeze({ u: Object.freeze(u), v: Object.freeze(v), n: Object.freeze(n) });
+    return Object.freeze({ u: freezeVector(u), v: freezeVector(v), n: freezeVector(n) });
+  }
+
+  function basisDeterminant(basis) {
+    return dot(basis.u, cross(basis.v, basis.n));
+  }
+
+  function normalizeQuaternion(value, label = "quaternion") {
+    const q = vector3(value.slice?.(0, 3), `${label}[xyz]`);
+    const w = finiteNumber(value?.[3], `${label}[3]`);
+    const all = [q[0], q[1], q[2], w];
+    const magnitude = Math.hypot(...all);
+    if (magnitude <= EPSILON) throw new RangeError(`${label} must be non-degenerate.`);
+    return all.map(component => component / magnitude);
+  }
+
+  function basisToQuaternion(input) {
+    const basis = orthonormalizeBasis(input);
+    const m00 = basis.u[0], m01 = basis.v[0], m02 = basis.n[0];
+    const m10 = basis.u[1], m11 = basis.v[1], m12 = basis.n[1];
+    const m20 = basis.u[2], m21 = basis.v[2], m22 = basis.n[2];
+    const trace = m00 + m11 + m22;
+    let x, y, z, w;
+    if (trace > 0) {
+      const s = Math.sqrt(trace + 1) * 2;
+      w = 0.25 * s;
+      x = (m21 - m12) / s;
+      y = (m02 - m20) / s;
+      z = (m10 - m01) / s;
+    } else if (m00 > m11 && m00 > m22) {
+      const s = Math.sqrt(1 + m00 - m11 - m22) * 2;
+      w = (m21 - m12) / s;
+      x = 0.25 * s;
+      y = (m01 + m10) / s;
+      z = (m02 + m20) / s;
+    } else if (m11 > m22) {
+      const s = Math.sqrt(1 + m11 - m00 - m22) * 2;
+      w = (m02 - m20) / s;
+      x = (m01 + m10) / s;
+      y = 0.25 * s;
+      z = (m12 + m21) / s;
+    } else {
+      const s = Math.sqrt(1 + m22 - m00 - m11) * 2;
+      w = (m10 - m01) / s;
+      x = (m02 + m20) / s;
+      y = (m12 + m21) / s;
+      z = 0.25 * s;
+    }
+    const q = normalizeQuaternion([x, y, z, w]);
+    if (q[3] < 0) return q.map(component => -component);
+    return q;
+  }
+
+  function quaternionToBasis(input) {
+    const [x, y, z, w] = normalizeQuaternion(input);
+    const xx = x * x, yy = y * y, zz = z * z;
+    const xy = x * y, xz = x * z, yz = y * z;
+    const wx = w * x, wy = w * y, wz = w * z;
+    const basis = {
+      u: [1 - 2 * (yy + zz), 2 * (xy + wz), 2 * (xz - wy)],
+      v: [2 * (xy - wz), 1 - 2 * (xx + zz), 2 * (yz + wx)],
+      n: [2 * (xz + wy), 2 * (yz - wx), 1 - 2 * (xx + yy)]
+    };
+    return orthonormalizeBasis(basis, "interpolated basis");
+  }
+
+  function quaternionDot(a, b) {
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+  }
+
+  function quaternionSlerp(sourceInput, targetInput, progress) {
+    const amount = unitInterval(progress, "orientation progress");
+    const source = normalizeQuaternion(sourceInput, "source quaternion");
+    let target = normalizeQuaternion(targetInput, "target quaternion");
+    let cosine = quaternionDot(source, target);
+    if (cosine < 0) {
+      target = target.map(component => -component);
+      cosine = -cosine;
+    }
+    if (cosine > 0.9995) {
+      return normalizeQuaternion(source.map((component, index) => component + (target[index] - component) * amount));
+    }
+    const angle = Math.acos(Math.max(-1, Math.min(1, cosine)));
+    const sine = Math.sin(angle);
+    const sourceWeight = Math.sin((1 - amount) * angle) / sine;
+    const targetWeight = Math.sin(amount * angle) / sine;
+    return normalizeQuaternion(source.map((component, index) => component * sourceWeight + target[index] * targetWeight));
+  }
+
+  function quaternionAngle(a, b) {
+    const cosine = Math.min(1, Math.abs(quaternionDot(normalizeQuaternion(a), normalizeQuaternion(b))));
+    return 2 * Math.acos(cosine);
   }
 
   function cubicPoint(points, progress) {
-    const t = clamp(progress, 0, 1);
+    const t = unitInterval(progress, "route progress");
     const inverse = 1 - t;
     const weights = [inverse ** 3, 3 * inverse ** 2 * t, 3 * inverse * t ** 2, t ** 3];
-    return [0, 1, 2].map(axis => (
-      points[0][axis] * weights[0]
-      + points[1][axis] * weights[1]
-      + points[2][axis] * weights[2]
-      + points[3][axis] * weights[3]
-    ));
+    return [0, 1, 2].map(axis => points.reduce((sum, point, index) => sum + point[axis] * weights[index], 0));
+  }
+
+  function midpoint(a, b) {
+    return scale(add(a, b), 0.5);
+  }
+
+  function splitCubic(points) {
+    const p01 = midpoint(points[0], points[1]);
+    const p12 = midpoint(points[1], points[2]);
+    const p23 = midpoint(points[2], points[3]);
+    const p012 = midpoint(p01, p12);
+    const p123 = midpoint(p12, p23);
+    const p0123 = midpoint(p012, p123);
+    return [
+      [points[0], p01, p012, p0123],
+      [p0123, p123, p23, points[3]]
+    ];
+  }
+
+  function pointLineDistance(point, start, end) {
+    const line = sub(end, start);
+    const lengthSquared = dot(line, line);
+    if (lengthSquared <= EPSILON) return distance3(point, start);
+    const t = Math.max(0, Math.min(1, dot(sub(point, start), line) / lengthSquared));
+    return distance3(point, add(start, scale(line, t)));
+  }
+
+  function routeFlatness(points) {
+    return Math.max(pointLineDistance(points[1], points[0], points[3]), pointLineDistance(points[2], points[0], points[3]));
   }
 
   function createBezierRoute(options = {}) {
-    const points = Array.from(options.points || []).map(point => freezeVector(point));
-    if (points.length !== 4) throw new TypeError("A cubic route requires exactly four control points.");
-    const sourceBasis = freezeBasis(options.sourceBasis);
-    const targetBasis = freezeBasis(options.targetBasis || sourceBasis);
+    const rawPoints = Array.from(options.points || []);
+    if (rawPoints.length !== 4) throw new TypeError("A cubic route requires exactly four finite control points.");
+    const points = rawPoints.map((point, index) => vector3(point, `points[${index}]`));
+    const sourceBasis = orthonormalizeBasis(options.sourceBasis, "sourceBasis");
+    const targetBasis = orthonormalizeBasis(options.targetBasis || sourceBasis, "targetBasis");
+    const sourceQuaternion = basisToQuaternion(sourceBasis);
+    const targetQuaternion = basisToQuaternion(targetBasis);
     const cluster = Object.freeze({
-      width: Math.max(EPSILON, Number(options.cluster?.width) || 0.5),
-      height: Math.max(EPSILON, Number(options.cluster?.height) || 0.5),
-      depth: Math.max(EPSILON, Number(options.cluster?.depth) || 0.5)
+      width: positiveFinite(options.cluster?.width, "cluster.width"),
+      height: positiveFinite(options.cluster?.height, "cluster.height"),
+      depth: positiveFinite(options.cluster?.depth, "cluster.depth")
     });
-    return Object.freeze({
-      id: String(options.id || options.corridor || "route"),
-      corridor: String(options.corridor || options.id || "unclassified"),
-      points: Object.freeze(points),
+    const id = String(options.id || options.corridor || "route").trim();
+    const corridor = String(options.corridor || options.id || "unclassified").trim();
+    if (!id || !corridor) throw new TypeError("Route id and corridor must be non-empty strings.");
+    const route = Object.freeze({
+      id,
+      corridor,
+      points: Object.freeze(points.map(freezeVector)),
       sourceBasis,
       targetBasis,
       cluster,
       sample(progress) {
-        const amount = clamp(progress, 0, 1);
+        const amount = unitInterval(progress, "route progress");
         return Object.freeze({
-          centre: Object.freeze(cubicPoint(points, amount)),
-          basis: interpolateBasis(sourceBasis, targetBasis, amount)
+          centre: freezeVector(cubicPoint(points, amount)),
+          basis: quaternionToBasis(quaternionSlerp(sourceQuaternion, targetQuaternion, amount))
         });
       }
     });
+    ROUTE_DATA.set(route, Object.freeze({ points, sourceQuaternion, targetQuaternion }));
+    return route;
   }
 
-  function normalizeConfig(value = {}) {
-    const central = value.centralBounds || DEFAULT_CONFIG.centralBounds;
-    return Object.freeze({
-      sampleIntervalMs: Math.max(30, Number(value.sampleIntervalMs ?? DEFAULT_CONFIG.sampleIntervalMs)),
-      delayStepMs: Math.max(20, Number(value.delayStepMs ?? DEFAULT_CONFIG.delayStepMs)),
-      preferredWaitMs: Math.max(0, Number(value.preferredWaitMs ?? DEFAULT_CONFIG.preferredWaitMs)),
-      maxDelayMs: Math.max(0, Number(value.maxDelayMs ?? DEFAULT_CONFIG.maxDelayMs)),
-      safetyMargin: Math.max(0, Number(value.safetyMargin ?? DEFAULT_CONFIG.safetyMargin)),
-      maxCentralConcurrent: Math.max(1, Math.round(value.maxCentralConcurrent ?? DEFAULT_CONFIG.maxCentralConcurrent)),
-      centralBounds: Object.freeze({
-        min: freezeVector(central.min, DEFAULT_CONFIG.centralBounds.min),
-        max: freezeVector(central.max, DEFAULT_CONFIG.centralBounds.max)
-      })
-    });
+  function normalizeTolerances(options = {}) {
+    const positionTolerance = positiveFinite(options.positionTolerance ?? DEFAULT_TOLERANCES.positionTolerance, "positionTolerance");
+    const angularToleranceRad = positiveFinite(options.angularToleranceRad ?? DEFAULT_TOLERANCES.angularToleranceRad, "angularToleranceRad");
+    const safetyMargin = finiteNumber(options.safetyMargin ?? DEFAULT_TOLERANCES.safetyMargin, "safetyMargin");
+    if (safetyMargin < 0) throw new RangeError("safetyMargin must not be negative.");
+    const maxSubdivisionDepth = finiteNumber(options.maxSubdivisionDepth ?? DEFAULT_TOLERANCES.maxSubdivisionDepth, "maxSubdivisionDepth");
+    if (!Number.isInteger(maxSubdivisionDepth) || maxSubdivisionDepth < 1 || maxSubdivisionDepth > 30) {
+      throw new RangeError("maxSubdivisionDepth must be an integer between 1 and 30.");
+    }
+    return Object.freeze({ positionTolerance, angularToleranceRad, safetyMargin, maxSubdivisionDepth });
   }
 
-  function axisAlignedBounds(centre, basis, cluster, safetyMargin) {
+  function actualBounds(centreInput, basisInput, cluster, safetyMargin = 0) {
+    const centre = vector3(centreInput, "centre");
+    const basis = orthonormalizeBasis(basisInput, "basis");
+    const margin = finiteNumber(safetyMargin, "safetyMargin");
+    if (margin < 0) throw new RangeError("safetyMargin must not be negative.");
     const half = [cluster.width * 0.5, cluster.height * 0.5, cluster.depth * 0.5];
     const axes = [basis.u, basis.v, basis.n];
-    const extent = [0, 1, 2].map(worldAxis => (
-      Math.abs(axes[0][worldAxis]) * half[0]
-      + Math.abs(axes[1][worldAxis]) * half[1]
-      + Math.abs(axes[2][worldAxis]) * half[2]
-      + safetyMargin
-    ));
+    const extent = [0, 1, 2].map(worldAxis => axes.reduce((sum, axis, localAxis) => sum + Math.abs(axis[worldAxis]) * half[localAxis], margin));
     return Object.freeze({
-      min: Object.freeze([centre[0] - extent[0], centre[1] - extent[1], centre[2] - extent[2]]),
-      max: Object.freeze([centre[0] + extent[0], centre[1] + extent[1], centre[2] + extent[2]])
+      min: freezeVector(centre.map((value, axis) => value - extent[axis])),
+      max: freezeVector(centre.map((value, axis) => value + extent[axis]))
     });
   }
 
-  function unionBounds(first, second) {
+  function hullBounds(points, expansion) {
+    const amount = finiteNumber(expansion, "sweep expansion");
+    const minima = [0, 1, 2].map(axis => Math.min(...points.map(point => point[axis])) - amount);
+    const maxima = [0, 1, 2].map(axis => Math.max(...points.map(point => point[axis])) + amount);
+    return Object.freeze({ min: freezeVector(minima), max: freezeVector(maxima) });
+  }
+
+  function normalizeCellLock(value, fallbackRegion, start, end, label) {
+    if (value == null) return null;
+    if (!value || typeof value !== "object") throw new TypeError(`${label} must be an object.`);
+    const region = String(value.region || fallbackRegion || "").trim();
+    if (!region) throw new TypeError(`${label}.region must be non-empty.`);
+    const u0 = finiteNumber(value.minU ?? value.u, `${label}.minU`);
+    const u1 = finiteNumber(value.maxU ?? value.u, `${label}.maxU`);
+    const v0 = finiteNumber(value.minV ?? value.v, `${label}.minV`);
+    const v1 = finiteNumber(value.maxV ?? value.v, `${label}.maxV`);
+    const padding = finiteNumber(value.paddingCells ?? 0, `${label}.paddingCells`);
+    if (padding < 0) throw new RangeError(`${label}.paddingCells must not be negative.`);
     return Object.freeze({
-      min: Object.freeze([0, 1, 2].map(axis => Math.min(first.min[axis], second.min[axis]))),
-      max: Object.freeze([0, 1, 2].map(axis => Math.max(first.max[axis], second.max[axis])))
+      region,
+      minU: Math.min(u0, u1) - padding,
+      maxU: Math.max(u0, u1) + padding,
+      minV: Math.min(v0, v1) - padding,
+      maxV: Math.max(v0, v1) + padding,
+      start: finiteNumber(start, `${label}.start`),
+      end: finiteNumber(end, `${label}.end`)
     });
   }
 
-  function boundsOverlap(first, second) {
-    return [0, 1, 2].every(axis => first.min[axis] <= second.max[axis] && second.min[axis] <= first.max[axis]);
+  function createAdaptiveSweeps(route, startAt, duration, tolerances) {
+    const data = ROUTE_DATA.get(route);
+    if (!data) throw new TypeError("Route must be created by createBezierRoute().");
+    const rotationRadius = 0.5 * Math.hypot(route.cluster.width, route.cluster.height, route.cluster.depth);
+    const expansion = rotationRadius + tolerances.safetyMargin;
+    const sweeps = [];
+
+    function subdivide(points, t0, t1, q0, q1, depth) {
+      const positionalDeviation = routeFlatness(points);
+      const angularSpan = quaternionAngle(q0, q1);
+      const terminal = (positionalDeviation <= tolerances.positionTolerance && angularSpan <= tolerances.angularToleranceRad)
+        || depth >= tolerances.maxSubdivisionDepth;
+      if (terminal) {
+        const midpointProgress = (t0 + t1) * 0.5;
+        sweeps.push(Object.freeze({
+          index: sweeps.length,
+          progressStart: t0,
+          progressEnd: t1,
+          start: startAt + duration * t0,
+          end: startAt + duration * t1,
+          centre: route.sample(midpointProgress).centre,
+          bounds: hullBounds(points, expansion),
+          positionalDeviation,
+          angularSpan,
+          guarantee: "cubic-convex-hull-plus-cluster-sphere"
+        }));
+        return;
+      }
+      const [left, right] = splitCubic(points);
+      const tm = (t0 + t1) * 0.5;
+      const qm = quaternionSlerp(q0, q1, 0.5);
+      subdivide(left, t0, tm, q0, qm, depth + 1);
+      subdivide(right, tm, t1, qm, q1, depth + 1);
+    }
+
+    subdivide(data.points, 0, 1, data.sourceQuaternion, data.targetQuaternion, 0);
+    const progressValues = [...new Set(sweeps.flatMap(sweep => [sweep.progressStart, sweep.progressEnd]))].sort((a, b) => a - b);
+    const poses = progressValues.map(progress => {
+      const pose = route.sample(progress);
+      return Object.freeze({
+        progress,
+        time: startAt + duration * progress,
+        centre: pose.centre,
+        basis: pose.basis,
+        bounds: actualBounds(pose.centre, pose.basis, route.cluster, tolerances.safetyMargin)
+      });
+    });
+    return Object.freeze({ poses: Object.freeze(poses), sweeps: Object.freeze(sweeps) });
+  }
+
+  function validateBounds(bounds, label) {
+    if (!bounds || typeof bounds !== "object") throw new TypeError(`${label} bounds are required.`);
+    const min = vector3(bounds.min, `${label}.min`);
+    const max = vector3(bounds.max, `${label}.max`);
+    for (let axis = 0; axis < 3; axis += 1) {
+      if (min[axis] > max[axis]) throw new RangeError(`${label} min must not exceed max.`);
+    }
+    return { min, max };
+  }
+
+  function createRouteCandidate(options = {}) {
+    const route = options.route;
+    if (!ROUTE_DATA.has(route)) throw new TypeError("Candidate route must be created by createBezierRoute().");
+    const startAt = finiteNumber(options.startAt, "startAt");
+    const duration = positiveFinite(options.duration, "duration");
+    const endAt = startAt + duration;
+    if (!Number.isFinite(endAt)) throw new RangeError("Route end time must be finite.");
+    const sourceReleaseProgress = unitInterval(options.sourceReleaseProgress ?? 0.22, "sourceReleaseProgress");
+    const targetAcquireProgress = unitInterval(options.targetAcquireProgress ?? 0.74, "targetAcquireProgress");
+    const tolerances = normalizeTolerances(options);
+    const sampled = createAdaptiveSweeps(route, startAt, duration, tolerances);
+    const sourceLock = normalizeCellLock(
+      options.sourceLock,
+      options.sourceRegion,
+      startAt,
+      startAt + duration * sourceReleaseProgress,
+      "sourceLock"
+    );
+    const targetLock = normalizeCellLock(
+      options.targetLock,
+      options.targetRegion,
+      startAt + duration * targetAcquireProgress,
+      endAt,
+      "targetLock"
+    );
+    const id = String(options.id || `${route.id}@${startAt}`).trim();
+    if (!id) throw new TypeError("Candidate id must be non-empty.");
+    return Object.freeze({
+      id,
+      routeId: route.id,
+      corridor: route.corridor,
+      startAt,
+      endAt,
+      duration,
+      sourceLock,
+      targetLock,
+      cluster: route.cluster,
+      poses: sampled.poses,
+      sweeps: sampled.sweeps,
+      tolerances,
+      metadata: Object.freeze({ ...(options.metadata || {}) }),
+      conservativeSweepGuarantee: "Every cubic centre path lies inside each subcurve control hull; every rigid orientation lies inside the cluster bounding sphere added to that hull."
+    });
   }
 
   function timeOverlap(first, second) {
     return first.start < second.end - EPSILON && second.start < first.end - EPSILON;
   }
 
-  function normalizeCellLock(value, fallbackRegion, start, end) {
-    if (!value) return null;
-    const minU = Math.min(Number(value.minU ?? value.u ?? 0), Number(value.maxU ?? value.u ?? 0));
-    const maxU = Math.max(Number(value.minU ?? value.u ?? 0), Number(value.maxU ?? value.u ?? 0));
-    const minV = Math.min(Number(value.minV ?? value.v ?? 0), Number(value.maxV ?? value.v ?? 0));
-    const maxV = Math.max(Number(value.minV ?? value.v ?? 0), Number(value.maxV ?? value.v ?? 0));
-    const padding = Math.max(0, Number(value.paddingCells) || 0);
-    return Object.freeze({
-      region: String(value.region || fallbackRegion || "unknown"),
-      minU: minU - padding,
-      maxU: maxU + padding,
-      minV: minV - padding,
-      maxV: maxV + padding,
-      start,
-      end
-    });
+  function boundsOverlap(first, second) {
+    return [0, 1, 2].every(axis => first.min[axis] <= second.max[axis] && second.min[axis] <= first.max[axis]);
   }
 
   function cellLocksOverlap(first, second) {
@@ -208,275 +425,76 @@
       && first.minV <= second.maxV && second.minV <= first.maxV;
   }
 
-  function estimateRouteLength(route, samples = 24) {
-    let total = 0;
-    let previous = route.sample(0).centre;
-    for (let index = 1; index <= samples; index += 1) {
-      const current = route.sample(index / samples).centre;
-      total += length3(sub(current, previous));
-      previous = current;
-    }
-    return total;
+  function validateLock(lock, label) {
+    if (lock == null) return;
+    if (!lock || typeof lock !== "object") throw new TypeError(`${label} must be an object.`);
+    if (!String(lock.region || "").trim()) throw new TypeError(`${label}.region must be non-empty.`);
+    for (const key of ["minU", "maxU", "minV", "maxV", "start", "end"]) finiteNumber(lock[key], `${label}.${key}`);
+    if (lock.minU > lock.maxU || lock.minV > lock.maxV || lock.start > lock.end) throw new RangeError(`${label} has inverted bounds or timing.`);
   }
 
-  function sampleRoute(route, startAt, duration, config) {
-    const timeSteps = Math.ceil(duration / config.sampleIntervalMs);
-    const smallestDimension = Math.min(route.cluster.width, route.cluster.height, route.cluster.depth);
-    const spatialStride = Math.max(0.04, smallestDimension * 0.45 + config.safetyMargin * 0.5);
-    const spatialSteps = Math.ceil(estimateRouteLength(route) / spatialStride);
-    const steps = Math.min(256, Math.max(2, timeSteps, spatialSteps));
-    const poses = [];
-    for (let index = 0; index <= steps; index += 1) {
-      const progress = index / steps;
-      const pose = route.sample(progress);
-      poses.push(Object.freeze({
-        progress,
-        time: startAt + duration * progress,
-        centre: pose.centre,
-        basis: pose.basis,
-        bounds: axisAlignedBounds(pose.centre, pose.basis, route.cluster, config.safetyMargin)
-      }));
-    }
-    const sweeps = [];
-    for (let index = 0; index < poses.length - 1; index += 1) {
-      const midpointProgress = (poses[index].progress + poses[index + 1].progress) * 0.5;
-      const midpointPose = route.sample(midpointProgress);
-      const midpointBounds = axisAlignedBounds(midpointPose.centre, midpointPose.basis, route.cluster, config.safetyMargin);
-      sweeps.push(Object.freeze({
-        index,
-        start: poses[index].time,
-        end: poses[index + 1].time,
-        bounds: unionBounds(unionBounds(poses[index].bounds, midpointBounds), poses[index + 1].bounds),
-        centre: Object.freeze(midpointPose.centre)
-      }));
-    }
-    return Object.freeze({ poses: Object.freeze(poses), sweeps: Object.freeze(sweeps) });
-  }
-
-  function centralSweep(sweep, config) {
-    return boundsOverlap(sweep.bounds, config.centralBounds);
-  }
-
-  function normalizeRequest(request = {}, serial = 0) {
-    const routes = Array.from(request.routes || request.candidates || []).map(route => {
-      if (route?.sample && route?.cluster) return route;
-      return createBezierRoute(route);
+  function validateCandidate(candidate, label = "candidate") {
+    if (!candidate || typeof candidate !== "object") throw new TypeError(`${label} must be an object.`);
+    finiteNumber(candidate.startAt, `${label}.startAt`);
+    finiteNumber(candidate.endAt, `${label}.endAt`);
+    positiveFinite(candidate.duration, `${label}.duration`);
+    if (candidate.endAt < candidate.startAt) throw new RangeError(`${label} timing is inverted.`);
+    validateLock(candidate.sourceLock, `${label}.sourceLock`);
+    validateLock(candidate.targetLock, `${label}.targetLock`);
+    if (!Array.isArray(candidate.sweeps) || candidate.sweeps.length === 0) throw new TypeError(`${label}.sweeps must be non-empty.`);
+    candidate.sweeps.forEach((sweep, index) => {
+      finiteNumber(sweep.start, `${label}.sweeps[${index}].start`);
+      finiteNumber(sweep.end, `${label}.sweeps[${index}].end`);
+      if (sweep.end < sweep.start) throw new RangeError(`${label}.sweeps[${index}] timing is inverted.`);
+      validateBounds(sweep.bounds, `${label}.sweeps[${index}].bounds`);
     });
-    if (!routes.length) throw new TypeError("A route request requires at least one candidate route.");
-    const duration = Math.max(250, Number(request.duration) || 7000);
-    return Object.freeze({
-      id: String(request.id || `route-request-${serial}`),
-      priority: Number(request.priority) || 0,
-      serial,
-      earliestStart: Number.isFinite(Number(request.earliestStart)) ? Number(request.earliestStart) : 0,
-      duration,
-      routes: Object.freeze(routes),
-      sourceRegion: String(request.sourceRegion || request.sourceLock?.region || "unknown"),
-      targetRegion: String(request.targetRegion || request.targetLock?.region || "unknown"),
-      sourceLock: request.sourceLock || null,
-      targetLock: request.targetLock || null,
-      sourceReleaseProgress: clamp(request.sourceReleaseProgress ?? 0.22, 0, 1),
-      targetAcquireProgress: clamp(request.targetAcquireProgress ?? 0.74, 0, 1),
-      maxDelayMs: request.maxDelayMs == null ? null : Math.max(0, Number(request.maxDelayMs) || 0),
-      preferredWaitMs: request.preferredWaitMs == null ? null : Math.max(0, Number(request.preferredWaitMs) || 0),
-      metadata: Object.freeze({ ...(request.metadata || {}) })
-    });
+    return candidate;
   }
 
-  function createRouteAdmissionPlanner(options = {}) {
-    const config = normalizeConfig(options);
-    const reservations = new Map();
-    const queue = new Map();
-    let requestSerial = 0;
-    let reservationSerial = 0;
-
-    function normalizeTiming(request, startAt) {
-      const endAt = startAt + request.duration;
-      const sourceEnd = startAt + request.duration * request.sourceReleaseProgress;
-      const targetStart = startAt + request.duration * request.targetAcquireProgress;
-      return Object.freeze({ startAt, endAt, sourceEnd, targetStart });
-    }
-
-    function buildCandidate(request, route, startAt) {
-      const timing = normalizeTiming(request, startAt);
-      const sampled = sampleRoute(route, timing.startAt, request.duration, config);
-      const sourceLock = normalizeCellLock(request.sourceLock, request.sourceRegion, timing.startAt, timing.sourceEnd);
-      const targetLock = normalizeCellLock(request.targetLock, request.targetRegion, timing.targetStart, timing.endAt);
-      return Object.freeze({
-        requestId: request.id,
-        routeId: route.id,
-        corridor: route.corridor,
-        priority: request.priority,
-        serial: request.serial,
-        startAt: timing.startAt,
-        endAt: timing.endAt,
-        duration: request.duration,
-        sourceLock,
-        targetLock,
-        poses: sampled.poses,
-        sweeps: sampled.sweeps,
-        metadata: request.metadata
-      });
-    }
-
-    function conflictReason(candidate) {
-      for (const active of reservations.values()) {
-        if (cellLocksOverlap(candidate.sourceLock, active.sourceLock)
-          || cellLocksOverlap(candidate.sourceLock, active.targetLock)
-          || cellLocksOverlap(candidate.targetLock, active.sourceLock)
-          || cellLocksOverlap(candidate.targetLock, active.targetLock)) {
-          return Object.freeze({ reason: "surface-lock", reservationId: active.id });
-        }
-
-        for (const first of candidate.sweeps) {
-          if (first.end <= active.startAt || first.start >= active.endAt) continue;
-          for (const second of active.sweeps) {
-            if (!timeOverlap(first, second)) continue;
-            if (boundsOverlap(first.bounds, second.bounds)) {
-              return Object.freeze({ reason: "swept-volume", reservationId: active.id, candidateSweep: first.index, activeSweep: second.index });
-            }
+  function evaluateConflict(candidateInput, reservationInputs = []) {
+    const candidate = validateCandidate(candidateInput, "candidate");
+    const reservations = Array.from(reservationInputs || []);
+    for (let reservationIndex = 0; reservationIndex < reservations.length; reservationIndex += 1) {
+      const active = validateCandidate(reservations[reservationIndex], `reservations[${reservationIndex}]`);
+      if (cellLocksOverlap(candidate.sourceLock, active.sourceLock)
+        || cellLocksOverlap(candidate.sourceLock, active.targetLock)
+        || cellLocksOverlap(candidate.targetLock, active.sourceLock)
+        || cellLocksOverlap(candidate.targetLock, active.targetLock)) {
+        return Object.freeze({ reason: "surface-lock", reservationId: active.id || null });
+      }
+      for (const first of candidate.sweeps) {
+        if (first.end <= active.startAt || first.start >= active.endAt) continue;
+        for (const second of active.sweeps) {
+          if (timeOverlap(first, second) && boundsOverlap(first.bounds, second.bounds)) {
+            return Object.freeze({
+              reason: "swept-volume",
+              reservationId: active.id || null,
+              candidateSweep: first.index,
+              activeSweep: second.index
+            });
           }
         }
       }
-
-      if (config.maxCentralConcurrent > 0) {
-        for (const sweep of candidate.sweeps) {
-          if (!centralSweep(sweep, config)) continue;
-          const simultaneous = new Set();
-          for (const active of reservations.values()) {
-            if (active.sweeps.some(other => timeOverlap(sweep, other) && centralSweep(other, config))) {
-              simultaneous.add(active.id);
-            }
-          }
-          if (simultaneous.size >= config.maxCentralConcurrent) {
-            return Object.freeze({ reason: "central-capacity", reservationIds: Object.freeze([...simultaneous]) });
-          }
-        }
-      }
-      return null;
     }
+    return null;
+  }
 
-    function attemptOrder(request, now) {
-      const earliest = Math.max(now, request.earliestStart);
-      const step = config.delayStepMs;
-      const preferredWait = request.preferredWaitMs ?? config.preferredWaitMs;
-      const maxDelay = request.maxDelayMs ?? config.maxDelayMs;
-      const preferred = request.routes[0];
-      const alternatives = request.routes.slice(1);
-      const attempts = [];
-
-      for (let delay = 0; delay <= Math.min(preferredWait, maxDelay) + EPSILON; delay += step) {
-        attempts.push({ route: preferred, startAt: earliest + delay });
-      }
-      for (let delay = 0; delay <= maxDelay + EPSILON; delay += step) {
-        for (const route of alternatives) attempts.push({ route, startAt: earliest + delay });
-      }
-      for (let delay = Math.max(step, preferredWait + step); delay <= maxDelay + EPSILON; delay += step) {
-        attempts.push({ route: preferred, startAt: earliest + delay });
-      }
-      return attempts;
-    }
-
-    function plan(input, now = 0) {
-      const request = input?.routes ? normalizeRequest(input, ++requestSerial) : input;
-      let lastConflict = null;
-      for (const attempt of attemptOrder(request, Number(now) || 0)) {
-        const candidate = buildCandidate(request, attempt.route, attempt.startAt);
-        const conflict = conflictReason(candidate);
-        if (!conflict) {
-          return Object.freeze({ accepted: true, request, candidate, delayedBy: candidate.startAt - Math.max(Number(now) || 0, request.earliestStart) });
-        }
-        lastConflict = conflict;
-      }
-      return Object.freeze({ accepted: false, request, reason: lastConflict?.reason || "no-safe-route", conflict: lastConflict });
-    }
-
-    function reserve(input, now = 0) {
-      const result = plan(input, now);
-      if (!result.accepted) return result;
-      const id = `route-reservation-${++reservationSerial}`;
-      const reservation = Object.freeze({ id, ...result.candidate });
-      // Atomic commit: no mutable partial reservations are exposed before every
-      // surface and swept-volume check has passed.
-      reservations.set(id, reservation);
-      return Object.freeze({ ...result, reservation });
-    }
-
-    function release(id) {
-      return reservations.delete(String(id));
-    }
-
-    function enqueue(input) {
-      const request = normalizeRequest(input, ++requestSerial);
-      queue.set(request.id, request);
-      return request.id;
-    }
-
-    function cancelQueued(id) {
-      return queue.delete(String(id));
-    }
-
-    function drain(now = 0) {
-      const ordered = [...queue.values()].sort((first, second) => (
-        second.priority - first.priority || first.serial - second.serial
-      ));
-      const admitted = [];
-      const waiting = [];
-      for (const request of ordered) {
-        const result = reserve(request, now);
-        if (result.accepted) {
-          queue.delete(request.id);
-          admitted.push(result.reservation);
-        } else {
-          waiting.push(Object.freeze({ requestId: request.id, reason: result.reason, conflict: result.conflict || null }));
-        }
-      }
-      return Object.freeze({ admitted: Object.freeze(admitted), waiting: Object.freeze(waiting) });
-    }
-
-    function inspect(id) {
-      return reservations.get(String(id)) || null;
-    }
-
-    function snapshot() {
-      return Object.freeze({
-        version: VERSION,
-        reservationCount: reservations.size,
-        queuedCount: queue.size,
-        reservations: Object.freeze([...reservations.values()]),
-        queue: Object.freeze([...queue.values()].sort((a, b) => b.priority - a.priority || a.serial - b.serial)),
-        config,
-        immutableActiveReservations: true,
-        atomicAdmission: true,
-        noPrivateAnimationLoop: true
-      });
-    }
-
-    function clear() {
-      const result = Object.freeze({ reservations: reservations.size, queued: queue.size });
-      reservations.clear();
-      queue.clear();
-      return result;
-    }
-
-    return Object.freeze({
-      version: VERSION,
-      plan,
-      reserve,
-      release,
-      enqueue,
-      cancelQueued,
-      drain,
-      inspect,
-      snapshot,
-      clear
-    });
+  function evaluateCandidate(candidate, reservations = []) {
+    const conflict = evaluateConflict(candidate, reservations);
+    return Object.freeze({ accepted: conflict == null, conflict, reason: conflict?.reason || null });
   }
 
   return Object.freeze({
     VERSION,
-    DEFAULT_CONFIG,
+    DEFAULT_TOLERANCES,
+    orthonormalizeBasis,
+    basisDeterminant,
+    basisToQuaternion,
+    quaternionToBasis,
+    quaternionSlerp,
     createBezierRoute,
-    createRouteAdmissionPlanner
+    createRouteCandidate,
+    evaluateConflict,
+    evaluateCandidate
   });
 });
