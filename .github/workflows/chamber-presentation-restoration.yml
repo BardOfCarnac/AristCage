@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -100,3 +100,156 @@ jobs:
           name: chamber-presentation-frame-bound
           path: artifacts/
           if-no-files-found: ignore
+
+  apply-review-correction:
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/synchronize-chamber-weather-depth'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/synchronize-chamber-weather-depth
+          fetch-depth: 0
+      - name: Apply accepted narrow correction
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_exact(path, old, new):
+              target = Path(path)
+              text = target.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one replacement, found {count}")
+              target.write_text(text.replace(old, new))
+
+          replace_exact(
+              "departments/weather/README.md",
+              '  // payload.type === "invalidate" before the current frame becomes stale',
+              '  // payload.type === "invalidate" immediately after the current frame becomes inert'
+          )
+          replace_exact(
+              "docs/CHAMBER-PRESENTATION-RESTORATION.md",
+              '  // or "invalidate" before the current frame becomes stale.',
+              '  // or "invalidate" immediately after the current frame becomes inert.'
+          )
+          replace_exact(
+              "departments/weather/weather-module.js",
+              '        timing: "synchronous-after-completed-weather-canvas-render",\n        payload: "immutable-current-depth-frame",',
+              '        timing: "synchronous-after-completed-weather-canvas-render",\n        invalidation: "synchronous-immediately-after-current-depth-frame-inert",\n        payload: "immutable-current-depth-frame",'
+          )
+          replace_exact(
+              "tests/weather-after-render-contract.test.js",
+              '  const events=[];\n  const unsubscribe=service.subscribeAfterRender(payload=>events.push(payload));',
+              '  const events=[];\n  const invalidationObservations=[];\n  const unsubscribe=service.subscribeAfterRender(payload=>{\n    events.push(payload);\n    if(payload.type==="invalidate")invalidationObservations.push(service.getDepthFrame(payload.token));\n  });'
+          )
+          replace_exact(
+              "tests/weather-after-render-contract.test.js",
+              '  assert.equal(service.afterRenderContract.timing,"synchronous-after-completed-weather-canvas-render");',
+              '  assert.equal(service.afterRenderContract.timing,"synchronous-after-completed-weather-canvas-render");\n  assert.equal(service.afterRenderContract.invalidation,"synchronous-immediately-after-current-depth-frame-inert");'
+          )
+          replace_exact(
+              "tests/weather-after-render-contract.test.js",
+              '  assert.ok(invalidation,"suspension synchronously invalidates the published frame");\n  assert.equal(unsubscribe.active(),false,"Weather clears subscribers on suspension");',
+              '  assert.ok(invalidation,"suspension synchronously invalidates the published frame");\n  assert.strictEqual(invalidationObservations.at(-1),null,"invalidation is delivered immediately after the old handle becomes inert");\n  assert.equal(service.getDepthFrame(invalidation.token),null,"the invalidated token is no longer current");\n  assert.equal(unsubscribe.active(),false,"Weather clears subscribers on suspension");'
+          )
+
+          replace_exact(
+              "js/chamber-motion-presentation.js",
+              '''    nextSurface.append(nextWall);
+              nextSurface.append(nextForeground);
+              surface = nextSurface;
+              wallCanvas = nextWall;
+              foregroundCanvas = nextForeground;
+              wallDrawing = nextWallDrawing;
+              foregroundDrawing = nextForegroundDrawing;
+              registerCleanup(transaction, () => {
+                nextWall.remove?.();
+                nextForeground.remove?.();
+                if (wallCanvas === nextWall) { wallCanvas = null; wallDrawing = null; }
+                if (foregroundCanvas === nextForeground) { foregroundCanvas = null; foregroundDrawing = null; }
+                if (surface === nextSurface) surface = null;
+              });''',
+              '''    registerCleanup(transaction, () => {
+                nextWall.remove?.();
+                nextForeground.remove?.();
+                if (wallCanvas === nextWall) { wallCanvas = null; wallDrawing = null; }
+                if (foregroundCanvas === nextForeground) { foregroundCanvas = null; foregroundDrawing = null; }
+                if (surface === nextSurface) surface = null;
+              });
+              nextSurface.append(nextWall);
+              nextSurface.append(nextForeground);
+              surface = nextSurface;
+              wallCanvas = nextWall;
+              foregroundCanvas = nextForeground;
+              wallDrawing = nextWallDrawing;
+              foregroundDrawing = nextForegroundDrawing;'''
+          )
+          replace_exact(
+              "js/chamber-motion-presentation.js",
+              '''      presentationTask = runtime.register("chamber-motion:wall-matched-presentation", presentationStep, {
+                group: "chamber",
+                priority: 29,
+                maxFps: 30,
+                enabled: true,
+                wake: false
+              });
+              registerCleanup(transaction, () => presentationTask?.unregister?.());''',
+              '''      presentationTask = runtime.register("chamber-motion:wall-matched-presentation", presentationStep, {
+                group: "chamber",
+                priority: 29,
+                maxFps: 30,
+                enabled: true,
+                wake: false
+              });
+              if (!presentationTask
+                || typeof presentationTask.wake !== "function"
+                || typeof presentationTask.unregister !== "function") {
+                throw new Error("Shared viewer runtime did not return a conforming chamber presentation task handle.");
+              }
+              registerCleanup(transaction, () => presentationTask.unregister());'''
+          )
+
+          replace_exact(
+              "tests/chamber-motion-presentation-transaction.test.js",
+              '  constructor(tag="div") { this.tagName=tag.toUpperCase(); this.style={}; this.dataset={}; this.children=[]; this.parentElement=null; this.isConnected=true; this.hidden=false; this.width=800; this.height=600; }\n  append(child){child.parentElement=this;child.isConnected=true;this.children.push(child);}',
+              '  constructor(tag="div") { this.tagName=tag.toUpperCase(); this.style={}; this.dataset={}; this.children=[]; this.parentElement=null; this.isConnected=true; this.hidden=false; this.width=800; this.height=600; this.appendCount=0; this.failOnAppend=0; }\n  append(child){this.appendCount+=1;if(this.failOnAppend===this.appendCount)throw new Error("canvas append failure");child.parentElement=this;child.isConnected=true;this.children.push(child);}'
+          )
+          replace_exact(
+              "tests/chamber-motion-presentation-transaction.test.js",
+              '  const original=new Canvas(); original.dataset.ncnChamberMotionCanvas="production"; surface.append(original);',
+              '  const original=new Canvas(); original.dataset.ncnChamberMotionCanvas="production"; surface.append(original);\n  if(stage==="canvas-append-second")surface.failOnAppend=surface.appendCount+2;'
+          )
+          replace_exact(
+              "tests/chamber-motion-presentation-transaction.test.js",
+              '  const runtime={register(){\n    if(stage==="runtime-register")throw new Error("runtime registration failure");\n    const handle={wake(){},unregister(){tasks.delete(handle);},snapshot:()=>({})};tasks.add(handle);return handle;\n  }};',
+              '  const runtime={register(){\n    if(stage==="runtime-register")throw new Error("runtime registration failure");\n    if(stage==="runtime-register-null")return null;\n    const handle={wake(){},unregister(){tasks.delete(handle);},snapshot:()=>({})};tasks.add(handle);return handle;\n  }};'
+          )
+          replace_exact(
+              "tests/chamber-motion-presentation-transaction.test.js",
+              '  for(const stage of ["canvas-context","runtime-register","weather-subscribe","window-listener"])await runFailure(stage);',
+              '  for(const stage of ["canvas-context","canvas-append-second","runtime-register","runtime-register-null","weather-subscribe","window-listener"])await runFailure(stage);'
+          )
+
+          workflow = Path(".github/workflows/chamber-presentation-restoration.yml")
+          text = workflow.read_text()
+          marker = "\n  apply-review-correction:"
+          if marker not in text:
+              raise SystemExit("temporary correction job marker missing")
+          text = text.split(marker, 1)[0].rstrip() + "\n"
+          text = text.replace("permissions:\n  contents: write", "permissions:\n  contents: read")
+          workflow.write_text(text)
+          PY
+
+          node --check departments/weather/weather-module.js
+          node --check js/chamber-motion-presentation.js
+          node --check tests/weather-after-render-contract.test.js
+          node --check tests/chamber-motion-presentation-transaction.test.js
+          node tests/weather-after-render-contract.test.js
+          node tests/chamber-motion-presentation-transaction.test.js
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/chamber-presentation-restoration.yml departments/weather/README.md departments/weather/weather-module.js docs/CHAMBER-PRESENTATION-RESTORATION.md js/chamber-motion-presentation.js tests/weather-after-render-contract.test.js tests/chamber-motion-presentation-transaction.test.js
+          git commit -m "Address final Integration contract and rollback review"
+          git push origin HEAD:agent/synchronize-chamber-weather-depth
