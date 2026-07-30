@@ -24,6 +24,7 @@ async function runViewport(browser, name, viewport) {
   const initial = await page.evaluate(() => {
     const state = window.NCNDripfeedChamber.snapshot();
     const root = document.querySelector('#dripfeed-root');
+    const rail = document.querySelector('.rail');
     const stage = root.querySelector('[data-depth-host]');
     const occluder = root.querySelector('#dripfeed-chamber-occluder');
     const filter = root.querySelector('.dripfeed-filter-rail');
@@ -36,12 +37,20 @@ async function runViewport(browser, name, viewport) {
     };
     return {
       state,
+      rail: rect(rail),
       stage: rect(stage),
       occluder: rect(occluder),
       filter: rect(filter),
       utility: rect(utility),
       live: rect(live),
       latent: rect(latent),
+      rootVariables: {
+        chamberTop: getComputedStyle(root).getPropertyValue('--drip-chamber-top'),
+        controlTop: getComputedStyle(root).getPropertyValue('--drip-chamber-control-top'),
+        filterHeight: getComputedStyle(root).getPropertyValue('--drip-chamber-filter-height'),
+        utilityTop: getComputedStyle(root).getPropertyValue('--drip-chamber-utility-top'),
+        utilityHeight: getComputedStyle(root).getPropertyValue('--drip-chamber-utility-height')
+      },
       stageStyle: {
         position: getComputedStyle(stage).position,
         overflowY: getComputedStyle(stage).overflowY,
@@ -55,13 +64,24 @@ async function runViewport(browser, name, viewport) {
       filterStyle: {
         position: getComputedStyle(filter).position,
         flexWrap: getComputedStyle(filter).flexWrap,
-        zIndex: getComputedStyle(filter).zIndex
+        zIndex: getComputedStyle(filter).zIndex,
+        paddingTop: getComputedStyle(filter).paddingTop,
+        paddingBottom: getComputedStyle(filter).paddingBottom
+      },
+      utilityStyle: {
+        position: getComputedStyle(utility).position,
+        paddingTop: getComputedStyle(utility).paddingTop,
+        paddingBottom: getComputedStyle(utility).paddingBottom
       },
       scroll: { top: stage.scrollTop, height: stage.scrollHeight, client: stage.clientHeight },
       tileCount: live.querySelectorAll('.listing-tile').length,
       rootBackground: getComputedStyle(root).backgroundColor
     };
   });
+
+  await page.screenshot({ path: path.join(artifactDir, `${name}-initial.png`), fullPage: false });
+  await fs.writeFile(path.join(artifactDir, `${name}-initial.json`), JSON.stringify({ initial, errors }, null, 2));
+  console.log(`${name} initial geometry: ${JSON.stringify({ rail: initial.rail, filter: initial.filter, utility: initial.utility, stage: initial.stage, variables: initial.rootVariables, geometry: initial.state.geometry })}`);
 
   const planes = initial.state.planes.reduce((map, plane) => ({ ...map, [plane.role]: plane.z }), {});
   assert(initial.state.integrated, `${name}: Dripfeed was not marked chamber-integrated.`);
