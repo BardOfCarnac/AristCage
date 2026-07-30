@@ -1,0 +1,124 @@
+/* Provider-neutral Dripfeed image picker. Source-specific obligations stay visible. */
+#dripfeed-root .image-network-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 7px;
+}
+
+#dripfeed-root .image-network-bar input,
+#dripfeed-root .image-network-bar select {
+  width: 100%;
+  border: 1px solid var(--line2);
+  background: #060505;
+  color: var(--text);
+  padding: 10px;
+  outline: 0;
+}
+
+#dripfeed-root .source-tab.active {
+  border-color: var(--orange);
+  color: #fff;
+  background: rgba(240, 68, 57, .12);
+  box-shadow: inset 0 0 0 1px rgba(240, 68, 57, .18);
+}
+
+#dripfeed-root .photo-result-meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px;
+}
+
+#dripfeed-root .photo-result-meta b {
+  color: var(--orange);
+  font-size: .5rem;
+  letter-spacing: .08em;
+}
+
+#dripfeed-root .photo-result-meta span {
+  min-width: 0;
+  padding: 0;
+  color: #cdb8b0;
+  font-size: .57rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#dripfeed-root .selected-image-copy {
+  min-width: 0;
+}
+
+#dripfeed-root .crop-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line2);
+}
+
+#dripfeed-root .crop-preview {
+  min-width: 0;
+  margin: 0;
+}
+
+#dripfeed-root .crop-preview div {
+  width: 100%;
+  border: 1px solid rgba(255, 145, 77, .25);
+  background-position: center;
+  background-size: cover;
+  filter: saturate(.8) brightness(.72);
+}
+
+#dripfeed-root .crop-preview figcaption {
+  margin-top: 3px;
+  color: #907771;
+  font-size: .5rem;
+  letter-spacing: .08em;
+  text-align: center;
+}
+
+#dripfeed-root .crop-square div,
+#dripfeed-root .crop-feature div {
+  aspect-ratio: 1;
+}
+
+#dripfeed-root .crop-wide div {
+  aspect-ratio: 2 / 1;
+}
+
+#dripfeed-root .crop-tall div {
+  aspect-ratio: 1 / 2;
+  max-height: 74px;
+}
+
+#dripfeed-root .photo-credit a,
+#dripfeed-root .reader-credit a,
+#dripfeed-root .selected-image-preview a {
+  color: inherit;
+  text-decoration-color: rgba(255, 145, 77, .55);
+  text-underline-offset: 2px;
+}
+
+#dripfeed-root .photo-credit a:focus-visible,
+#dripfeed-root .reader-credit a:focus-visible,
+#dripfeed-root .selected-image-preview a:focus-visible {
+  outline: 1px solid var(--orange);
+  outline-offset: 2px;
+}
+
+@media (max-width: 740px) {
+  #dripfeed-root .image-network-bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  #dripfeed-root .image-network-bar select {
+    grid-column: 1 / -1;
+  }
+
+  #dripfeed-root .crop-preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
