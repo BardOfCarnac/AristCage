@@ -16,11 +16,22 @@ const NCN_CONFIG = {
     travel: 58
   },
   dripfeed: {
-    // Set these to the deployed Supabase Edge Function URLs when the live
-    // Unsplash application is connected. Empty values keep the local demo
-    // image search available without exposing an API key in the browser.
+    // A single provider-neutral proxy can serve both routes by reading the
+    // `provider` query/body field. Empty values keep deterministic mock
+    // providers active without exposing any API key in the browser.
+    imageSearchEndpoint: "",
+    imageTrackEndpoint: "",
+
+    // Provider-specific endpoints override the shared endpoints when needed.
+    // Unsplash requires hotlinked URLs and a selection/download event.
     unsplashSearchEndpoint: "",
-    unsplashTrackEndpoint: ""
+    unsplashTrackEndpoint: "",
+
+    // Pexels uses its own API key and attribution/usage rules. It does not use
+    // the Unsplash download event; the track endpoint is reserved for a future
+    // provider-specific action if the backend ever needs one.
+    pexelsSearchEndpoint: "",
+    pexelsTrackEndpoint: ""
   }
 };
 
