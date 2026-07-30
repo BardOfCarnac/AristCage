@@ -1,0 +1,40 @@
+/*==================================================
+  DRIPFEED · CHAMBER CALIBRATION
+
+  Host-owned aperture sizing. This resolves the Dripfeed square cell from the
+  camera aperture while preserving Dripfeed's published column breakpoints.
+==================================================*/
+
+html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] {
+  --unit: calc(
+    (var(--drip-chamber-width) - (2 * var(--drip-wall-gutter)) - (2 * var(--gap))) / 3
+  );
+}
+
+html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .reader-overlay.open [data-reader-target] {
+  transform: translate3d(0, 0, 0) scale(var(--drip-reader-scale, 1));
+}
+
+@media (max-width: 430px) {
+  html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] {
+    --unit: calc(
+      (var(--drip-chamber-width) - (2 * var(--drip-wall-gutter)) - var(--gap)) / 2
+    );
+  }
+}
+
+@media (min-width: 720px) {
+  html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] {
+    --unit: calc(
+      (var(--drip-chamber-width) - (2 * var(--drip-wall-gutter)) - (3 * var(--gap))) / 4
+    );
+  }
+}
+
+@media (min-width: 1180px) {
+  html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] {
+    --unit: calc(
+      (var(--drip-chamber-width) - (2 * var(--drip-wall-gutter)) - (5 * var(--gap))) / 6
+    );
+  }
+}
