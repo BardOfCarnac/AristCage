@@ -70,6 +70,7 @@ async function runViewport(browser, name, viewport) {
       },
       utilityStyle: {
         position: getComputedStyle(utility).position,
+        zIndex: getComputedStyle(utility).zIndex,
         paddingTop: getComputedStyle(utility).paddingTop,
         paddingBottom: getComputedStyle(utility).paddingBottom
       },
@@ -90,10 +91,14 @@ async function runViewport(browser, name, viewport) {
   assert(planes.live < planes.latent, `${name}: latent wall is not behind live.`);
   assert(initial.stageStyle.position === 'fixed', `${name}: stage is not fixed to the chamber aperture.`);
   assert(['auto', 'scroll'].includes(initial.stageStyle.overflowY), `${name}: stage does not own native vertical scrolling.`);
+  assert(initial.stage.top >= initial.rail.bottom, `${name}: chamber aperture begins beneath the title rail.`);
   assert(initial.filterStyle.position === 'fixed', `${name}: filter rail is not foreground-fixed.`);
   assert(initial.filterStyle.flexWrap === 'nowrap', `${name}: filter rail wrapped.`);
-  assert(initial.filter.bottom <= initial.stage.top + 1, `${name}: filter rail is not above the chamber aperture.`);
-  assert(initial.utility.bottom <= initial.stage.top + 1, `${name}: utility rail is not above the chamber aperture.`);
+  assert(initial.filter.top >= initial.rail.bottom - 1, `${name}: filter rail is not immediately beneath the title.`);
+  assert(initial.utility.top >= initial.filter.bottom - 1, `${name}: utility controls do not follow the filter rail.`);
+  assert(Number(initial.filterStyle.zIndex) > Number(initial.occluderStyle.zIndex), `${name}: filter rail is not in front of the chamber lip.`);
+  assert(Number(initial.utilityStyle.zIndex) > Number(initial.occluderStyle.zIndex), `${name}: utility rail is not in front of the chamber lip.`);
+  assert(initial.utility.bottom > initial.stage.top, `${name}: controls are not floating over the upper aperture.`);
   assert(Math.abs(initial.stage.left - initial.occluder.left) < 1.5, `${name}: occluder left edge does not match stage.`);
   assert(Math.abs(initial.stage.top - initial.occluder.top) < 1.5, `${name}: occluder top edge does not match stage.`);
   assert(Math.abs(initial.stage.width - initial.occluder.width) < 1.5, `${name}: occluder width does not match stage.`);
