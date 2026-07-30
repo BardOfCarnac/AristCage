@@ -4,14 +4,15 @@ This integration mounts the accepted Dripfeed spatial publication into the produ
 
 ## Plane order
 
-The host derives the nearest usable chamber grid line from `NCNChamberCamera`. It selects the first grid-depth aperture that clears the fixed title and Dripfeed controls while retaining a usable reading area.
+The host derives the nearest usable chamber grid line from `NCNChamberCamera`. It selects the first grid-depth aperture that clears the fixed title rail and retains a usable reading area. The Dripfeed control rows are foreground overlays, so they do not force the wall deeper merely to reserve flat page space.
 
 The resulting order uses the chamber convention `smaller-positive-z-is-nearer`:
 
 1. Dripfeed reader plane;
-2. host-owned chamber grid occluder;
-3. Dripfeed live wall;
-4. Dripfeed latent wall.
+2. foreground Dripfeed controls;
+3. host-owned chamber grid occluder;
+4. Dripfeed live wall;
+5. Dripfeed latent wall.
 
 The live wall is only a small clearance behind the selected line. The latent wall is one shallow interval behind live. The stage fills the selected camera aperture rather than shrinking the Dripfeed layout into a distant board.
 
@@ -23,7 +24,9 @@ The host-owned `#dripfeed-chamber-occluder` exactly matches the camera-derived a
 
 ## Foreground controls
 
-The approved animated Dripfeed title remains in the terminal rail. The filter rail and utility rail are fixed beneath it and do not inherit wall scrolling or perspective. Category chips remain one non-wrapping horizontal row, with horizontal scrolling on narrow displays.
+The approved animated Dripfeed title remains in the terminal rail. The filter rail and compact utility rail are fixed directly beneath it and float over the upper part of the chamber aperture. They remain in front of the structural grid lip and do not inherit wall scrolling or perspective. Category chips stay in one non-wrapping horizontal row, with horizontal scrolling on narrow displays.
+
+This overlap is intentional: treating both control rows as empty chamber clearance pushed the tile wall to the fourteenth grid step on an ordinary desktop viewport. Floating them preserves the requested foreground-machine treatment and keeps the live wall close enough to read.
 
 ## Reader lifecycle
 
@@ -64,4 +67,4 @@ node tests/dripfeed-chamber-integration.test.js
 node tests/dripfeed-chamber-integration.mjs
 ```
 
-The deterministic test protects camera-derived plane order, shallow separation, fixed-aperture scrolling, tokenised reader state and complete scene cleanup. The Playwright proof runs desktop and mobile, checks actual rendered geometry, scrolls the wall through the aperture, opens and closes a reader, performs a RedWire round trip and records screenshots and metrics.
+The deterministic test protects title-cleared camera geometry, foreground control overlap, plane order, shallow separation, fixed-aperture scrolling, tokenised reader state and complete scene cleanup. The Playwright proof runs desktop and mobile, checks actual rendered geometry, scrolls the wall through the aperture, opens and closes a reader, performs a RedWire round trip and records screenshots and metrics.
