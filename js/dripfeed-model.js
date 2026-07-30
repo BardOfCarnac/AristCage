@@ -5,8 +5,12 @@
 
   DF.config = Object.assign({
     worldNow: '2045-07-14T21:17:00-07:00',
+    imageSearchEndpoint: terminalConfig.imageSearchEndpoint || '',
+    imageTrackEndpoint: terminalConfig.imageTrackEndpoint || '',
     unsplashSearchEndpoint: terminalConfig.unsplashSearchEndpoint || '',
     unsplashTrackEndpoint: terminalConfig.unsplashTrackEndpoint || '',
+    pexelsSearchEndpoint: terminalConfig.pexelsSearchEndpoint || '',
+    pexelsTrackEndpoint: terminalConfig.pexelsTrackEndpoint || '',
     terminalId: '08-441',
     appVersion: '0.8.1',
     storageKey: 'ncn-dripfeed-v08'
@@ -35,8 +39,80 @@
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient><pattern id="p" width="90" height="90" patternUnits="userSpaceOnUse"><path d="M0 90L90 0M-25 25L25-25M65 115L115 65" stroke="rgba(255,255,255,.12)" stroke-width="2"/></pattern></defs><rect width="100%" height="100%" fill="url(#g)"/><rect width="100%" height="100%" fill="url(#p)"/><text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" fill="white" opacity=".9" font-family="monospace" font-size="54">${label}</text></svg>`;
     return {
       provider: 'demo',
+      providerImageId: label.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
-      alt: label
+      alt: label,
+      width: 1200,
+      height: 800,
+      orientation: 'landscape',
+      urls: {
+        thumbnail: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
+        display: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
+        expanded: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+      },
+      credit: {
+        creatorName: 'Dripfeed demo image',
+        providerName: 'Dripfeed',
+        attributionRequired: false,
+        attributionRecommended: false
+      },
+      usage: {
+        hotlinkRequired: false,
+        selectionTrackingRequired: false,
+        localCopyAllowed: true
+      }
+    };
+  }
+
+  function normaliseStoryImage(raw) {
+    if (!raw) return null;
+    const provider = String(raw.provider || 'custom');
+    const urls = raw.urls || {};
+    const credit = raw.credit || {};
+    const photographer = raw.photographer || {};
+    const usage = raw.usage || {};
+    const displayUrl = raw.url || urls.display || urls.regular || urls.small || urls.expanded || urls.full || '';
+
+    return {
+      provider,
+      providerImageId: String(raw.providerImageId || raw.id || ''),
+      id: String(raw.id || raw.providerImageId || ''),
+      url: displayUrl,
+      alt: String(raw.alt || raw.altText || ''),
+      width: Number(raw.width || 0),
+      height: Number(raw.height || 0),
+      orientation: String(raw.orientation || ''),
+      colour: raw.colour || raw.color || '',
+      blurHash: raw.blurHash || raw.blur_hash || '',
+      urls: {
+        thumbnail: urls.thumbnail || urls.thumb || displayUrl,
+        display: urls.display || urls.small || displayUrl,
+        expanded: urls.expanded || urls.regular || urls.full || displayUrl
+      },
+      credit: {
+        creatorName: String(credit.creatorName || photographer.name || ''),
+        creatorUrl: credit.creatorUrl || photographer.url || '',
+        providerName: String(credit.providerName || (provider === 'unsplash' ? 'Unsplash' : provider === 'pexels' ? 'Pexels' : '')),
+        providerUrl: credit.providerUrl || raw.unsplashUrl || '',
+        providerPageUrl: credit.providerPageUrl || raw.photoUrl || '',
+        attributionRequired: Boolean(credit.attributionRequired || provider === 'unsplash'),
+        attributionRecommended: credit.attributionRecommended !== false && ['unsplash', 'pexels'].includes(provider)
+      },
+      usage: {
+        hotlinkRequired: Boolean(usage.hotlinkRequired || provider === 'unsplash'),
+        selectionTrackingRequired: Boolean(usage.selectionTrackingRequired || provider === 'unsplash'),
+        localCopyAllowed: usage.localCopyAllowed !== undefined ? Boolean(usage.localCopyAllowed) : provider !== 'unsplash',
+        selectionTrackingUrl: usage.selectionTrackingUrl || raw.downloadLocation || ''
+      },
+      photographer: {
+        name: String(photographer.name || credit.creatorName || ''),
+        url: photographer.url || credit.creatorUrl || ''
+      },
+      photoUrl: raw.photoUrl || credit.providerPageUrl || '',
+      unsplashUrl: raw.unsplashUrl || (provider === 'unsplash' ? credit.providerUrl || '' : ''),
+      downloadLocation: raw.downloadLocation || usage.selectionTrackingUrl || '',
+      selectedAt: raw.selectedAt || '',
+      crop: raw.crop || null
     };
   }
 
@@ -65,7 +141,7 @@
       createdAt: raw.createdAt || now,
       expiresAt: raw.expiresAt || new Date(new Date(now).getTime() + 3 * 86400000).toISOString(),
       publicationState: PUBLICATION_STATES.includes(raw.publicationState) ? raw.publicationState : 'live',
-      image: raw.image || null,
+      image: normaliseStoryImage(raw.image),
       custom: Boolean(raw.custom)
     };
   }
@@ -130,6 +206,7 @@
     PUBLICATION_STATES,
     seedPosts,
     normalisePost,
+    normaliseStoryImage,
     relativeTime,
     expiryLabel,
     effectiveState,
