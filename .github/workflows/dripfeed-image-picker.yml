@@ -7,15 +7,22 @@ on:
       - "js/config.js"
       - "js/dripfeed-model.js"
       - "js/dripfeed-image-providers.js"
+      - "js/dripfeed-image-picker-hardening.js"
       - "js/dripfeed-renderer.js"
       - "js/dripfeed-submit-controller.js"
       - "js/dripfeed-app.js"
       - "css/dripfeed-image-picker.css"
+      - "css/dripfeed-image-picker-hardening.css"
       - "tests/dripfeed-image-providers.test.js"
       - "tests/dripfeed-image-picker-contract.test.js"
+      - "tests/dripfeed-image-picker-hardening.test.js"
+      - "tests/dripfeed-image-picker.mjs"
       - "docs/dripfeed-image-provider-picker.md"
       - ".github/workflows/dripfeed-image-picker.yml"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   provider-contract:
@@ -30,12 +37,51 @@ jobs:
           node --check js/config.js
           node --check js/dripfeed-model.js
           node --check js/dripfeed-image-providers.js
+          node --check js/dripfeed-image-picker-hardening.js
           node --check js/dripfeed-renderer.js
           node --check js/dripfeed-submit-controller.js
           node --check js/dripfeed-app.js
           node --check tests/dripfeed-image-providers.test.js
           node --check tests/dripfeed-image-picker-contract.test.js
+          node --check tests/dripfeed-image-picker-hardening.test.js
+          node --check tests/dripfeed-image-picker.mjs
       - name: Verify provider registry
         run: node tests/dripfeed-image-providers.test.js
       - name: Verify picker integration boundary
         run: node tests/dripfeed-image-picker-contract.test.js
+      - name: Verify picker compliance and lifecycle hardening
+        run: node tests/dripfeed-image-picker-hardening.test.js
+
+  rendered-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1 > /tmp/ncn-picker-browser-install.log 2>&1
+          npx playwright install --with-deps chromium >> /tmp/ncn-picker-browser-install.log 2>&1
+      - name: Run desktop and mobile provider-picker proof
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/dripfeed-image-picker
+          python3 -m http.server 4173 > /tmp/ncn-picker-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          NCN_ARTIFACT_DIR=artifacts/dripfeed-image-picker node tests/dripfeed-image-picker.mjs
+      - name: Upload rendered proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dripfeed-image-picker
+          path: artifacts/dripfeed-image-picker
+          if-no-files-found: warn
