@@ -15,7 +15,8 @@ function near(actual, expected, tolerance = 0.025) {
 }
 
 async function runViewport(browser, name, viewport) {
-  const page = await browser.newPage({ viewportSize: viewport });
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
   page.on('console', message => {
@@ -102,6 +103,9 @@ async function runViewport(browser, name, viewport) {
     };
   });
 
+  assert(initial.viewport.width === viewport.width && initial.viewport.height === viewport.height,
+    `${name}: requested ${viewport.width}x${viewport.height} but rendered ${initial.viewport.width}x${initial.viewport.height}.`);
+
   const planes = initial.state.planes.reduce((map, plane) => ({ ...map, [plane.role]: plane }), {});
   assert(initial.state.integrated, `${name}: Dripfeed was not marked chamber-integrated.`);
   assert(initial.adapter.geometryOwner === OWNER, `${name}: public adapter did not publish Integration geometry ownership.`);
@@ -127,7 +131,7 @@ async function runViewport(browser, name, viewport) {
   assert(Number.isFinite(initial.unit) && initial.unit > 0, `${name}: chamber geometry did not publish a square cell unit.`);
   assert(initial.tileReadability.every(item => item.headlineInside && item.bodyInside && item.footerInside), `${name}: tile text escapes its card.`);
   if (viewport.width <= 430) {
-    assert(initial.columns === 2, `${name}: narrow Dripfeed board did not switch to two columns.`);
+    assert(initial.columns === 2, `${name}: narrow Dripfeed board did not switch to two columns (got ${initial.columns}).`);
     assert(initial.tileReadability.every(item => item.headlineBodyClear && item.bodyFooterClear && item.headlineFooterClear), `${name}: narrow-screen tile text regions collide.`);
   }
 
@@ -233,7 +237,7 @@ async function runViewport(browser, name, viewport) {
     JSON.stringify({ initial, scrollResult, reading, latentProof, redwire, returned, errors }, null, 2)
   );
   assert(errors.length === 0, `${name}: browser errors: ${errors.join(' | ')}`);
-  await page.close();
+  await context.close();
 }
 
 await fs.mkdir(artifactDir, { recursive: true });
