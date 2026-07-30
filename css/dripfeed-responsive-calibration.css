@@ -1,0 +1,73 @@
+/*==================================================
+  DRIPFEED · RESPONSIVE SURFACE CALIBRATION
+
+  Dripfeed-owned packing and text-budget corrections. The chamber host may place
+  this publication but does not change its square-cell packing or content fit.
+==================================================*/
+
+/* Compact one-row cells need a stricter local text budget at every viewport.
+   This keeps body copy clear of the footer without changing voice, shape or
+   membership. Taller tiles retain their published body budgets. */
+@container (max-height: 230px) {
+  #dripfeed-root .tile-square .tile-copy p,
+  #dripfeed-root .tile-wide .tile-copy p,
+  #dripfeed-root .tile-banner .tile-copy p,
+  #dripfeed-root .tile-square .photo-credit,
+  #dripfeed-root .tile-wide .photo-credit,
+  #dripfeed-root .tile-banner .photo-credit {
+    display: none;
+  }
+
+  #dripfeed-root .tile-square .tile-copy h2,
+  #dripfeed-root .tile-wide .tile-copy h2,
+  #dripfeed-root .tile-banner .tile-copy h2 {
+    -webkit-line-clamp: 3;
+  }
+
+  #dripfeed-root .tile-square .tile-content,
+  #dripfeed-root .tile-wide .tile-content,
+  #dripfeed-root .tile-banner .tile-content {
+    gap: 4px;
+    padding: clamp(8px, 3.8cqi, 12px);
+  }
+
+  #dripfeed-root .tile-square .tile-footer,
+  #dripfeed-root .tile-wide .tile-footer,
+  #dripfeed-root .tile-banner .tile-footer {
+    font-size: clamp(.46rem, 2.25cqi, .59rem);
+  }
+}
+
+@media (max-width: 430px) {
+  html[data-ncn-app="dripfeed"] #dripfeed-root {
+    --cols: 2 !important;
+  }
+
+  #dripfeed-root .listing-tile {
+    --headline-lines: 3;
+    --body-lines: 2;
+  }
+
+  #dripfeed-root .tile-square .tile-copy p,
+  #dripfeed-root .tile-wide .tile-copy p,
+  #dripfeed-root .tile-banner .tile-copy p {
+    display: none;
+  }
+
+  #dripfeed-root .tile-header,
+  #dripfeed-root .tile-footer {
+    font-size: clamp(.48rem, 2.55cqi, .62rem);
+  }
+
+  #dripfeed-root .listing-type,
+  #dripfeed-root .state-token {
+    min-height: 15px;
+    padding-inline: 4px;
+    font-size: clamp(.44rem, 2.15cqi, .55rem);
+  }
+
+  #dripfeed-root .tile-content {
+    padding: clamp(8px, 4.4cqi, 13px);
+    gap: 4px;
+  }
+}
