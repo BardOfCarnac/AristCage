@@ -1,70 +1,87 @@
 # Dripfeed chamber integration
 
-This integration mounts the accepted Dripfeed spatial publication into the production chamber without changing Dripfeed packing, tile geometry, typography, image treatment or membership.
+This integration mounts the accepted Dripfeed spatial publication into the production chamber without changing post membership, image treatment, font voices or tile-shape rules.
 
-## Plane order
+## Public ownership boundary
 
-The host derives the nearest usable chamber grid line from `NCNChamberCamera`. It selects the first complete grid-depth aperture that fits inside the viewport and retains a usable reading area. The title and Dripfeed control rows are foreground overlays, so they do not force the wall deeper merely to reserve flat page space.
+Integration does not access the private Dripfeed application instance. `NCNDripfeed` publishes the narrow host contract:
 
-The resulting order uses the chamber convention `smaller-positive-z-is-nearer`:
+- `getSpatialSurfaces()` for the depth host, live wall, latent wall, ready reading surface and controls;
+- `claimGeometryOwnership(owner)`;
+- `releaseGeometryOwnership(owner)`;
+- lifecycle and diagnostic snapshots.
 
-1. Dripfeed reader plane;
+The earlier `SharedDepthAdapter` now has an explicit external-owner handoff. While `integration:dripfeed-chamber` owns geometry, its camera listeners and `ResizeObserver` are disconnected and its snapshot reports `dormant: true`. Ownership is preclaimed during the empty application-switch phase, before Dripfeed activation can wake the interim adapter.
+
+## Rendered plane order
+
+The host derives the closest complete chamber aperture that fits inside the viewport from `NCNChamberCamera`. The chamber convention is `smaller-positive-z-is-nearer`:
+
+1. ready Dripfeed reading plane;
 2. foreground title and Dripfeed controls;
 3. host-owned chamber grid occluder;
 4. Dripfeed live wall;
 5. Dripfeed latent wall.
 
-The live wall is only a small clearance behind the selected line. The latent wall is one shallow interval behind live. The stage fills the selected camera aperture rather than shrinking the Dripfeed layout into a distant board.
+The live, latent and reading surfaces consume real camera-derived transforms. Their computed browser transforms are checked against the scales returned by `camera.apertureAt(z)`; the depth values are not diagnostic metadata alone.
 
-## Scrolling and occlusion
+## Aperture, initial clearance and scrolling
 
-`[data-depth-host]` becomes a fixed transparent aperture with native vertical scrolling. The live wall remains one coherent Dripfeed grid and establishes the scroll height. The latent wall shares that scroll space behind it.
+`[data-depth-host]` is a fixed transparent aperture with native vertical scrolling. The wall remains close to the nearest complete structural opening.
 
-The host-owned `#dripfeed-chamber-occluder` exactly matches the camera-derived aperture rectangle and sits above both walls. Stage clipping removes tiles once they cross the aperture boundary; the foreground grid line provides the visible structural edge. No page-level opacity fade substitutes for the occlusion.
+The foreground controls may overlap the upper aperture, but Integration publishes scrollable leading clearance inside the live and latent walls. Consequently, the first readable live tile begins beneath the control shell at the initial scroll position. Native scrolling then carries the wall through the fixed top and bottom chamber boundaries.
 
-## Foreground controls
+The host-owned `#dripfeed-chamber-occluder` matches the camera-derived aperture and sits above both walls. No page-sized backing panel or opacity fade substitutes for structural occlusion.
 
-The approved animated Dripfeed title remains in the terminal rail. The filter rail and compact utility rail are fixed directly beneath it and float over the upper part of the chamber aperture where the chosen aperture reaches that high. They remain in front of the structural grid lip and do not inherit wall scrolling or perspective. Category chips stay in one non-wrapping horizontal row, with horizontal scrolling on narrow displays.
+## Live and latent publication
 
-This overlap is intentional. Reserving the complete title-and-controls stack as empty chamber clearance pushed the desktop tile wall to the fourteenth grid step. Selecting the closest viewport-fitting aperture brings it forward to the nearest complete structural opening while preserving the foreground-machine treatment.
+Both Dripfeed walls remain coherent square-cell grids. The latent wall is visibly mounted rather than suppressed by the earlier header stylesheet. Opening a post and repacking gives the opened post a genuine latent membership; the proof asserts a non-zero latent tile count, rectangle and rendered transform behind live.
 
-## Reader lifecycle
+At the accepted proof sizes:
 
-Integration listens to the accepted tokenised events from the Dripfeed publication:
+- desktop `1440 × 900`: six columns, `210.71px` cells, `1323 × 567px` chamber aperture;
+- mobile `390 × 844`: two columns, `174px` cells, `364 × 436.8px` chamber aperture.
 
-- `dripfeed:open-transmission-start` prepares pending spatial state;
-- `dripfeed:open-transmission-ready` occupies the forward reading plane;
-- `dripfeed:open-transmission-cancelled` clears only the matching pending state;
+The narrow-screen two-column rule and reduced text budgets live in the Dripfeed-owned responsive calibration stylesheet, not in the host integration stylesheet.
+
+## Reader lifecycle and token safety
+
+Integration consumes the accepted tokenised events:
+
+- `dripfeed:open-transmission-start` records the current pending token;
+- `dripfeed:open-transmission-ready` occupies the forward reading plane only for that token;
+- `dripfeed:open-transmission-cancelled` clears state only when its token still matches the current pending opening;
 - `dripfeed:close-transmission` releases only the matching ready publication.
 
-The existing Dripfeed reader transition remains responsible for the visual tile-to-reader movement. Integration does not clone, rewrite or reposition individual tiles.
+A stale cancellation for opening A cannot set the state to idle after opening B has started. Dripfeed publication listeners are unbound while the application is inactive, and hidden-app events cannot mutate chamber state.
 
-## Scene registrations
+The existing Dripfeed reader transition remains responsible for the visual tile-to-reader movement. Integration does not clone or individually reposition tiles.
+
+## Scene registrations and cleanup
 
 While Dripfeed is active, Integration publishes read-only scene entries owned by `integration:dripfeed-chamber`:
 
 - `dripfeed:controls`;
+- `dripfeed:depth-host`;
 - `dripfeed:live`;
 - `dripfeed:latent`;
 - `dripfeed:reading`;
 - `dripfeed:occluder`.
 
-All registrations are released when leaving Dripfeed and renewed on return.
-
-## Runtime and cleanup
-
-Geometry updates use one sleeping `NCNViewerRuntime` task. Camera, application and Dripfeed publication events wake it for one frame; it returns to sleep immediately. There is no private animation loop, interval or transformed scroll simulation.
-
-RedWire switching hides the occluder, clears pending and ready reader ownership, suspends the task and unregisters every Dripfeed scene entry. The CSS is scoped to `html[data-ncn-app="dripfeed"]`, so RedWire layout and Optical behaviour are unchanged.
+Switching to RedWire hides the occluder, unbinds publication listeners, clears pending and ready tokens, releases geometry ownership, suspends the sleeping runtime task and unregisters every Dripfeed scene entry. Returning to Dripfeed renews the contract while Weather remains disabled under the Dripfeed environment profile.
 
 ## Validation
 
 Run:
 
 ```bash
+node --check js/dripfeed-depth.js
+node --check js/dripfeed-adapter.js
 node --check js/dripfeed-chamber-integration.js
 node tests/dripfeed-chamber-integration.test.js
 node tests/dripfeed-chamber-integration.mjs
 ```
 
-The deterministic test protects camera-derived plane order, shallow separation, foreground control overlap, fixed-aperture scrolling, tokenised reader state and complete scene cleanup. The Playwright proof runs real desktop and mobile viewport sizes, checks rendered geometry, scrolls the wall through the aperture, opens and closes a reader, performs a RedWire round trip and records screenshots and metrics.
+The deterministic contract protects ownership handoff, camera plane order, leading clearance, stale-token behavior, inactive-event isolation and complete cleanup.
+
+The Playwright proof uses explicit `1440 × 900` and `390 × 844` browser contexts. It retains six screenshots—desktop and mobile initial, reader-open and latent states—plus JSON metrics. It checks non-zero rendered live/latent planes, computed camera-relative transforms, native aperture scrolling, mobile two-column readability, real latent membership, reader resolution, RedWire cleanup and Dripfeed return.
