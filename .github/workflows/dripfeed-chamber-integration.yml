@@ -1,0 +1,121 @@
+name: Dripfeed Chamber Integration
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "css/dripfeed-chamber-integration.css"
+      - "css/dripfeed-responsive-calibration.css"
+      - "js/dripfeed-depth.js"
+      - "js/dripfeed-adapter.js"
+      - "js/dripfeed-chamber-integration.js"
+      - "tests/dripfeed-responsive-columns.test.js"
+      - "tests/dripfeed-chamber-integration.test.js"
+      - "tests/dripfeed-chamber-integration.mjs"
+      - "docs/DRIPFEED-CHAMBER-INTEGRATION.md"
+      - ".github/workflows/dripfeed-chamber-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check integration syntax
+        run: |
+          node --check js/dripfeed-depth.js
+          node --check js/dripfeed-adapter.js
+          node --check js/dripfeed-chamber-integration.js
+          node --check tests/dripfeed-responsive-columns.test.js
+          node --check tests/dripfeed-chamber-integration.test.js
+          node --check tests/dripfeed-chamber-integration.mjs
+      - name: Run Dripfeed responsive-column contract
+        run: node tests/dripfeed-responsive-columns.test.js
+      - name: Run deterministic chamber contract
+        run: node tests/dripfeed-chamber-integration.test.js
+      - name: Check production load order and ownership boundary
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const surface = html.indexOf('js/dripfeed-surface-controller.js');
+          const camera = html.indexOf('js/chamber-camera.js');
+          const applications = html.indexOf('js/application-switcher.js');
+          const adapter = html.indexOf('js/dripfeed-adapter.js');
+          const integration = html.indexOf('js/dripfeed-chamber-integration.js');
+          const environment = html.indexOf('js/environment-manager.js');
+          const surfaceStyles = html.indexOf('css/dripfeed-surface-prep.css');
+          const mobileStyles = html.indexOf('css/dripfeed-responsive-calibration.css');
+          const integrationStyles = html.indexOf('css/dripfeed-chamber-integration.css');
+          if (surface < 0 || camera < surface || applications < camera || adapter < applications || integration < adapter || environment < integration) {
+            throw new Error('Dripfeed chamber integration must load after camera/application switching and the public adapter, before environment activation.');
+          }
+          if (surfaceStyles < 0 || mobileStyles < surfaceStyles || integrationStyles < mobileStyles) {
+            throw new Error('Dripfeed responsive calibration must remain Dripfeed-owned and load before the host integration stylesheet.');
+          }
+
+          const source = fs.readFileSync('js/dripfeed-chamber-integration.js', 'utf8');
+          for (const rejected of ['requestAnimationFrame(', 'setInterval(', '__dripfeedApp', "querySelectorAll('.listing-tile", 'memory.mark', 'BoardPlanner']) {
+            if (source.includes(rejected)) throw new Error(`Host integration reaches beyond its ownership boundary: ${rejected}`);
+          }
+          for (const required of ['getSpatialSurfaces', 'claimGeometryOwnership', 'releaseGeometryOwnership']) {
+            if (!source.includes(required)) throw new Error(`Host integration is not using the public Dripfeed contract: ${required}`);
+          }
+
+          const adapterSource = fs.readFileSync('js/dripfeed-adapter.js', 'utf8');
+          for (const required of [
+            'getSpatialSurfaces',
+            'claimGeometryOwnership',
+            'releaseGeometryOwnership',
+            'syncResponsiveColumns',
+            'responsive-columns-change',
+            'app.render()'
+          ]) {
+            if (!adapterSource.includes(required)) throw new Error(`Public Dripfeed adapter is missing: ${required}`);
+          }
+          const depthSource = fs.readFileSync('js/dripfeed-depth.js', 'utf8');
+          for (const required of ['claimExternalGeometry', 'releaseExternalGeometry', 'sharedDepthDormant']) {
+            if (!depthSource.includes(required)) throw new Error(`Interim depth adapter lacks explicit geometry handoff: ${required}`);
+          }
+          console.log('Dripfeed chamber load order, responsive replan, public contract and geometry handoff are valid.');
+          NODE
+
+  rendered-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1 > /tmp/ncn-browser-install.log 2>&1
+          npx playwright install --with-deps chromium >> /tmp/ncn-browser-install.log 2>&1
+      - name: Run desktop, mobile and responsive-transition chamber proof
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/dripfeed-chamber
+          python3 -m http.server 4173 > /tmp/ncn-dripfeed-chamber-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          NCN_ARTIFACT_DIR=artifacts/dripfeed-chamber node tests/dripfeed-chamber-integration.mjs
+      - name: Upload rendered proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dripfeed-chamber-integration
+          path: artifacts/dripfeed-chamber
+          if-no-files-found: warn
