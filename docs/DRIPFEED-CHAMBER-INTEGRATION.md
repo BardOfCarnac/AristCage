@@ -11,7 +11,9 @@ Integration does not access the private Dripfeed application instance. `NCNDripf
 - `releaseGeometryOwnership(owner)`;
 - lifecycle and diagnostic snapshots.
 
-The earlier `SharedDepthAdapter` now has an explicit external-owner handoff. While `integration:dripfeed-chamber` owns geometry, its camera listeners and `ResizeObserver` are disconnected and its snapshot reports `dormant: true`. Ownership is preclaimed during the empty application-switch phase, before Dripfeed activation can wake the interim adapter.
+The earlier `SharedDepthAdapter` has an explicit external-owner handoff. While `integration:dripfeed-chamber` owns geometry, its camera listeners and `ResizeObserver` are disconnected and its snapshot reports `dormant: true`. Ownership is preclaimed during the empty application-switch phase, before Dripfeed activation can wake the interim adapter.
+
+Dripfeed separately owns effective-column changes. `NCNDripfeed` watches the computed `--cols` value and asks the Dripfeed renderer to replan only when that value changes. That publication response does not calculate chamber geometry and does not move individual tiles itself.
 
 ## Rendered plane order
 
@@ -39,10 +41,16 @@ Both Dripfeed walls remain coherent square-cell grids. The latent wall is visibl
 
 At the accepted proof sizes:
 
-- desktop `1440 × 900`: six columns, `210.71px` cells, `1323 × 567px` chamber aperture;
-- mobile `390 × 844`: two columns, `174px` cells, `364 × 436.8px` chamber aperture.
+- desktop `1440 × 900`: six columns, approximately `210.71px` cells, `1323 × 567px` chamber aperture;
+- mobile `390 × 844`: two columns, approximately `174px` cells, `364 × 436.8px` chamber aperture.
 
-The narrow-screen two-column rule and reduced text budgets live in the Dripfeed-owned responsive calibration stylesheet, not in the host integration stylesheet.
+Crossing the `430px` breakpoint while the application is already mounted publishes `dripfeed:responsive-columns-change`, replans the board from three columns to two and removes stale third-column assignments. The proof resizes one live browser context from `520px` to `390px` and rejects implicit horizontal overflow.
+
+## Text fitting
+
+The responsive calibration stylesheet remains Dripfeed-owned. Compact one-row cells use a stricter local text budget at every viewport: body copy and image credit are removed where the cell height cannot support them, while headline and footer remain separated. Taller tiles retain their existing body budgets.
+
+This correction does not alter font voice, tile shape, post membership or image treatment. The browser proof requires headline/body/footer separation on desktop and mobile rather than applying that check only to narrow screens.
 
 ## Reader lifecycle and token safety
 
@@ -78,10 +86,11 @@ Run:
 node --check js/dripfeed-depth.js
 node --check js/dripfeed-adapter.js
 node --check js/dripfeed-chamber-integration.js
+node tests/dripfeed-responsive-columns.test.js
 node tests/dripfeed-chamber-integration.test.js
 node tests/dripfeed-chamber-integration.mjs
 ```
 
-The deterministic contract protects ownership handoff, camera plane order, leading clearance, stale-token behavior, inactive-event isolation and complete cleanup.
+The deterministic contracts protect responsive effective-column replanning, ownership handoff, camera plane order, leading clearance, stale-token behavior, inactive-event isolation and complete cleanup.
 
-The Playwright proof uses explicit `1440 × 900` and `390 × 844` browser contexts. It retains six screenshots—desktop and mobile initial, reader-open and latent states—plus JSON metrics. It checks non-zero rendered live/latent planes, computed camera-relative transforms, native aperture scrolling, mobile two-column readability, real latent membership, reader resolution, RedWire cleanup and Dripfeed return.
+The Playwright proof uses explicit `1440 × 900` and `390 × 844` browser contexts plus a live `520 × 844 → 390 × 844` resize transition. It retains desktop and mobile initial, reader-open and latent screenshots, a transition screenshot and JSON metrics. It checks non-zero rendered live/latent planes, computed camera-relative transforms, native aperture scrolling, text-region separation at every viewport, live two-column replanning, real latent membership, reader resolution, RedWire cleanup and Dripfeed return.
