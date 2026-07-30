@@ -14,7 +14,6 @@ window.NCNDripfeedChamber = (() => {
   const MAX_GRID_STEPS = 14;
   const VIEWPORT_MARGIN = 8;
   const CONTROL_GAP = 4;
-  const OCCLUSION_GAP = 7;
   const MIN_APERTURE_HEIGHT = 250;
 
   let active = false;
@@ -85,11 +84,10 @@ window.NCNDripfeedChamber = (() => {
     return Math.max(0, rectHeight || finite(element?.offsetHeight) || fallback);
   }
 
-  /* The controls are deliberately foreground overlays. A very tall title plus
-     both control rows would otherwise force the wall deep into the chamber.
-     The selected grid aperture therefore clears the terminal title rail; the
-     Dripfeed controls float over its upper portion, exactly as the UI brief
-     requires, while remaining outside the scrolling surface. */
+  /* The title and controls are foreground overlays. Requiring the chamber
+     aperture to begin beneath those flat UI surfaces pushed the tile wall deep
+     into the room. Instead, choose the closest complete grid aperture that fits
+     the viewport; the foreground shell naturally covers its upper portion. */
   function computeGeometry(camera, metrics = {}) {
     if (!camera?.apertureAt || !camera?.scaleAt) return null;
 
@@ -115,13 +113,13 @@ window.NCNDripfeedChamber = (() => {
       const candidate = { lineZ, aperture, step };
       fallback = candidate;
 
-      const clearsTitle = aperture.top >= railBottom + OCCLUSION_GAP;
-      const clearsViewport = aperture.left >= -VIEWPORT_MARGIN
+      const fitsViewport = aperture.left >= -VIEWPORT_MARGIN
         && aperture.right <= viewportWidth + VIEWPORT_MARGIN
+        && aperture.top >= VIEWPORT_MARGIN
         && aperture.bottom <= viewportHeight - VIEWPORT_MARGIN;
       const usableHeight = aperture.height >= MIN_APERTURE_HEIGHT;
 
-      if (clearsTitle && clearsViewport && usableHeight) {
+      if (fitsViewport && usableHeight) {
         chosen = candidate;
         break;
       }
