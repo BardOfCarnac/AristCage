@@ -6,8 +6,8 @@
 ==================================================*/
 
 @media (max-width: 430px) {
-  #dripfeed-root {
-    --cols: 2;
+  html[data-ncn-app="dripfeed"] #dripfeed-root {
+    --cols: 2 !important;
   }
 
   #dripfeed-root .listing-tile {
