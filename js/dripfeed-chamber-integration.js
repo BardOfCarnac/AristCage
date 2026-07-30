@@ -2,8 +2,8 @@
   DRIPFEED CHAMBER INTEGRATION
 
   Host-owned placement for Dripfeed's published live, latent and reading
-  surfaces. Dripfeed continues to own packing and content; this bridge owns
-  chamber-relative aperture geometry, foreground controls and lifecycle cleanup.
+  surfaces. Dripfeed owns membership, packing and presentation; Integration
+  owns the camera-relative planes, aperture, foreground clearance and cleanup.
 ==================================================*/
 window.NCNDripfeedChamber = (() => {
   'use strict';
@@ -14,6 +14,7 @@ window.NCNDripfeedChamber = (() => {
   const MAX_GRID_STEPS = 14;
   const VIEWPORT_MARGIN = 8;
   const CONTROL_GAP = 4;
+  const OCCLUSION_GAP = 8;
   const MIN_APERTURE_HEIGHT = 250;
 
   let active = false;
@@ -30,21 +31,34 @@ window.NCNDripfeedChamber = (() => {
     return document.querySelector('#dripfeed-root');
   }
 
-  function app() {
-    return root()?.__dripfeedApp || null;
+  function adapter() {
+    return window.NCNDripfeed || null;
+  }
+
+  function surfaces() {
+    return adapter()?.getSpatialSurfaces?.() || Object.freeze({
+      depthHost: null,
+      live: null,
+      latent: null,
+      reading: null,
+      controls: Object.freeze([])
+    });
   }
 
   function isDripfeedActive() {
-    const element = root();
     return Boolean(
-      element
-      && !element.hidden
+      root()
+      && !root().hidden
       && (window.NCNApplications?.current?.() || window.NCN_STATE?.activeApp) === 'dripfeed'
     );
   }
 
   function finite(value, fallback = 0) {
     return Number.isFinite(Number(value)) ? Number(value) : fallback;
+  }
+
+  function clamp(value, minimum, maximum) {
+    return Math.max(minimum, Math.min(maximum, value));
   }
 
   function freezeRect(rect) {
@@ -72,22 +86,23 @@ window.NCNDripfeedChamber = (() => {
     return Math.max(0, finite(document.querySelector('.rail')?.getBoundingClientRect?.().bottom));
   }
 
-  function controlElements(element = root()) {
-    return Object.freeze({
-      filter: element?.querySelector?.('.dripfeed-filter-rail') || null,
-      utility: element?.querySelector?.('.dripfeed-utility-rail') || null
-    });
-  }
-
   function measureHeight(element, fallback) {
     const rectHeight = finite(element?.getBoundingClientRect?.().height);
     return Math.max(0, rectHeight || finite(element?.offsetHeight) || fallback);
   }
 
-  /* The title and controls are foreground overlays. Requiring the chamber
-     aperture to begin beneath those flat UI surfaces pushed the tile wall deep
-     into the room. Instead, choose the closest complete grid aperture that fits
-     the viewport; the foreground shell naturally covers its upper portion. */
+  function planeProjection(camera, z, aperture) {
+    const rect = freezeRect(camera.apertureAt(z));
+    const scale = aperture.width > 0 ? rect.width / aperture.width : 1;
+    return Object.freeze({
+      z,
+      rect,
+      scale,
+      x: rect.left - aperture.left,
+      y: rect.top - aperture.top
+    });
+  }
+
   function computeGeometry(camera, metrics = {}) {
     if (!camera?.apertureAt || !camera?.scaleAt) return null;
 
@@ -104,22 +119,17 @@ window.NCNDripfeedChamber = (() => {
 
     let chosen = null;
     let fallback = null;
-
     for (let step = 1; step <= MAX_GRID_STEPS; step += 1) {
       const lineZ = near + cell * step;
       const aperture = freezeRect(camera.apertureAt(lineZ));
       if (!aperture.width || !aperture.height) continue;
-
       const candidate = { lineZ, aperture, step };
       fallback = candidate;
-
       const fitsViewport = aperture.left >= -VIEWPORT_MARGIN
         && aperture.right <= viewportWidth + VIEWPORT_MARGIN
         && aperture.top >= VIEWPORT_MARGIN
         && aperture.bottom <= viewportHeight - VIEWPORT_MARGIN;
-      const usableHeight = aperture.height >= MIN_APERTURE_HEIGHT;
-
-      if (fitsViewport && usableHeight) {
+      if (fitsViewport && aperture.height >= MIN_APERTURE_HEIGHT) {
         chosen = candidate;
         break;
       }
@@ -131,17 +141,22 @@ window.NCNDripfeedChamber = (() => {
     const liveZ = chosen.lineZ + cell * 0.12;
     const latentZ = liveZ + cell * 0.32;
     const readerZ = Math.max(near + cell * 0.04, chosen.lineZ - cell * 0.58);
-    const rearScale = Math.max(0.9, Math.min(0.985, camera.scaleAt(latentZ) / camera.scaleAt(liveZ)));
+    const live = planeProjection(camera, liveZ, chosen.aperture);
+    const latent = planeProjection(camera, latentZ, chosen.aperture);
+    const reader = planeProjection(camera, readerZ, chosen.aperture);
+    const wallGutter = clamp(viewportWidth * 0.0065, 5, 10);
+    const leadingClearance = Math.max(
+      0,
+      (controlsBottom + OCCLUSION_GAP - live.rect.top) / Math.max(0.001, live.scale) - wallGutter
+    );
 
     return Object.freeze({
       depthConvention: 'smaller-positive-z-is-nearer',
       lineZ: chosen.lineZ,
-      liveZ,
-      latentZ,
-      readerZ,
-      rearScale,
       gridStep: chosen.step,
       aperture: chosen.aperture,
+      wallGutter,
+      leadingClearance,
       controls: Object.freeze({
         top: controlTop,
         filterHeight,
@@ -150,7 +165,8 @@ window.NCNDripfeedChamber = (() => {
         bottom: controlsBottom,
         left: chosen.aperture.left,
         width: chosen.aperture.width
-      })
+      }),
+      planes: Object.freeze({ live, latent, reader })
     });
   }
 
@@ -169,33 +185,48 @@ window.NCNDripfeedChamber = (() => {
 
   function publishScene() {
     const scene = window.NCNScene;
-    if (!scene?.register) return;
-
+    if (!scene?.register || !active) return;
     const register = (name, resolver, description) => scene.register(name, resolver, {
       owner: OWNER,
       replace: true,
       writable: false,
       description
     });
-
-    register('dripfeed:controls', () => root()?.querySelector?.('.dripfeed-filter-rail'), 'Foreground Dripfeed filter controls.');
-    register('dripfeed:live', () => app()?.getSpatialSurfaces?.().live || null, 'Live Dripfeed wall immediately behind the selected chamber grid line.');
-    register('dripfeed:latent', () => app()?.getSpatialSurfaces?.().latent || null, 'Latent Dripfeed wall one shallow interval behind the live wall.');
-    register('dripfeed:reading', () => readyPublication?.readingSurface || null, 'Forward Dripfeed reading surface after ready publication.');
-    register('dripfeed:occluder', () => root()?.querySelector?.(`#${OCCLUDER_ID}`), 'Host-owned chamber grid lip in front of Dripfeed walls.');
+    register('dripfeed:controls', () => surfaces().controls[0] || null, 'Foreground Dripfeed filter controls.');
+    register('dripfeed:depth-host', () => surfaces().depthHost, 'Transparent chamber aperture hosting Dripfeed surfaces.');
+    register('dripfeed:live', () => surfaces().live, 'Camera-projected live Dripfeed wall.');
+    register('dripfeed:latent', () => surfaces().latent, 'Camera-projected latent Dripfeed wall.');
+    register('dripfeed:reading', () => readyPublication?.readingSurface || null, 'Ready-gated camera-projected reading surface.');
+    register('dripfeed:occluder', () => root()?.querySelector?.(`#${OCCLUDER_ID}`), 'Host-owned chamber grid lip.');
   }
 
   function clearScene() {
     window.NCNScene?.unregisterOwner?.(OWNER);
   }
 
+  function applyPlaneVariables(element, next) {
+    const { live, latent, reader } = next.planes;
+    setPx(element, '--drip-live-x', live.x);
+    setPx(element, '--drip-live-y', live.y);
+    element.style.setProperty('--drip-live-scale', live.scale.toFixed(6));
+    setPx(element, '--drip-latent-x', latent.x);
+    setPx(element, '--drip-latent-y', latent.y);
+    element.style.setProperty('--drip-latent-scale', latent.scale.toFixed(6));
+    setPx(element, '--drip-reader-x', reader.x);
+    setPx(element, '--drip-reader-y', reader.y);
+    element.style.setProperty('--drip-reader-scale', reader.scale.toFixed(6));
+  }
+
   function applyGeometry() {
     if (!active || destroyed || !isDripfeedActive()) return false;
     const element = root();
     const camera = cameraSnapshot();
-    if (!element || !camera) return false;
+    const publication = surfaces();
+    if (!element || !camera || !publication.depthHost || !publication.live || !publication.latent) return false;
 
-    const controls = controlElements(element);
+    const controls = publication.controls;
+    const filter = controls[0] || null;
+    const utility = controls[1] || null;
     const provisional = freezeRect(camera.apertureAt(camera.near + camera.cell));
     setPx(element, '--drip-chamber-control-left', provisional.left);
     setPx(element, '--drip-chamber-control-width', provisional.width);
@@ -203,8 +234,8 @@ window.NCNDripfeedChamber = (() => {
 
     let next = computeGeometry(camera, {
       railBottom: currentRailBottom(),
-      filterHeight: measureHeight(controls.filter, 38),
-      utilityHeight: measureHeight(controls.utility, 42)
+      filterHeight: measureHeight(filter, 38),
+      utilityHeight: measureHeight(utility, 42)
     });
     if (!next) return false;
 
@@ -215,8 +246,8 @@ window.NCNDripfeedChamber = (() => {
 
     const corrected = computeGeometry(camera, {
       railBottom: currentRailBottom(),
-      filterHeight: measureHeight(controls.filter, next.controls.filterHeight),
-      utilityHeight: measureHeight(controls.utility, next.controls.utilityHeight)
+      filterHeight: measureHeight(filter, next.controls.filterHeight),
+      utilityHeight: measureHeight(utility, next.controls.utilityHeight)
     });
     if (corrected) next = corrected;
 
@@ -232,12 +263,16 @@ window.NCNDripfeedChamber = (() => {
     setPx(element, '--drip-chamber-filter-height', next.controls.filterHeight);
     setPx(element, '--drip-chamber-utility-top', next.controls.utilityTop);
     setPx(element, '--drip-chamber-utility-height', next.controls.utilityHeight);
-    element.style.setProperty('--drip-rear-scale', next.rearScale.toFixed(5));
-    element.style.setProperty('--drip-live-z', next.liveZ.toFixed(4));
-    element.style.setProperty('--drip-latent-z', next.latentZ.toFixed(4));
-    element.style.setProperty('--drip-reader-z', next.readerZ.toFixed(4));
+    setPx(element, '--drip-wall-gutter', next.wallGutter);
+    setPx(element, '--drip-leading-clearance', next.leadingClearance);
+    applyPlaneVariables(element, next);
+
     element.dataset.chamberIntegrated = 'true';
     element.dataset.chamberOccluderStep = String(next.gridStep);
+    publication.depthHost.dataset.geometryOwner = OWNER;
+    publication.live.dataset.planeZ = next.planes.live.z.toFixed(4);
+    publication.latent.dataset.planeZ = next.planes.latent.z.toFixed(4);
+    if (publication.reading) publication.reading.dataset.planeZ = next.planes.reader.z.toFixed(4);
 
     const occluder = ensureOccluder(element);
     if (occluder) {
@@ -260,11 +295,11 @@ window.NCNDripfeedChamber = (() => {
 
   function readingState(state) {
     const element = root();
-    if (!element) return;
-    element.dataset.chamberReadingState = state;
+    if (element) element.dataset.chamberReadingState = state;
   }
 
   function onRootEvent(event) {
+    if (!active || destroyed) return;
     const detail = event.detail || {};
     switch (event.type) {
       case 'dripfeed:walls-change':
@@ -288,9 +323,11 @@ window.NCNDripfeedChamber = (() => {
         });
         readingState('ready');
         publishScene();
+        wake('reader-ready');
         break;
       case 'dripfeed:open-transmission-cancelled':
-        if (pendingOpen?.token === detail.token) pendingOpen = null;
+        if (pendingOpen?.token !== detail.token) break;
+        pendingOpen = null;
         if (!readyPublication) readingState('idle');
         break;
       case 'dripfeed:close-transmission':
@@ -304,21 +341,23 @@ window.NCNDripfeedChamber = (() => {
     }
   }
 
+  const ROOT_EVENTS = Object.freeze([
+    'dripfeed:walls-change',
+    'dripfeed:filter-change',
+    'dripfeed:repack',
+    'dripfeed:restore',
+    'dripfeed:dismiss',
+    'dripfeed:open-transmission-start',
+    'dripfeed:open-transmission-ready',
+    'dripfeed:open-transmission-cancelled',
+    'dripfeed:close-transmission'
+  ]);
+
   function bindRootEvents() {
     const element = root();
     if (!element || rootEventsBound) return;
     rootEventsBound = true;
-    [
-      'dripfeed:walls-change',
-      'dripfeed:filter-change',
-      'dripfeed:repack',
-      'dripfeed:restore',
-      'dripfeed:dismiss',
-      'dripfeed:open-transmission-start',
-      'dripfeed:open-transmission-ready',
-      'dripfeed:open-transmission-cancelled',
-      'dripfeed:close-transmission'
-    ].forEach(type => {
+    ROOT_EVENTS.forEach(type => {
       element.addEventListener(type, onRootEvent);
       eventHandlers.set(type, onRootEvent);
     });
@@ -332,8 +371,17 @@ window.NCNDripfeedChamber = (() => {
     rootEventsBound = false;
   }
 
+  function claimGeometry() {
+    return adapter()?.claimGeometryOwnership?.(OWNER) !== false;
+  }
+
+  function releaseGeometry() {
+    adapter()?.releaseGeometryOwnership?.(OWNER);
+  }
+
   function activate(reason = 'activate') {
     if (destroyed) return false;
+    claimGeometry();
     active = true;
     bindRootEvents();
     const element = root();
@@ -350,11 +398,16 @@ window.NCNDripfeedChamber = (() => {
 
   function deactivate(reason = 'deactivate') {
     active = false;
+    unbindRootEvents();
     pendingOpen = null;
     readyPublication = null;
     geometryTask?.suspend?.();
     clearScene();
 
+    const publication = surfaces();
+    if (publication.depthHost) {
+      delete publication.depthHost.dataset.geometryOwner;
+    }
     const element = root();
     if (element) {
       readingState('idle');
@@ -363,6 +416,7 @@ window.NCNDripfeedChamber = (() => {
       const occluder = element.querySelector?.(`#${OCCLUDER_ID}`);
       if (occluder) occluder.hidden = true;
     }
+    releaseGeometry();
     window.dispatchEvent(new CustomEvent('ncn:dripfeed-chamber-deactivated', { detail: { reason } }));
   }
 
@@ -372,15 +426,30 @@ window.NCNDripfeedChamber = (() => {
   }
 
   function onEnvironmentPhase(event) {
-    if (event.detail?.phase === 'active' && event.detail?.next === 'dripfeed') wake('environment-ready');
+    if (event.detail?.phase === 'empty' && event.detail?.next === 'dripfeed') {
+      claimGeometry();
+      return;
+    }
+    if (event.detail?.phase === 'active' && event.detail?.next === 'dripfeed') {
+      if (!active && isDripfeedActive()) activate('environment-ready');
+      else wake('environment-ready');
+    }
   }
 
   function onCameraChange() {
     wake('camera-change');
   }
 
+  function renderedPlane(element) {
+    if (!element?.isConnected) return null;
+    const rect = freezeRect(element.getBoundingClientRect());
+    let transform = '';
+    try { transform = getComputedStyle(element).transform; } catch (error) {}
+    return Object.freeze({ rect, transform });
+  }
+
   function snapshot() {
-    const stage = root()?.querySelector?.('[data-depth-host]') || null;
+    const publication = surfaces();
     return Object.freeze({
       active,
       destroyed,
@@ -388,16 +457,23 @@ window.NCNDripfeedChamber = (() => {
       readingState: root()?.dataset?.chamberReadingState || 'idle',
       pendingToken: pendingOpen?.token || null,
       readyToken: readyPublication?.token || null,
-      scrollTop: finite(stage?.scrollTop),
-      scrollHeight: finite(stage?.scrollHeight),
-      clientHeight: finite(stage?.clientHeight),
+      rootEventsBound,
+      adapter: adapter()?.snapshot?.() || null,
+      scrollTop: finite(publication.depthHost?.scrollTop),
+      scrollHeight: finite(publication.depthHost?.scrollHeight),
+      clientHeight: finite(publication.depthHost?.clientHeight),
       geometry,
       planes: geometry ? Object.freeze([
-        Object.freeze({ role: 'reader', z: geometry.readerZ }),
-        Object.freeze({ role: 'occluder', z: geometry.lineZ }),
-        Object.freeze({ role: 'live', z: geometry.liveZ }),
-        Object.freeze({ role: 'latent', z: geometry.latentZ })
-      ]) : Object.freeze([])
+        Object.freeze({ role: 'reader', z: geometry.planes.reader.z, scale: geometry.planes.reader.scale }),
+        Object.freeze({ role: 'occluder', z: geometry.lineZ, scale: 1 }),
+        Object.freeze({ role: 'live', z: geometry.planes.live.z, scale: geometry.planes.live.scale }),
+        Object.freeze({ role: 'latent', z: geometry.planes.latent.z, scale: geometry.planes.latent.scale })
+      ]) : Object.freeze([]),
+      rendered: Object.freeze({
+        live: renderedPlane(publication.live),
+        latent: renderedPlane(publication.latent),
+        reading: renderedPlane(publication.reading)
+      })
     });
   }
 
@@ -420,7 +496,6 @@ window.NCNDripfeedChamber = (() => {
     window.addEventListener('ncn:chamber-camera-change', onCameraChange);
     window.addEventListener('ncn:application-environment-phase', onEnvironmentPhase);
     window.addEventListener('ncn:application-change', onApplicationChange);
-
     if (isDripfeedActive()) activate('initial');
   }
 
@@ -428,7 +503,6 @@ window.NCNDripfeedChamber = (() => {
     if (destroyed) return;
     deactivate('destroy');
     destroyed = true;
-    unbindRootEvents();
     window.removeEventListener('resize', onCameraChange);
     window.removeEventListener('orientationchange', onCameraChange);
     window.removeEventListener('ncn:chamber-camera-change', onCameraChange);
