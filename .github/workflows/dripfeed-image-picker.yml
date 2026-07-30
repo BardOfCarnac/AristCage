@@ -8,6 +8,7 @@ on:
       - "js/dripfeed-model.js"
       - "js/dripfeed-image-providers.js"
       - "js/dripfeed-image-picker-hardening.js"
+      - "js/dripfeed-image-picker-surface-compat.js"
       - "js/dripfeed-renderer.js"
       - "js/dripfeed-submit-controller.js"
       - "js/dripfeed-app.js"
@@ -39,6 +40,7 @@ jobs:
           node --check js/dripfeed-model.js
           node --check js/dripfeed-image-providers.js
           node --check js/dripfeed-image-picker-hardening.js
+          node --check js/dripfeed-image-picker-surface-compat.js
           node --check js/dripfeed-renderer.js
           node --check js/dripfeed-submit-controller.js
           node --check js/dripfeed-app.js
