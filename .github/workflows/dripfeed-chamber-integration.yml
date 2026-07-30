@@ -5,6 +5,9 @@ on:
     paths:
       - "index.html"
       - "css/dripfeed-chamber-integration.css"
+      - "css/dripfeed-responsive-calibration.css"
+      - "js/dripfeed-depth.js"
+      - "js/dripfeed-adapter.js"
       - "js/dripfeed-chamber-integration.js"
       - "tests/dripfeed-chamber-integration.test.js"
       - "tests/dripfeed-chamber-integration.mjs"
@@ -25,6 +28,8 @@ jobs:
           node-version: 24
       - name: Check integration syntax
         run: |
+          node --check js/dripfeed-depth.js
+          node --check js/dripfeed-adapter.js
           node --check js/dripfeed-chamber-integration.js
           node --check tests/dripfeed-chamber-integration.test.js
           node --check tests/dripfeed-chamber-integration.mjs
@@ -41,19 +46,33 @@ jobs:
           const adapter = html.indexOf('js/dripfeed-adapter.js');
           const integration = html.indexOf('js/dripfeed-chamber-integration.js');
           const environment = html.indexOf('js/environment-manager.js');
-          const stylesheet = html.indexOf('css/dripfeed-chamber-integration.css');
           const surfaceStyles = html.indexOf('css/dripfeed-surface-prep.css');
+          const mobileStyles = html.indexOf('css/dripfeed-responsive-calibration.css');
+          const integrationStyles = html.indexOf('css/dripfeed-chamber-integration.css');
           if (surface < 0 || camera < surface || applications < camera || adapter < applications || integration < adapter || environment < integration) {
-            throw new Error('Dripfeed chamber integration must load after the camera, application switcher and protected adapter, and before environment activation.');
+            throw new Error('Dripfeed chamber integration must load after camera/application switching and the public adapter, before environment activation.');
           }
-          if (stylesheet < 0 || stylesheet < surfaceStyles) {
-            throw new Error('Dripfeed chamber integration styles must load after the Dripfeed-owned surface styles.');
+          if (surfaceStyles < 0 || mobileStyles < surfaceStyles || integrationStyles < mobileStyles) {
+            throw new Error('Dripfeed responsive calibration must remain Dripfeed-owned and load before the host integration stylesheet.');
           }
+
           const source = fs.readFileSync('js/dripfeed-chamber-integration.js', 'utf8');
-          for (const rejected of ['requestAnimationFrame(', 'setInterval(', "querySelectorAll('.listing-tile", 'memory.mark', 'BoardPlanner']) {
+          for (const rejected of ['requestAnimationFrame(', 'setInterval(', '__dripfeedApp', "querySelectorAll('.listing-tile", 'memory.mark', 'BoardPlanner']) {
             if (source.includes(rejected)) throw new Error(`Host integration reaches beyond its ownership boundary: ${rejected}`);
           }
-          console.log('Dripfeed chamber load order and ownership boundary are valid.');
+          for (const required of ['getSpatialSurfaces', 'claimGeometryOwnership', 'releaseGeometryOwnership']) {
+            if (!source.includes(required)) throw new Error(`Host integration is not using the public Dripfeed contract: ${required}`);
+          }
+
+          const adapterSource = fs.readFileSync('js/dripfeed-adapter.js', 'utf8');
+          for (const required of ['getSpatialSurfaces', 'claimGeometryOwnership', 'releaseGeometryOwnership']) {
+            if (!adapterSource.includes(required)) throw new Error(`Public Dripfeed adapter is missing: ${required}`);
+          }
+          const depthSource = fs.readFileSync('js/dripfeed-depth.js', 'utf8');
+          for (const required of ['claimExternalGeometry', 'releaseExternalGeometry', 'sharedDepthDormant']) {
+            if (!depthSource.includes(required)) throw new Error(`Interim depth adapter lacks explicit geometry handoff: ${required}`);
+          }
+          console.log('Dripfeed chamber load order, public contract and geometry handoff are valid.');
           NODE
 
   rendered-proof:
