@@ -27,7 +27,7 @@
           <span class="online">● SYSTEM ONLINE</span>
           <span>TERMINAL ${DF.render.esc(DF.config.terminalId)}</span>
           <span id="clock">--:--:--</span>
-          <span id="api-mode">UNSPLASH DEMO</span>
+          <span id="api-mode">IMAGE NETWORK DEMO</span>
         </div>
         <label class="search-box">⌕ <input id="feed-search" type="search" placeholder="Search classified transmissions…"></label>
         <div class="display-note"><strong id="result-count">0</strong> TRANSMISSIONS</div>
@@ -74,22 +74,23 @@
             </section>
 
             <section class="wizard-panel" data-wizard-step="2">
-              <div class="image-source-tabs">
-                <button type="button" class="source-tab active" data-image-source="unsplash">SEARCH UNSPLASH</button>
+              <div class="image-source-tabs" aria-label="Image source">
+                <button type="button" class="source-tab active" data-image-source="unsplash">UNSPLASH</button>
+                <button type="button" class="source-tab" data-image-source="pexels">PEXELS</button>
                 <button type="button" class="source-tab" data-image-source="url">IMAGE URL</button>
                 <button type="button" class="source-tab" data-image-source="none">TEXT ONLY</button>
               </div>
-              <div class="source-panel active" data-source-panel="unsplash">
-                <div class="unsplash-bar"><input id="unsplash-query" type="search" value="neon city" maxlength="80"><select id="unsplash-orientation"><option value="">Any shape</option><option value="landscape">Landscape</option><option value="portrait">Portrait</option><option value="squarish">Square</option></select><button type="button" class="button primary" data-submit-action="search">SEARCH</button></div>
-                <p class="network-note"><strong>The image stays on Unsplash.</strong> Dripfeed stores its URL, photo ID and attribution metadata—not a copy of the file.</p>
-                <div id="picker-state" class="picker-state">Search to choose an image.</div>
-                <div id="photo-results" class="photo-results"></div>
+              <div class="source-panel active" data-source-panel="network">
+                <div class="image-network-bar"><input id="image-query" type="search" value="neon city" maxlength="80" aria-label="Search image source"><select id="image-orientation" aria-label="Image orientation"><option value="">Any shape</option><option value="landscape">Landscape</option><option value="portrait">Portrait</option><option value="squarish">Square</option></select><button type="button" class="button primary" data-submit-action="search">SEARCH</button></div>
+                <p id="provider-note" class="network-note"></p>
+                <div id="picker-state" class="picker-state" role="status" aria-live="polite">Search to choose an image.</div>
+                <div id="photo-results" class="photo-results" aria-label="Image search results"></div>
                 <div class="result-pager"><button type="button" class="button" data-submit-action="prev">PREV</button><button type="button" class="button" data-submit-action="next-results">NEXT</button></div>
               </div>
               <div class="source-panel" data-source-panel="url"><div class="field"><label>PUBLIC HTTPS IMAGE URL</label><input id="custom-image-url" type="url" placeholder="https://…"></div><p class="network-note">Only publish an image you own or have permission to use. Dripfeed does not re-host it.</p></div>
               <div class="source-panel" data-source-panel="none"><div class="text-only-sample"><strong>TEXT-ONLY PLATE</strong><span>The category code becomes the visual anchor.</span></div></div>
               <div id="selected-image-preview" class="selected-image-preview"></div>
-              <div class="wizard-actions"><button type="button" class="button" data-submit-action="back">← DETAILS</button><button type="button" class="button primary" data-submit-action="next">REVIEW →</button></div>
+              <div class="wizard-actions"><button type="button" class="button" data-submit-action="back">← DETAILS</button><button type="button" class="button primary" data-submit-action="next">USE IMAGE / REVIEW →</button></div>
             </section>
 
             <section class="wizard-panel" data-wizard-step="3">
@@ -109,7 +110,7 @@
     constructor(root, options = {}) {
       this.root = root;
       this.store = options.store || new DF.model.Store();
-      this.unsplash = options.unsplash || new DF.unsplash.UnsplashClient(DF.config);
+      this.images = options.images || DF.images.createDefaultRegistry(DF.config);
       this.state = { category: 'all', query: '', active: null };
       this.depth = options.depthAdapter || new DF.depth.SharedDepthAdapter(this);
       this.readerTransition = options.readerTransition || new DF.readerTransition.ReaderTransition(this);
@@ -248,9 +249,9 @@
       if (element) element.textContent = new Date().toLocaleTimeString('en-GB', { hour12: false });
     }
 
-    updateApiMode(mode) {
+    updateApiMode(provider, mode) {
       const element = this.root.querySelector('#api-mode');
-      if (element) element.textContent = mode === 'live' ? 'UNSPLASH LIVE' : 'UNSPLASH DEMO';
+      if (element) element.textContent = `${String(provider || 'IMAGE NETWORK').toUpperCase()} ${mode === 'live' ? 'LIVE' : 'DEMO'}`;
     }
 
     activate() {
