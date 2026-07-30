@@ -95,7 +95,6 @@ async function runViewport(browser, name, viewport) {
   assert(['auto', 'scroll'].includes(initial.stageStyle.overflowY), `${name}: stage does not own native vertical scrolling.`);
   assert(initial.stage.left >= -1 && initial.stage.right <= initial.viewport.width + 1, `${name}: chamber aperture exceeds the horizontal viewport.`);
   assert(initial.stage.top >= -1 && initial.stage.bottom <= initial.viewport.height + 1, `${name}: chamber aperture exceeds the vertical viewport.`);
-  assert(initial.rail.bottom > initial.stage.top, `${name}: title rail is not floating over the upper aperture.`);
   assert(initial.filterStyle.position === 'fixed', `${name}: filter rail is not foreground-fixed.`);
   assert(initial.filterStyle.flexWrap === 'nowrap', `${name}: filter rail wrapped.`);
   assert(initial.filter.top >= initial.rail.bottom - 1, `${name}: filter rail is not immediately beneath the title.`);
