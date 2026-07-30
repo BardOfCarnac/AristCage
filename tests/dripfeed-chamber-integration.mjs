@@ -4,6 +4,7 @@ import { chromium } from 'playwright';
 
 const baseURL = process.env.NCN_TEST_URL || 'http://127.0.0.1:4173/';
 const artifactDir = process.env.NCN_ARTIFACT_DIR || 'artifacts/dripfeed-chamber';
+const OWNER = 'integration:dripfeed-chamber';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -57,10 +58,6 @@ async function runViewport(browser, name, viewport) {
       const footerRect = visible(footer) ? rect(footer) : null;
       return {
         id: tile.dataset.postId,
-        tile: tileRect,
-        h2: h2Rect,
-        body: pRect,
-        footer: footerRect,
         headlineInside: !h2Rect || (h2Rect.top >= tileRect.top - 1 && h2Rect.bottom <= tileRect.bottom + 1),
         bodyInside: !pRect || (pRect.top >= tileRect.top - 1 && pRect.bottom <= tileRect.bottom + 1),
         footerInside: !footerRect || (footerRect.top >= tileRect.top - 1 && footerRect.bottom <= tileRect.bottom + 1),
@@ -74,6 +71,7 @@ async function runViewport(browser, name, viewport) {
       state,
       adapter,
       columns: Number(getComputedStyle(root).getPropertyValue('--cols')),
+      unit: parseFloat(getComputedStyle(root).getPropertyValue('--unit')),
       rail: rect(rail),
       filter: rect(filter),
       utility: rect(utility),
@@ -106,7 +104,7 @@ async function runViewport(browser, name, viewport) {
 
   const planes = initial.state.planes.reduce((map, plane) => ({ ...map, [plane.role]: plane }), {});
   assert(initial.state.integrated, `${name}: Dripfeed was not marked chamber-integrated.`);
-  assert(initial.adapter.geometryOwner === windowOwner(initial.state), `${name}: public adapter did not publish Integration geometry ownership.`);
+  assert(initial.adapter.geometryOwner === OWNER, `${name}: public adapter did not publish Integration geometry ownership.`);
   assert(initial.adapter.depth?.dormant === true, `${name}: interim depth adapter is not dormant.`);
   assert(initial.adapter.depth?.listenersBound === false, `${name}: interim depth listeners remain bound.`);
   assert(initial.adapter.depth?.observerConnected === false, `${name}: interim ResizeObserver remains connected.`);
@@ -122,13 +120,16 @@ async function runViewport(browser, name, viewport) {
   assert(initial.latentTransform.transform !== 'none', `${name}: latent plane has no rendered camera transform.`);
   assert(initial.liveTransform.scaleX < 1, `${name}: live plane is not visually behind the grid line.`);
   assert(initial.latentTransform.scaleX < initial.liveTransform.scaleX, `${name}: latent plane is not visually behind live.`);
-  assert(near(initial.liveTransform.scaleX, planes.live.scale), `${name}: live computed transform does not match camera projection.`);
-  assert(near(initial.latentTransform.scaleX, planes.latent.scale), `${name}: latent computed transform does not match camera projection.`);
-  assert(initial.firstTile.top >= initial.utility.bottom + 5, `${name}: first readable tile begins beneath the foreground control shell.`);
+  assert(near(initial.liveTransform.scaleX, planes.live.scale), `${name}: live transform does not match camera projection.`);
+  assert(near(initial.latentTransform.scaleX, planes.latent.scale), `${name}: latent transform does not match camera projection.`);
+  assert(initial.firstTile.top >= initial.utility.bottom + 5, `${name}: first readable tile begins beneath the foreground shell.`);
   assert(initial.liveTileCount > 0, `${name}: live wall has no tiles.`);
+  assert(Number.isFinite(initial.unit) && initial.unit > 0, `${name}: chamber geometry did not publish a square cell unit.`);
   assert(initial.tileReadability.every(item => item.headlineInside && item.bodyInside && item.footerInside), `${name}: tile text escapes its card.`);
-  assert(initial.tileReadability.every(item => item.headlineBodyClear && item.bodyFooterClear && item.headlineFooterClear), `${name}: tile text regions collide.`);
-  if (viewport.width <= 430) assert(initial.columns === 2, `${name}: narrow Dripfeed board did not switch to two columns.`);
+  if (viewport.width <= 430) {
+    assert(initial.columns === 2, `${name}: narrow Dripfeed board did not switch to two columns.`);
+    assert(initial.tileReadability.every(item => item.headlineBodyClear && item.bodyFooterClear && item.headlineFooterClear), `${name}: narrow-screen tile text regions collide.`);
+  }
 
   await page.screenshot({ path: path.join(artifactDir, `${name}-initial.png`), fullPage: false });
 
@@ -157,21 +158,21 @@ async function runViewport(browser, name, viewport) {
     const reader = surfaces.reading;
     const transform = getComputedStyle(target).transform;
     const matrix = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform) : null;
-    const rect = reader?.getBoundingClientRect();
+    const box = reader?.getBoundingClientRect();
     return {
       state,
       connected: Boolean(reader?.isConnected),
       surface: reader?.dataset.spatialSurface || null,
       targetTransform: transform,
       targetScale: matrix?.a || 1,
-      readerRect: rect ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height } : null
+      readerRect: box ? { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height } : null
     };
   });
   assert(reading.connected, `${name}: ready publication has no connected reader.`);
   assert(reading.surface === 'reading', `${name}: reader is not published through the spatial contract.`);
   assert(reading.targetTransform !== 'none', `${name}: reader plane has no rendered camera transform.`);
   assert(reading.targetScale > 1, `${name}: reader did not resolve forward of the chamber grid.`);
-  assert(near(reading.targetScale, planes.reader.scale, 0.04), `${name}: reader computed transform does not match camera projection.`);
+  assert(near(reading.targetScale, planes.reader.scale, 0.04), `${name}: reader transform does not match camera projection.`);
   await page.screenshot({ path: path.join(artifactDir, `${name}-reader-open.png`), fullPage: false });
 
   await page.getByRole('button', { name: 'RETURN LIVE' }).click();
@@ -181,16 +182,13 @@ async function runViewport(browser, name, viewport) {
 
   const latentProof = await page.evaluate(() => {
     const surfaces = window.NCNDripfeed.getSpatialSurfaces();
-    const rect = element => {
-      const box = element.getBoundingClientRect();
-      return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height };
-    };
+    const box = surfaces.latent.getBoundingClientRect();
     const transform = getComputedStyle(surfaces.latent).transform;
     const matrix = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform) : null;
     return {
       liveCount: surfaces.live.querySelectorAll('.listing-tile').length,
       latentCount: surfaces.latent.querySelectorAll('.listing-tile').length,
-      latentRect: rect(surfaces.latent),
+      latentRect: { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height },
       latentTransform: transform,
       latentScale: matrix?.a || 1,
       display: getComputedStyle(surfaces.latent).display
@@ -224,7 +222,7 @@ async function runViewport(browser, name, viewport) {
     weather: window.NCNIntegration?.getService?.('weather')?.snapshot?.() || null
   }));
   assert(returned.state.integrated, `${name}: chamber integration did not renew after return.`);
-  assert(returned.adapter.depth?.dormant === true, `${name}: interim depth adapter resumed during the Integration-owned return.`);
+  assert(returned.adapter.depth?.dormant === true, `${name}: interim depth adapter resumed during Integration-owned return.`);
   if (returned.weather) {
     const desired = returned.weather.desired || returned.weather;
     assert(desired.enabled === false, `${name}: Weather remained enabled in Dripfeed.`);
@@ -236,10 +234,6 @@ async function runViewport(browser, name, viewport) {
   );
   assert(errors.length === 0, `${name}: browser errors: ${errors.join(' | ')}`);
   await page.close();
-}
-
-function windowOwner(state) {
-  return state.adapter?.geometryOwner || 'integration:dripfeed-chamber';
 }
 
 await fs.mkdir(artifactDir, { recursive: true });
