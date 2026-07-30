@@ -4,12 +4,21 @@
   Host-facing boundary around the protected Dripfeed application. Other modules
   may inspect published surfaces and request geometry ownership, but must not
   manipulate tile membership, packing or reader internals.
+
+  Responsive column changes remain Dripfeed-owned. This adapter observes only
+  the effective CSS column count and asks the Dripfeed renderer to replan when
+  that count changes; Integration continues to own chamber geometry.
 ==================================================*/
 
 window.NCNDripfeed = (() => {
   let suspended = false;
   let restoreAfterSuspend = false;
   let geometryOwner = null;
+  let responsiveObserver = null;
+  let responsiveFrame = 0;
+  let responsiveTrackingBound = false;
+  let effectiveColumns = null;
+  const responsiveListeners = new Map();
 
   function root() {
     return document.querySelector('#dripfeed-root');
@@ -26,6 +35,96 @@ window.NCNDripfeed = (() => {
       && !element.hidden
       && (window.NCNApplications?.current?.() || window.NCN_STATE?.activeApp) === 'dripfeed'
     );
+  }
+
+  function computedColumns() {
+    const element = root();
+    if (!element || typeof getComputedStyle !== 'function') return null;
+    const value = Number(getComputedStyle(element).getPropertyValue('--cols'));
+    if (!Number.isFinite(value)) return null;
+    return Math.max(1, Math.min(6, Math.floor(value)));
+  }
+
+  function cancelResponsiveFrame() {
+    if (!responsiveFrame) return;
+    cancelAnimationFrame(responsiveFrame);
+    responsiveFrame = 0;
+  }
+
+  function publishResponsiveColumns(previous, columns, reason, rendered) {
+    const element = root();
+    if (!element) return;
+    const detail = Object.freeze({ previous, columns, reason, rendered });
+    if (window.Dripfeed?.mechanics?.dispatch) {
+      window.Dripfeed.mechanics.dispatch(element, 'responsive-columns-change', detail);
+      return;
+    }
+    if (typeof CustomEvent === 'function') {
+      element.dispatchEvent(new CustomEvent('dripfeed:responsive-columns-change', {
+        bubbles: true,
+        detail
+      }));
+    }
+  }
+
+  function syncResponsiveColumns(reason = 'measure') {
+    responsiveFrame = 0;
+    const next = computedColumns();
+    if (next == null) return false;
+
+    const previous = effectiveColumns;
+    if (previous == null) {
+      effectiveColumns = next;
+      return false;
+    }
+    if (next === previous) return false;
+
+    effectiveColumns = next;
+    const app = instance();
+    const rendered = Boolean(app && isActive() && typeof app.render === 'function');
+    if (rendered) app.render();
+    publishResponsiveColumns(previous, next, reason, rendered);
+    return true;
+  }
+
+  function scheduleResponsiveColumns(reason = 'resize') {
+    if (responsiveFrame) return false;
+    responsiveFrame = requestAnimationFrame(() => syncResponsiveColumns(reason));
+    return true;
+  }
+
+  function bindResponsiveColumns() {
+    if (responsiveTrackingBound) return;
+    responsiveTrackingBound = true;
+    if (effectiveColumns == null) effectiveColumns = computedColumns();
+
+    const onResize = () => scheduleResponsiveColumns('viewport-resize');
+    const onOrientation = () => scheduleResponsiveColumns('orientation-change');
+    const onApplication = event => {
+      if (event.detail?.name === 'dripfeed') scheduleResponsiveColumns('application-activate');
+    };
+
+    window.addEventListener('resize', onResize, { passive: true });
+    window.addEventListener('orientationchange', onOrientation, { passive: true });
+    window.addEventListener('ncn:application-change', onApplication);
+    responsiveListeners.set('resize', onResize);
+    responsiveListeners.set('orientationchange', onOrientation);
+    responsiveListeners.set('ncn:application-change', onApplication);
+
+    if (typeof ResizeObserver === 'function') {
+      responsiveObserver = new ResizeObserver(() => scheduleResponsiveColumns('root-resize'));
+      const element = root();
+      if (element) responsiveObserver.observe(element);
+    }
+  }
+
+  function unbindResponsiveColumns() {
+    cancelResponsiveFrame();
+    responsiveObserver?.disconnect?.();
+    responsiveObserver = null;
+    responsiveListeners.forEach((listener, type) => window.removeEventListener(type, listener));
+    responsiveListeners.clear();
+    responsiveTrackingBound = false;
   }
 
   function publishedElement(role) {
@@ -144,7 +243,10 @@ window.NCNDripfeed = (() => {
   }
 
   function resume() {
-    if (!suspended) return;
+    if (!suspended) {
+      scheduleResponsiveColumns('resume');
+      return;
+    }
     suspended = false;
     if (restoreAfterSuspend && isActive()) {
       const app = instance();
@@ -153,6 +255,7 @@ window.NCNDripfeed = (() => {
       applyGeometryOwner();
     }
     restoreAfterSuspend = false;
+    scheduleResponsiveColumns('resume');
   }
 
   function reset() {
@@ -160,14 +263,17 @@ window.NCNDripfeed = (() => {
     if (!app) return;
     if (typeof app.reset === 'function') {
       app.reset();
+      scheduleResponsiveColumns('reset');
       return;
     }
     app.readerTransition?.close?.({ immediate: true });
     app.submit?.close?.();
     app.render?.();
+    effectiveColumns = computedColumns() ?? effectiveColumns;
   }
 
   function destroy() {
+    unbindResponsiveColumns();
     const element = root();
     const app = instance();
     if (geometryOwner) app?.depth?.releaseExternalGeometry?.(geometryOwner);
@@ -176,6 +282,7 @@ window.NCNDripfeed = (() => {
     suspended = false;
     restoreAfterSuspend = false;
     geometryOwner = null;
+    effectiveColumns = null;
   }
 
   function getDepthPlaneDefinitions() {
@@ -184,6 +291,8 @@ window.NCNDripfeed = (() => {
       || [];
   }
 
+  bindResponsiveColumns();
+
   return Object.freeze({
     getSpatialSurfaces,
     getReadingZone,
@@ -191,6 +300,8 @@ window.NCNDripfeed = (() => {
     getDepthPlaneDefinitions,
     claimGeometryOwnership,
     releaseGeometryOwnership,
+    syncResponsiveColumns,
+    getEffectiveColumns: () => computedColumns(),
     isReading,
     suspend,
     resume,
@@ -204,6 +315,13 @@ window.NCNDripfeed = (() => {
       suspended,
       hasReadingZone: Boolean(readingElement()),
       geometryOwner,
+      responsiveColumns: Object.freeze({
+        effective: effectiveColumns,
+        computed: computedColumns(),
+        tracking: responsiveTrackingBound,
+        observerConnected: Boolean(responsiveObserver),
+        pending: Boolean(responsiveFrame)
+      }),
       depth: instance()?.depth?.snapshot?.() || null,
       surfaces: Object.freeze(Object.fromEntries(
         Object.entries(getSpatialSurfaces()).map(([key, value]) => [
