@@ -9,6 +9,7 @@ on:
       - "js/dripfeed-depth.js"
       - "js/dripfeed-adapter.js"
       - "js/dripfeed-chamber-integration.js"
+      - "tests/dripfeed-responsive-columns.test.js"
       - "tests/dripfeed-chamber-integration.test.js"
       - "tests/dripfeed-chamber-integration.mjs"
       - "docs/DRIPFEED-CHAMBER-INTEGRATION.md"
@@ -31,8 +32,11 @@ jobs:
           node --check js/dripfeed-depth.js
           node --check js/dripfeed-adapter.js
           node --check js/dripfeed-chamber-integration.js
+          node --check tests/dripfeed-responsive-columns.test.js
           node --check tests/dripfeed-chamber-integration.test.js
           node --check tests/dripfeed-chamber-integration.mjs
+      - name: Run Dripfeed responsive-column contract
+        run: node tests/dripfeed-responsive-columns.test.js
       - name: Run deterministic chamber contract
         run: node tests/dripfeed-chamber-integration.test.js
       - name: Check production load order and ownership boundary
@@ -65,14 +69,21 @@ jobs:
           }
 
           const adapterSource = fs.readFileSync('js/dripfeed-adapter.js', 'utf8');
-          for (const required of ['getSpatialSurfaces', 'claimGeometryOwnership', 'releaseGeometryOwnership']) {
+          for (const required of [
+            'getSpatialSurfaces',
+            'claimGeometryOwnership',
+            'releaseGeometryOwnership',
+            'syncResponsiveColumns',
+            'responsive-columns-change',
+            'app.render()'
+          ]) {
             if (!adapterSource.includes(required)) throw new Error(`Public Dripfeed adapter is missing: ${required}`);
           }
           const depthSource = fs.readFileSync('js/dripfeed-depth.js', 'utf8');
           for (const required of ['claimExternalGeometry', 'releaseExternalGeometry', 'sharedDepthDormant']) {
             if (!depthSource.includes(required)) throw new Error(`Interim depth adapter lacks explicit geometry handoff: ${required}`);
           }
-          console.log('Dripfeed chamber load order, public contract and geometry handoff are valid.');
+          console.log('Dripfeed chamber load order, responsive replan, public contract and geometry handoff are valid.');
           NODE
 
   rendered-proof:
@@ -87,7 +98,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.54.1 > /tmp/ncn-browser-install.log 2>&1
           npx playwright install --with-deps chromium >> /tmp/ncn-browser-install.log 2>&1
-      - name: Run desktop and mobile chamber proof
+      - name: Run desktop, mobile and responsive-transition chamber proof
         run: |
           set -euo pipefail
           mkdir -p artifacts/dripfeed-chamber
