@@ -60,11 +60,18 @@ async function enterImageStep(page, suffix) {
 async function commitSelectedImage(page) {
   await page.locator('.photo-result-shell .photo-result').first().click();
   await page.waitForFunction(() => document.querySelectorAll('.crop-preview-grid .crop-preview').length === 4);
-  await page.evaluate(() => {
-    const button = document.querySelector('[data-wizard-step="2"] [data-submit-action="next"]');
-    button.click();
-    button.click();
+  const commit = await page.evaluate(async () => {
+    const controller = document.querySelector('#dripfeed-root').__dripfeedApp.submit;
+    const results = await Promise.all([controller.next(), controller.next()]);
+    return {
+      results,
+      step: controller.step,
+      committedPhotoKey: controller.committedPhotoKey,
+      pendingCommit: Boolean(controller.commitPromise)
+    };
   });
+  assert(commit.step === 3, `concurrent picker commit remained on step ${commit.step}.`);
+  assert(Boolean(commit.committedPhotoKey), 'concurrent picker commit did not retain its committed image key.');
   await page.waitForFunction(() => document.querySelector('[data-wizard-step="3"]')?.classList.contains('active'));
 }
 
