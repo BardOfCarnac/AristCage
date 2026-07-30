@@ -85,6 +85,11 @@ window.NCNDripfeedChamber = (() => {
     return Math.max(0, rectHeight || finite(element?.offsetHeight) || fallback);
   }
 
+  /* The controls are deliberately foreground overlays. A very tall title plus
+     both control rows would otherwise force the wall deep into the chamber.
+     The selected grid aperture therefore clears the terminal title rail; the
+     Dripfeed controls float over its upper portion, exactly as the UI brief
+     requires, while remaining outside the scrolling surface. */
   function computeGeometry(camera, metrics = {}) {
     if (!camera?.apertureAt || !camera?.scaleAt) return null;
 
@@ -110,13 +115,13 @@ window.NCNDripfeedChamber = (() => {
       const candidate = { lineZ, aperture, step };
       fallback = candidate;
 
-      const clearsControls = aperture.top >= controlsBottom + OCCLUSION_GAP;
+      const clearsTitle = aperture.top >= railBottom + OCCLUSION_GAP;
       const clearsViewport = aperture.left >= -VIEWPORT_MARGIN
         && aperture.right <= viewportWidth + VIEWPORT_MARGIN
         && aperture.bottom <= viewportHeight - VIEWPORT_MARGIN;
       const usableHeight = aperture.height >= MIN_APERTURE_HEIGHT;
 
-      if (clearsControls && clearsViewport && usableHeight) {
+      if (clearsTitle && clearsViewport && usableHeight) {
         chosen = candidate;
         break;
       }
@@ -207,6 +212,8 @@ window.NCNDripfeedChamber = (() => {
 
     setPx(element, '--drip-chamber-control-left', next.controls.left);
     setPx(element, '--drip-chamber-control-width', next.controls.width);
+    setPx(element, '--drip-chamber-control-top', next.controls.top);
+    setPx(element, '--drip-chamber-utility-top', next.controls.utilityTop);
 
     const corrected = computeGeometry(camera, {
       railBottom: currentRailBottom(),
