@@ -131,7 +131,7 @@ async function runViewport(browser, name, viewport) {
   assert(reading.connected, `${name}: ready publication has no connected reading surface.`);
   assert(reading.surface === 'reading', `${name}: reader is not published as the reading surface.`);
 
-  await page.locator('#dripfeed-root [data-action="close-reader"]').click();
+  await page.locator('#dripfeed-root [data-reader-target] > .reader-card [data-action="close-reader"]').click();
   await page.waitForFunction(() => window.NCNDripfeedChamber.snapshot().readingState === 'idle');
 
   await page.evaluate(() => window.NCNApplications.switchTo('redwire', { animate: false }));
