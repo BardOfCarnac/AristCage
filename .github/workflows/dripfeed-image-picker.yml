@@ -17,6 +17,7 @@ on:
       - "tests/dripfeed-image-picker-contract.test.js"
       - "tests/dripfeed-image-picker-hardening.test.js"
       - "tests/dripfeed-image-picker.mjs"
+      - "tests/dripfeed-tile-fit-diagnostic.mjs"
       - "docs/dripfeed-image-provider-picker.md"
       - ".github/workflows/dripfeed-image-picker.yml"
   workflow_dispatch:
@@ -45,6 +46,7 @@ jobs:
           node --check tests/dripfeed-image-picker-contract.test.js
           node --check tests/dripfeed-image-picker-hardening.test.js
           node --check tests/dripfeed-image-picker.mjs
+          node --check tests/dripfeed-tile-fit-diagnostic.mjs
       - name: Verify provider registry
         run: node tests/dripfeed-image-providers.test.js
       - name: Verify picker integration boundary
@@ -77,6 +79,7 @@ jobs:
             fi
             sleep 1
           done
+          node tests/dripfeed-tile-fit-diagnostic.mjs
           NCN_ARTIFACT_DIR=artifacts/dripfeed-image-picker node tests/dripfeed-image-picker.mjs
       - name: Upload rendered proof
         if: always()
