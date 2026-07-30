@@ -1,0 +1,41 @@
+name: Dripfeed image picker
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "js/config.js"
+      - "js/dripfeed-model.js"
+      - "js/dripfeed-image-providers.js"
+      - "js/dripfeed-renderer.js"
+      - "js/dripfeed-submit-controller.js"
+      - "js/dripfeed-app.js"
+      - "css/dripfeed-image-picker.css"
+      - "tests/dripfeed-image-providers.test.js"
+      - "tests/dripfeed-image-picker-contract.test.js"
+      - "docs/dripfeed-image-provider-picker.md"
+      - ".github/workflows/dripfeed-image-picker.yml"
+  workflow_dispatch:
+
+jobs:
+  provider-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check publication syntax
+        run: |
+          node --check js/config.js
+          node --check js/dripfeed-model.js
+          node --check js/dripfeed-image-providers.js
+          node --check js/dripfeed-renderer.js
+          node --check js/dripfeed-submit-controller.js
+          node --check js/dripfeed-app.js
+          node --check tests/dripfeed-image-providers.test.js
+          node --check tests/dripfeed-image-picker-contract.test.js
+      - name: Verify provider registry
+        run: node tests/dripfeed-image-providers.test.js
+      - name: Verify picker integration boundary
+        run: node tests/dripfeed-image-picker-contract.test.js
