@@ -10,7 +10,7 @@ function assert(condition, message) {
 }
 
 async function runViewport(browser, name, viewport) {
-  const page = await browser.newPage({ viewportSize: viewport });
+  const page = await browser.newPage({ viewport });
   const errors = [];
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
   page.on('console', message => {
@@ -37,6 +37,7 @@ async function runViewport(browser, name, viewport) {
     };
     return {
       state,
+      viewport: { width: innerWidth, height: innerHeight },
       rail: rect(rail),
       stage: rect(stage),
       occluder: rect(occluder),
@@ -82,16 +83,19 @@ async function runViewport(browser, name, viewport) {
 
   await page.screenshot({ path: path.join(artifactDir, `${name}-initial.png`), fullPage: false });
   await fs.writeFile(path.join(artifactDir, `${name}-initial.json`), JSON.stringify({ initial, errors }, null, 2));
-  console.log(`${name} initial geometry: ${JSON.stringify({ rail: initial.rail, filter: initial.filter, utility: initial.utility, stage: initial.stage, variables: initial.rootVariables, geometry: initial.state.geometry })}`);
+  console.log(`${name} initial geometry: ${JSON.stringify({ viewport: initial.viewport, rail: initial.rail, filter: initial.filter, utility: initial.utility, stage: initial.stage, variables: initial.rootVariables, geometry: initial.state.geometry })}`);
 
   const planes = initial.state.planes.reduce((map, plane) => ({ ...map, [plane.role]: plane.z }), {});
+  assert(initial.viewport.width === viewport.width && initial.viewport.height === viewport.height, `${name}: requested viewport was not applied.`);
   assert(initial.state.integrated, `${name}: Dripfeed was not marked chamber-integrated.`);
   assert(planes.reader < planes.occluder, `${name}: reader is not in front of the occluder.`);
   assert(planes.occluder < planes.live, `${name}: live wall is not behind the occluder.`);
   assert(planes.live < planes.latent, `${name}: latent wall is not behind live.`);
   assert(initial.stageStyle.position === 'fixed', `${name}: stage is not fixed to the chamber aperture.`);
   assert(['auto', 'scroll'].includes(initial.stageStyle.overflowY), `${name}: stage does not own native vertical scrolling.`);
-  assert(initial.stage.top >= initial.rail.bottom, `${name}: chamber aperture begins beneath the title rail.`);
+  assert(initial.stage.left >= -1 && initial.stage.right <= initial.viewport.width + 1, `${name}: chamber aperture exceeds the horizontal viewport.`);
+  assert(initial.stage.top >= -1 && initial.stage.bottom <= initial.viewport.height + 1, `${name}: chamber aperture exceeds the vertical viewport.`);
+  assert(initial.rail.bottom > initial.stage.top, `${name}: title rail is not floating over the upper aperture.`);
   assert(initial.filterStyle.position === 'fixed', `${name}: filter rail is not foreground-fixed.`);
   assert(initial.filterStyle.flexWrap === 'nowrap', `${name}: filter rail wrapped.`);
   assert(initial.filter.top >= initial.rail.bottom - 1, `${name}: filter rail is not immediately beneath the title.`);
