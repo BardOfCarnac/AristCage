@@ -1,0 +1,80 @@
+name: RedWire Weather Card Occlusion
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "js/redwire-weather-card-occlusion.js"
+      - "tests/redwire-weather-card-occlusion.test.js"
+      - "tests/redwire-weather-card-occlusion-render.mjs"
+      - ".github/workflows/redwire-weather-card-occlusion.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check occlusion bridge syntax
+        run: |
+          node --check js/redwire-weather-card-occlusion.js
+          node --check tests/redwire-weather-card-occlusion.test.js
+          node --check tests/redwire-weather-card-occlusion-render.mjs
+      - name: Run mounted occlusion contract
+        run: node tests/redwire-weather-card-occlusion.test.js
+      - name: Check production load order
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const departments = html.indexOf('js/integration-departments.js');
+          const occlusion = html.indexOf('js/redwire-weather-card-occlusion.js');
+          const article = html.indexOf('js/article-mist-descent.js');
+          if (departments < 0 || occlusion < departments || article < occlusion) {
+            throw new Error('Weather card occlusion must load after accepted departments and before article composition.');
+          }
+          if ((html.match(/js\/redwire-weather-card-occlusion\.js/g) || []).length !== 1) {
+            throw new Error('Weather card occlusion must load exactly once.');
+          }
+          console.log('Weather card occlusion production load order is correct.');
+          NODE
+
+  rendered-heavy-mist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1
+          npx playwright install --with-deps chromium
+      - name: Prove heavy mist is absent inside card plates
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/redwire-weather-card-occlusion
+          python3 -m http.server 4173 > /tmp/ncn-card-occlusion-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/redwire-weather-card-occlusion-render.mjs
+      - name: Upload heavy-mist evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redwire-weather-card-occlusion
+          path: |
+            artifacts/redwire-weather-card-occlusion/
+            /tmp/ncn-card-occlusion-http.log
+          if-no-files-found: warn
