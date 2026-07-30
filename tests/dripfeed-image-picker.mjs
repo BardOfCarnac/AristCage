@@ -161,9 +161,9 @@ async function runViewport(browser, name, viewport) {
   await page.check('#review-confirm');
   await page.locator('[data-wizard-step="3"] [data-submit-action="transmit"]').click();
   await page.waitForFunction(() => !document.querySelector('[data-overlay="submit"]')?.classList.contains('open'));
-  await page.waitForSelector('.live-wall [data-post-id] .photo-credit a');
-  const publishedTitle = await page.locator('.live-wall [data-post-id] h2').first().textContent();
-  assert(publishedTitle?.includes('Provider picker proof A'), `${name}: provider-backed transmission did not publish.`);
+  const publishedTile = page.locator('.live-wall .listing-tile').filter({ hasText: 'Provider picker proof A' }).first();
+  await publishedTile.waitFor({ state: 'attached' });
+  assert(await publishedTile.locator('.photo-credit a').count() >= 2, `${name}: published attribution links are missing.`);
 
   await page.locator('[data-action="open-submit"]').click();
   await enterImageStep(page, 'B');
