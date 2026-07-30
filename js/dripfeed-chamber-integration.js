@@ -46,9 +46,10 @@ window.NCNDripfeedChamber = (() => {
   }
 
   function isDripfeedActive() {
+    const element = root();
     return Boolean(
-      root()
-      && !root().hidden
+      element
+      && !element.hidden
       && (window.NCNApplications?.current?.() || window.NCN_STATE?.activeApp) === 'dripfeed'
     );
   }
@@ -89,6 +90,19 @@ window.NCNDripfeedChamber = (() => {
   function measureHeight(element, fallback) {
     const rectHeight = finite(element?.getBoundingClientRect?.().height);
     return Math.max(0, rectHeight || finite(element?.offsetHeight) || fallback);
+  }
+
+  function layoutMetrics(element, aperture, wallGutter) {
+    let columns = 3;
+    let gap = 8;
+    try {
+      const styles = getComputedStyle(element);
+      columns = Math.max(1, Math.floor(finite(styles.getPropertyValue('--cols'), 3)));
+      gap = Math.max(0, finite(parseFloat(styles.getPropertyValue('--gap')), 8));
+    } catch (error) {}
+    const contentWidth = Math.max(1, aperture.width - wallGutter * 2);
+    const unit = Math.max(24, (contentWidth - gap * (columns - 1)) / columns);
+    return Object.freeze({ columns, gap, unit, contentWidth });
   }
 
   function planeProjection(camera, z, aperture) {
@@ -212,8 +226,8 @@ window.NCNDripfeedChamber = (() => {
     setPx(element, '--drip-latent-x', latent.x);
     setPx(element, '--drip-latent-y', latent.y);
     element.style.setProperty('--drip-latent-scale', latent.scale.toFixed(6));
-    setPx(element, '--drip-reader-x', reader.x);
-    setPx(element, '--drip-reader-y', reader.y);
+    setPx(element, '--drip-reader-x', 0);
+    setPx(element, '--drip-reader-y', 0);
     element.style.setProperty('--drip-reader-scale', reader.scale.toFixed(6));
   }
 
@@ -251,7 +265,9 @@ window.NCNDripfeedChamber = (() => {
     });
     if (corrected) next = corrected;
 
-    geometry = next;
+    const layout = layoutMetrics(element, next.aperture, next.wallGutter);
+    geometry = Object.freeze({ ...next, layout });
+    next = geometry;
     const rect = next.aperture;
     setPx(element, '--drip-chamber-left', rect.left);
     setPx(element, '--drip-chamber-top', rect.top);
@@ -265,6 +281,7 @@ window.NCNDripfeedChamber = (() => {
     setPx(element, '--drip-chamber-utility-height', next.controls.utilityHeight);
     setPx(element, '--drip-wall-gutter', next.wallGutter);
     setPx(element, '--drip-leading-clearance', next.leadingClearance);
+    setPx(element, '--unit', next.layout.unit);
     applyPlaneVariables(element, next);
 
     element.dataset.chamberIntegrated = 'true';
@@ -405,9 +422,7 @@ window.NCNDripfeedChamber = (() => {
     clearScene();
 
     const publication = surfaces();
-    if (publication.depthHost) {
-      delete publication.depthHost.dataset.geometryOwner;
-    }
+    if (publication.depthHost) delete publication.depthHost.dataset.geometryOwner;
     const element = root();
     if (element) {
       readingState('idle');
