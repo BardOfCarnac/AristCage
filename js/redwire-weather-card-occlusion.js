@@ -2,8 +2,8 @@
   REDWIRE WEATHER CARD OCCLUSION
 
   Integration-owned completed-frame compositor. Rear Weather is removed beneath
-  rendered Optical plates. During heavy mist, only Weather puffs genuinely nearer
-  than the approved foreground threshold are replayed above those plates.
+  rendered Optical plates. During heavy mist, only the leading edge of genuinely
+  near Weather puffs is replayed above those plates.
 ==================================================*/
 (() => {
   "use strict";
@@ -16,6 +16,7 @@
   const FOREGROUND_CLASS = "ncn-redwire-weather-foreground";
   const HEAVY_MIST_PRESET = "heavy-mist";
   const HEAVY_FRONT_DEPTH = 5.45;
+  const LEADING_DEPTH_WINDOW = 0.18;
   const FOREGROUND_Z_INDEX = 24;
   const EDGE_FEATHER = 6;
 
@@ -33,6 +34,7 @@
   let lastCanvasCount = 0;
   let lastForegroundPuffs = 0;
   let lastForegroundRegions = 0;
+  let lastForegroundThreshold = HEAVY_FRONT_DEPTH;
   let foregroundGeneration = 0;
 
   function activeApplication() {
@@ -188,9 +190,15 @@
     lastForegroundRegions = 0;
   }
 
-  function foregroundRegions(plates) {
+  function leadingForegroundThreshold(depthFrame) {
+    const nearest = Number(depthFrame?.depthRange?.nearest);
+    if (!Number.isFinite(nearest)) return HEAVY_FRONT_DEPTH;
+    return Math.min(HEAVY_FRONT_DEPTH, nearest + LEADING_DEPTH_WINDOW);
+  }
+
+  function foregroundRegions(plates, nearerThan = HEAVY_FRONT_DEPTH) {
     return plates.map(rect => Object.freeze({
-      nearerThan: HEAVY_FRONT_DEPTH,
+      nearerThan,
       polygons: Object.freeze([Object.freeze([
         Object.freeze({ x: rect.left, y: rect.top }),
         Object.freeze({ x: rect.right, y: rect.top }),
@@ -245,7 +253,8 @@
 
     const viewport = foregroundViewport();
     if (!viewport || !foregroundContext) return 0;
-    const regions = foregroundRegions(plates);
+    const threshold = leadingForegroundThreshold(depthFrame);
+    const regions = foregroundRegions(plates, threshold);
     foregroundContext.clearRect?.(0, 0, viewport.width, viewport.height);
     let rendered = 0;
     try {
@@ -261,6 +270,7 @@
     }
 
     if (rendered > 0) applyFeatherMask(plates, viewport);
+    lastForegroundThreshold = threshold;
     lastForegroundPuffs = rendered;
     lastForegroundRegions = regions.length;
     foregroundCanvas.hidden = rendered <= 0;
@@ -344,6 +354,7 @@
       lastCanvasCount,
       lastForegroundPuffs,
       lastForegroundRegions,
+      lastForegroundThreshold,
       foregroundDepth: HEAVY_FRONT_DEPTH,
       foregroundZIndex: FOREGROUND_Z_INDEX,
       foregroundGeneration,
