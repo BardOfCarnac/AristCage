@@ -2,7 +2,7 @@
 window.NCNWeatherDepartmentManifest = Object.freeze({
   apiVersion: 1,
   department: "weather",
-  version: "1.2.0-pr86",
+  version: "1.3.0-pr86",
   dependencies: Object.freeze(["visual-director", "effects"]),
   layers: Object.freeze([
     "weather:far",
@@ -29,6 +29,7 @@ window.NCNWeatherDepartmentManifest = Object.freeze({
   owns: Object.freeze([
     "weather canvases within supplied weather layers",
     "bounded reusable weather particle pools",
+    "depth-aware light-catching ash, mote, ember and electrical fields",
     "data-driven weather presets and transitions",
     "reading and control-zone attenuation",
     "immutable read-only depth-frame rendering views",
@@ -39,5 +40,5 @@ window.NCNWeatherDepartmentManifest = Object.freeze({
   replaces: "weather",
   reducedMotion: true,
   deterministicTesting: true,
-  notes: "Departmental publication only. It exposes exact puff-depth frame views and a synchronous after-render subscription, but does not install itself or inspect Optical/article state."
+  notes: "Departmental publication only. It exposes exact puff-depth frame views and synchronous completed-frame publication, and renders deterministic depth-aware particles through supplied Weather layers without inspecting Optical/article state."
 });
