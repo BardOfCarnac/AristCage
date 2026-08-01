@@ -240,7 +240,9 @@ global.NCNIntegration = {
       preset: activeApplication === "redwire" ? "mist" : "clear",
       targetPreset: activeApplication === "redwire" ? "mist" : "clear",
       intensity: activeApplication === "redwire" ? 0.46 : 0,
-      targetIntensity: activeApplication === "redwire" ? 0.46 : 0
+      targetIntensity: activeApplication === "redwire" ? 0.46 : 0,
+      qualityOverride: "auto",
+      seed: 2045
     };
     motionState = { enabled: activeApplication === "redwire", activeSequenceCount: 0, activeSequences: [] };
     return Object.freeze({ application: activeApplication, applied: Object.freeze(["weather", "chamber-motion"]) });
@@ -287,11 +289,16 @@ vm.runInThisContext(source, { filename: "dev-panel-controls.js" });
   assert.equal(documentListeners.has("input:true"), true, "capture input delegate should exist only while active");
   assert.equal(busSubscriptions.size, 2, "diagnostic bus subscriptions should be bounded and visible");
 
+  inputs.get("quality").value = "high";
+  inputs.get("seed").value = "98765";
   await global.NCNDevPanel.dispatchControl("weather", "heavy");
   assert.equal(weatherCalls.at(-1).profile.preset, "heavy-mist");
+  assert.equal(weatherCalls.at(-1).profile.quality, "high");
+  assert.equal(weatherState.qualityOverride, "high", "the laboratory should be able to mutate Weather quality");
   assert.equal(documentElement.dataset.devEnvironmentPreview, "true");
   await global.NCNDevPanel.dispatchControl("weather-action", "reseed");
-  assert.deepEqual(seedCalls, ["2045"]);
+  assert.deepEqual(seedCalls, ["98765"]);
+  assert.equal(weatherState.seed, "98765", "the laboratory should be able to mutate Weather seed");
   global.NCNDevPanel.toggleWeatherLayer("near");
   assert.equal(documentElement.dataset.debugWeatherHiddenLayers, "near");
 
@@ -318,6 +325,8 @@ vm.runInThisContext(source, { filename: "dev-panel-controls.js" });
   assert.equal(cleaned.motionBindingsActive, false);
   assert.equal(cleaned.eventSubscriptionCount, 0);
   assert.equal(cleaned.overrideActive, false);
+  assert.equal(cleaned.weather.qualityOverride, "auto", "diagnostics-off must clear the laboratory quality override");
+  assert.equal(cleaned.weather.seed, 2045, "diagnostics-off must restore the canonical Weather seed");
   assert.equal(documentElement.dataset.devEnvironmentPreview, undefined);
   assert.equal(documentElement.dataset.debugWeatherHiddenLayers, undefined);
   assert.equal(documentListeners.size, 0, "diagnostic document delegates must be removed");
