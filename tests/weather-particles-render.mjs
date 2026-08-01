@@ -127,12 +127,14 @@ async function runCase(name, viewport, profile, expectations, reducedMotion = "n
   await page.emulateMedia({ reducedMotion });
   try {
     await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
-    await page.waitForFunction(() => (
-      window.NCNIntegratedDepartments?.isReady?.() === true
-      && window.NCNIntegration?.getService?.("weather")
-      && window.NCNWeatherParticleField?.installed?.() === true
-      && window.NCNChamberCamera?.snapshot?.().presentation?.settled === true
-    ), null, { timeout: 30_000 });
+    await page.waitForFunction(() => {
+      const camera = window.NCNChamberCamera?.snapshot?.();
+      return window.NCNIntegratedDepartments?.isReady?.() === true
+        && Boolean(window.NCNIntegration?.getService?.("weather"))
+        && window.NCNWeatherParticleField?.installed?.() === true
+        && Boolean(camera)
+        && Boolean(camera.visibleAperture || camera.nearAperture);
+    }, null, { timeout: 30_000 });
 
     await applyProfile(page, profile, `particle-render-proof:${name}`);
     await page.waitForFunction(minimum => {
