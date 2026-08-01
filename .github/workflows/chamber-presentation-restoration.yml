@@ -9,6 +9,8 @@ on:
       - "departments/weather/weather-module.js"
       - "departments/weather/README.md"
       - "js/environment-manager.js"
+      - "js/layered-chamber.js"
+      - "js/chamber-camera.js"
       - "js/chamber-motion-presentation.js"
       - "tests/environment-profile-contract.test.js"
       - "tests/weather-after-render-contract.test.js"
@@ -16,7 +18,10 @@ on:
       - "tests/chamber-motion-presentation-transaction.test.js"
       - "tests/chamber-motion-presentation-init-race.test.js"
       - "tests/chamber-motion-presentation-render.mjs"
+      - "tests/chamber-live-presentation.test.js"
+      - "tests/chamber-live-aperture-render.mjs"
       - "docs/CHAMBER-PRESENTATION-RESTORATION.md"
+      - ".github/workflows/chamber-live-aperture.yml"
       - ".github/workflows/chamber-presentation-restoration.yml"
   workflow_dispatch:
 
