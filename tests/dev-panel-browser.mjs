@@ -42,6 +42,16 @@ async function diagnosticsSnapshot(page) {
   }));
 }
 
+async function weatherBaseline(page) {
+  return page.evaluate(() => {
+    const weather = window.NCNIntegration?.getService?.("weather")?.snapshot?.();
+    return {
+      qualityOverride: weather?.qualityOverride || "auto",
+      seed: weather?.seed ?? null
+    };
+  });
+}
+
 async function waitForDiagnostics(page, enabled) {
   await page.waitForFunction(expected => {
     const snapshot = window.NCNDevPanel?.snapshot?.();
@@ -178,17 +188,21 @@ async function verifyWeatherControls(page, viewportName) {
   assert.equal(report.controls.quality, "high", `${viewportName}: report should include quality override`);
 }
 
-async function verifyDisabledCleanup(page, viewportName, application) {
+async function verifyDisabledCleanup(page, viewportName, application, baseline) {
   await page.locator(".diagnostics-toggle").click();
   await waitForDiagnostics(page, false);
 
-  await page.waitForFunction(expected => {
+  await page.waitForFunction(({ expectedApplication, expectedBaseline }) => {
     const weather = window.NCNIntegration?.getService?.("weather")?.snapshot?.();
-    if (expected === "dripfeed") return weather?.enabled === false && Number(weather.targetIntensity) === 0;
-    return weather?.enabled === true
-      && weather.targetPreset === "mist"
-      && Math.abs(Number(weather.targetIntensity) - 0.46) < 0.01;
-  }, application, { timeout: 15_000 });
+    const applicationReady = expectedApplication === "dripfeed"
+      ? weather?.enabled === false && Number(weather.targetIntensity) === 0
+      : weather?.enabled === true
+        && weather.targetPreset === "mist"
+        && Math.abs(Number(weather.targetIntensity) - 0.46) < 0.01;
+    return applicationReady
+      && weather?.qualityOverride === expectedBaseline.qualityOverride
+      && weather?.seed === expectedBaseline.seed;
+  }, { expectedApplication: application, expectedBaseline: baseline }, { timeout: 15_000 });
 
   const cleaned = await diagnosticsSnapshot(page);
   assert.equal(cleaned.rootClass, false, `${viewportName}/${application}: diagnostics class should be removed`);
@@ -201,6 +215,8 @@ async function verifyDisabledCleanup(page, viewportName, application) {
   assert.equal(cleaned.panel.eventSubscriptionCount, 0, `${viewportName}/${application}: event-bus subscriptions should be released`);
   assert.equal(cleaned.panel.overrideActive, false, `${viewportName}/${application}: override state should be cleared`);
   assert.equal(cleaned.environment, application, `${viewportName}/${application}: canonical application profile should be active`);
+  assert.equal(cleaned.weather.qualityOverride, baseline.qualityOverride, `${viewportName}/${application}: Weather quality must return to its canonical pre-lab value`);
+  assert.equal(cleaned.weather.seed, baseline.seed, `${viewportName}/${application}: Weather seed must return to its canonical pre-lab value`);
 }
 
 async function enableWithKeyboard(page) {
@@ -234,10 +250,12 @@ async function runViewport(viewportName, viewport) {
     await verifyWeatherControls(page, viewportName);
     await switchApplication(page, "dripfeed");
     await page.waitForSelector("#dripfeed-root .listing-tile", { state: "visible", timeout: 15_000 });
+    const dripfeedBaseline = await weatherBaseline(page);
+    assert.equal(dripfeedBaseline.qualityOverride, "auto", `${viewportName}/dripfeed: canonical profile should own automatic Weather quality`);
     await page.locator('[data-debug-weather="mist"]').click();
     await page.waitForFunction(() => document.documentElement.dataset.devEnvironmentPreview === "true", null, { timeout: 10_000 });
     await page.locator('[data-debug-weather-layer="rear"]').click();
-    await verifyDisabledCleanup(page, viewportName, "dripfeed");
+    await verifyDisabledCleanup(page, viewportName, "dripfeed", dripfeedBaseline);
 
     await page.locator("#dripfeed-root .listing-tile").first().click();
     await page.waitForSelector("#dripfeed-root [data-overlay='reader'].reader-resolved", { state: "visible", timeout: 15_000 });
@@ -246,9 +264,11 @@ async function runViewport(viewportName, viewport) {
 
     await enableWithKeyboard(page);
     await switchApplication(page, "redwire");
+    const redwireBaseline = await weatherBaseline(page);
+    assert.equal(redwireBaseline.qualityOverride, "auto", `${viewportName}/redwire: canonical profile should own automatic Weather quality`);
     await page.locator('[data-debug-weather="heavy"]').click();
     await page.locator('[data-debug-weather-layer="far"]').click();
-    await verifyDisabledCleanup(page, viewportName, "redwire");
+    await verifyDisabledCleanup(page, viewportName, "redwire", redwireBaseline);
 
     const story = page.locator("#feed > .entry:not(.panel)").first();
     await story.waitFor({ state: "visible", timeout: 10_000 });
@@ -280,7 +300,7 @@ async function runViewport(viewportName, viewport) {
 try {
   await runViewport("desktop", { width: 1440, height: 900 });
   await runViewport("mobile", { width: 390, height: 844 });
-  console.log("PASS: Weather laboratory interaction, cleanup and RedWire/Dripfeed usability verified on desktop and mobile");
+  console.log("PASS: Weather laboratory interaction, complete state cleanup and RedWire/Dripfeed usability verified on desktop and mobile");
 } finally {
   await browser.close();
 }
