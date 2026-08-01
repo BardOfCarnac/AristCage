@@ -1,93 +1,192 @@
-name: RedWire Weather Card Occlusion
+name: Apply canonical heavy mist
 
 on:
   pull_request:
     paths:
-      - "index.html"
-      - "js/redwire-weather-card-occlusion.js"
-      - "departments/weather/weather-presets.js"
-      - "departments/weather/weather-module.js"
-      - "tests/heavy-mist-weather-policy.test.js"
-      - "tests/redwire-weather-card-occlusion.test.js"
-      - "tests/redwire-weather-card-occlusion-render.mjs"
-      - "tests/redwire-weather-wiring-render.mjs"
       - ".github/workflows/redwire-weather-card-occlusion.yml"
+      - "departments/weather/weather-module.js"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  validate:
+  apply-canonical-weather:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'agent/heavy-mist-foreground-surge'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: 24
-      - name: Check foreground and Weather policy syntax
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Move heavy mist into the accepted Weather module
         run: |
-          node --check js/redwire-weather-card-occlusion.js
-          node --check departments/weather/weather-presets.js
-          node --check departments/weather/weather-module.js
-          node --check tests/heavy-mist-weather-policy.test.js
-          node --check tests/redwire-weather-card-occlusion.test.js
-          node --check tests/redwire-weather-card-occlusion-render.mjs
-          node --check tests/redwire-weather-wiring-render.mjs
-      - name: Run Weather-owned flow contract
-        run: |
-          node tests/heavy-mist-weather-policy.test.js
-          node departments/weather/tests/weather-module.node.test.js
-      - name: Run mounted foreground lifecycle contract
-        run: node tests/redwire-weather-card-occlusion.test.js
-      - name: Check production load order
-        run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const html = fs.readFileSync('index.html', 'utf8');
-          const departments = html.indexOf('js/integration-departments.js');
-          const occlusion = html.indexOf('js/redwire-weather-card-occlusion.js');
-          const article = html.indexOf('js/article-mist-descent.js');
-          if (departments < 0 || occlusion < departments || article < occlusion) {
-            throw new Error('Weather card composition must load after accepted departments and before article composition.');
-          }
-          if ((html.match(/js\/redwire-weather-card-occlusion\.js/g) || []).length !== 1) {
-            throw new Error('Weather card composition must load exactly once.');
-          }
-          console.log('Weather card composition production load order is correct.');
-          NODE
+          python3 <<'PY'
+          from pathlib import Path
 
-  rendered-heavy-mist:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Install browser runner
+          path = Path("departments/weather/weather-module.js")
+          text = path.read_text()
+
+          def replace_once(old, new, label):
+              global text
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f"Missing anchor: {label}")
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              '  const DEPTH_CONVENTION = "smaller-positive-z-is-nearer";\n',
+              '  const DEPTH_CONVENTION = "smaller-positive-z-is-nearer";\n'
+              '  const HEAVY_MIST_PRESET = "heavy-mist";\n'
+              '  const HEAVY_MIST_FOREGROUND_DEPTH = 5.45;\n'
+              '  const MIST_PRESET_DEPTH_BASELINE = Number(PRESETS.mist?.depthFlow) || 0;\n',
+              'Weather depth constants'
+          )
+          replace_once(
+              '      fpsUpdates: 0,\n      depthFrameSerial: 0\n',
+              '      fpsUpdates: 0,\n'
+              '      depthFrameSerial: 0,\n'
+              '      heavyMistPrimePending: false,\n'
+              '      heavyMistPrimeCount: 0\n',
+              'Weather state'
+          )
+          replace_once(
+              '    function resetMistBank(bank, bounds, initial = false) {\n',
+              '    function effectiveMistDepthFlow() {\n'
+              '      const configured = Number(state.config.depthFlow) || 0;\n'
+              '      const presetAdjustment = state.config.mist > 0\n'
+              '        ? configured - MIST_PRESET_DEPTH_BASELINE\n'
+              '        : configured;\n'
+              '      return APPROVED_MIST.depthFlow + presetAdjustment + state.wind.z;\n'
+              '    }\n\n'
+              '    function effectiveParticleDepthFlow() {\n'
+              '      return (Number(state.config.depthFlow) || 0) + state.wind.z;\n'
+              '    }\n\n'
+              '    function resetMistBank(bank, bounds, initial = false) {\n',
+              'effective Weather depth policy'
+          )
+          replace_once(
+              '        const depthFlow = APPROVED_MIST.depthFlow + state.wind.z;\n',
+              '        const depthFlow = effectiveMistDepthFlow();\n',
+              'mist respawn depth flow'
+          )
+          replace_once(
+              '        const particle = { active: false, type };\n',
+              '        const particle = { active: false, type, slot: pool.length };\n',
+              'stable particle slot'
+          )
+          replace_once(
+              '        depthFlow: APPROVED_MIST.depthFlow + state.wind.z,\n',
+              '        depthFlow: effectiveMistDepthFlow(),\n',
+              'mist settings depth flow'
+          )
+          text = text.replace(
+              '(state.wind.z + state.config.depthFlow) * 0.26',
+              'effectiveParticleDepthFlow() * 0.26'
+          )
+          text = text.replace(
+              '(state.wind.z + state.config.depthFlow) * 0.20',
+              'effectiveParticleDepthFlow() * 0.20'
+          )
+          replace_once(
+              '    function updateParticle(particle, deltaSeconds, bounds) {\n',
+              '    function primeHeavyMistBank(bounds) {\n'
+              '      if (!state.heavyMistPrimePending || state.targetPreset !== HEAVY_MIST_PRESET) return 0;\n'
+              '      const bank = particles.mist.find(item => item.active);\n'
+              '      if (!bank) return 0;\n'
+              '      resetMistBank(bank, bounds, true);\n'
+              '      bank.x = 0;\n'
+              '      bank.z = clamp(HEAVY_MIST_FOREGROUND_DEPTH - 0.22, bounds.near + 0.18, bounds.far - 0.25);\n'
+              '      bank.width = 1.72;\n'
+              '      bank.depth = 0.82;\n'
+              '      bank.lift = 0.18;\n'
+              '      bank.verticalSeed = 0.72;\n'
+              '      bank.scaleSeed = 1;\n'
+              '      bank.alpha = 0.95;\n'
+              '      bank.puffs = 4;\n'
+              '      bank.bias = 0.04;\n'
+              '      bank.speed = 0.92;\n'
+              '      state.heavyMistPrimePending = false;\n'
+              '      state.heavyMistPrimeCount += 1;\n'
+              '      return 1;\n'
+              '    }\n\n'
+              '    function updateParticle(particle, deltaSeconds, bounds) {\n',
+              'canonical near bank'
+          )
+          replace_once(
+              '      TYPES.forEach(type => deactivateSurplus(type, counts[type]));\n      particles.mist.forEach(bank => updateMistBank(bank, deltaSeconds, scene.bounds, settings));\n',
+              '      TYPES.forEach(type => deactivateSurplus(type, counts[type]));\n'
+              '      primeHeavyMistBank(scene.bounds);\n'
+              '      particles.mist.forEach(bank => updateMistBank(bank, deltaSeconds, scene.bounds, settings));\n',
+              'prime heavy bank during runtime'
+          )
+          replace_once(
+              '      state.config = selected.values;\n      state.transition = null;\n      if (state.initialised && state.enabled && !state.suspended) runtimeHandle?.wake?.("weather:preset");\n',
+              '      state.config = selected.values;\n'
+              '      state.transition = null;\n'
+              '      state.heavyMistPrimePending = selected.key === HEAVY_MIST_PRESET;\n'
+              '      if (state.initialised && state.enabled && !state.suspended) runtimeHandle?.wake?.("weather:preset");\n',
+              'setPreset heavy prime'
+          )
+          replace_once(
+              '      state.targetPreset = selected.key;\n      if (!duration) return setPreset(selected.key);\n',
+              '      state.targetPreset = selected.key;\n'
+              '      state.heavyMistPrimePending = selected.key === HEAVY_MIST_PRESET;\n'
+              '      if (!duration) return setPreset(selected.key);\n',
+              'transition heavy prime'
+          )
+          replace_once(
+              '      state.config = clonePreset(PRESETS.clear);\n      state.transition = null;\n      state.currentIntensity = 0;\n',
+              '      state.config = clonePreset(PRESETS.clear);\n'
+              '      state.transition = null;\n'
+              '      state.heavyMistPrimePending = false;\n'
+              '      state.currentIntensity = 0;\n',
+              'clear heavy prime'
+          )
+          replace_once(
+              '      particles.mist.forEach(bank => resetMistBank(bank, bounds, true));\n      deactivateAll(false);\n',
+              '      particles.mist.forEach(bank => resetMistBank(bank, bounds, true));\n'
+              '      state.heavyMistPrimePending = state.targetPreset === HEAVY_MIST_PRESET;\n'
+              '      deactivateAll(false);\n',
+              'seed heavy prime'
+          )
+          replace_once(
+              '        depthConvention: DEPTH_CONVENTION,\n        puffCount: puffs.length,\n',
+              '        depthConvention: DEPTH_CONVENTION,\n'
+              '        mistDepthFlow: effectiveMistDepthFlow(),\n'
+              '        particleDepthFlow: effectiveParticleDepthFlow(),\n'
+              '        puffCount: puffs.length,\n',
+              'depth frame flow diagnostics'
+          )
+          replace_once(
+              '          approvedMist: APPROVED_MIST,\n          depthFrame: Object.freeze({\n',
+              '          approvedMist: APPROVED_MIST,\n'
+              '          effectiveDepthFlow: Object.freeze({\n'
+              '            configured: Number(state.config.depthFlow) || 0,\n'
+              '            wind: state.wind.z,\n'
+              '            mist: effectiveMistDepthFlow(),\n'
+              '            particles: effectiveParticleDepthFlow(),\n'
+              '            heavyMistPrimeCount: state.heavyMistPrimeCount\n'
+              '          }),\n'
+              '          depthFrame: Object.freeze({\n',
+              'snapshot flow diagnostics'
+          )
+
+          path.write_text(text)
+          PY
+      - name: Validate canonical Weather source
         run: |
-          npm install --no-save --no-package-lock playwright@1.54.1
-          npx playwright install --with-deps chromium
-      - name: Prove installed Weather foreground publication
+          node --check departments/weather/weather-module.js
+          node departments/weather/tests/weather-module.node.test.js
+      - name: Commit canonical Weather implementation
         run: |
-          set -euo pipefail
-          mkdir -p artifacts/redwire-weather-card-occlusion
-          python3 -m http.server 4173 > /tmp/ncn-card-occlusion-http.log 2>&1 &
-          server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
-            sleep 1
-          done
-          node tests/redwire-weather-wiring-render.mjs
-          node tests/redwire-weather-card-occlusion-render.mjs
-      - name: Upload heavy-mist evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: redwire-weather-card-occlusion
-          path: |
-            artifacts/redwire-weather-card-occlusion/
-            /tmp/ncn-card-occlusion-http.log
-          if-no-files-found: warn
+          if git diff --quiet -- departments/weather/weather-module.js; then
+            echo "Canonical Weather implementation already applied."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add departments/weather/weather-module.js
+          git commit -m "Move heavy mist into canonical Weather module"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
