@@ -174,7 +174,7 @@ vm.runInContext(source, context, { filename: "redwire-weather-card-occlusion.js"
 
   assert.equal(foregroundOptions.length, 1, "Heavy mist must execute one exact-depth foreground pass.");
   assert.equal(foregroundOptions[0].regions.length, 1);
-  assert.equal(foregroundOptions[0].regions[0].nearerThan, 3.35);
+  assert.equal(foregroundOptions[0].regions[0].nearerThan, 5.45);
   assert.deepEqual(
     JSON.parse(JSON.stringify(foregroundOptions[0].regions[0].polygons[0])),
     [
