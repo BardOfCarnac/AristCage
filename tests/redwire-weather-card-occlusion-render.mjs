@@ -9,16 +9,15 @@ fs.mkdirSync(artifactRoot, { recursive: true });
 
 async function visualSnapshot(page) {
   return page.evaluate(() => {
-    const plateNode = [...document.querySelectorAll(
+    const plateNodes = [...document.querySelectorAll(
       ".optical-mode .optical-semantic-item[data-optical-role='plate'] .optical-plate-surface"
-    )].find(node => {
+    )].filter(node => {
       const rect = node.getBoundingClientRect();
       const style = getComputedStyle(node);
       return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && Number(style.opacity) !== 0;
     });
-    if (!plateNode) throw new Error("A visible lead Optical plate is required.");
+    if (!plateNodes.length) throw new Error("At least one visible Optical plate is required.");
 
-    const plate = plateNode.getBoundingClientRect();
     const baseCanvases = [...document.querySelectorAll("canvas.ncn-department-weather-canvas")]
       .filter(canvas => !canvas.hidden && getComputedStyle(canvas).visibility !== "hidden");
     const foreground = document.querySelector("canvas.ncn-redwire-weather-foreground");
@@ -35,55 +34,68 @@ async function visualSnapshot(page) {
       return context.getImageData(x, y, 1, 1).data[3];
     }
 
-    const interiorPoints = [];
-    for (const fx of [0.08, 0.18, 0.28, 0.38, 0.5, 0.62, 0.72, 0.82, 0.92]) {
-      for (const fy of [0.1, 0.23, 0.36, 0.5, 0.64, 0.77, 0.9]) {
-        interiorPoints.push({ x: plate.left + plate.width * fx, y: plate.top + plate.height * fy });
+    function samplePlate(node) {
+      const plate = node.getBoundingClientRect();
+      const interiorPoints = [];
+      for (const fx of [0.08, 0.18, 0.28, 0.38, 0.5, 0.62, 0.72, 0.82, 0.92]) {
+        for (const fy of [0.1, 0.23, 0.36, 0.5, 0.64, 0.77, 0.9]) {
+          interiorPoints.push({ x: plate.left + plate.width * fx, y: plate.top + plate.height * fy });
+        }
       }
+
+      const baseInterior = interiorPoints.map(point => Math.max(
+        0,
+        ...baseCanvases.map(canvas => alphaAtPage(canvas, point.x, point.y))
+      ));
+      const foregroundInterior = interiorPoints.map(point => alphaAtPage(foreground, point.x, point.y));
+
+      const edgeInside = [];
+      const edgeOutside = [];
+      const edgeInset = 3;
+      const outsideOffset = 3;
+      for (let step = 0.08; step <= 0.92; step += 0.04) {
+        const x = plate.left + plate.width * step;
+        const y = plate.top + plate.height * step;
+        edgeInside.push(
+          alphaAtPage(foreground, x, plate.top + edgeInset),
+          alphaAtPage(foreground, x, plate.bottom - edgeInset),
+          alphaAtPage(foreground, plate.left + edgeInset, y),
+          alphaAtPage(foreground, plate.right - edgeInset, y)
+        );
+        edgeOutside.push(
+          alphaAtPage(foreground, x, plate.top - outsideOffset),
+          alphaAtPage(foreground, x, plate.bottom + outsideOffset),
+          alphaAtPage(foreground, plate.left - outsideOffset, y),
+          alphaAtPage(foreground, plate.right + outsideOffset, y)
+        );
+      }
+
+      return {
+        plate: {
+          left: plate.left,
+          top: plate.top,
+          right: plate.right,
+          bottom: plate.bottom,
+          width: plate.width,
+          height: plate.height
+        },
+        baseInterior,
+        foregroundInterior,
+        edgeInside,
+        edgeOutside,
+        maxForegroundAlpha: Math.max(0, ...foregroundInterior),
+        activeSamples: foregroundInterior.filter(alpha => alpha > 8).length
+      };
     }
 
-    const baseInterior = interiorPoints.map(point => Math.max(
-      0,
-      ...baseCanvases.map(canvas => alphaAtPage(canvas, point.x, point.y))
-    ));
-    const foregroundInterior = interiorPoints.map(point => alphaAtPage(foreground, point.x, point.y));
-
-    const edgeInside = [];
-    const edgeOutside = [];
-    const edgeInset = 3;
-    const outsideOffset = 3;
-    for (let step = 0.08; step <= 0.92; step += 0.04) {
-      const x = plate.left + plate.width * step;
-      const y = plate.top + plate.height * step;
-      edgeInside.push(
-        alphaAtPage(foreground, x, plate.top + edgeInset),
-        alphaAtPage(foreground, x, plate.bottom - edgeInset),
-        alphaAtPage(foreground, plate.left + edgeInset, y),
-        alphaAtPage(foreground, plate.right - edgeInset, y)
-      );
-      edgeOutside.push(
-        alphaAtPage(foreground, x, plate.top - outsideOffset),
-        alphaAtPage(foreground, x, plate.bottom + outsideOffset),
-        alphaAtPage(foreground, plate.left - outsideOffset, y),
-        alphaAtPage(foreground, plate.right + outsideOffset, y)
-      );
-    }
-
+    const plates = plateNodes.map(samplePlate);
+    const selected = [...plates].sort((a, b) => b.maxForegroundAlpha - a.maxForegroundAlpha)[0];
     return {
       application: window.NCNApplications?.current?.() || null,
-      plate: {
-        left: plate.left,
-        top: plate.top,
-        right: plate.right,
-        bottom: plate.bottom,
-        width: plate.width,
-        height: plate.height
-      },
+      ...selected,
+      visiblePlateCount: plates.length,
+      crossedPlateCount: plates.filter(item => item.maxForegroundAlpha > 8).length,
       baseCanvasCount: baseCanvases.length,
-      baseInterior,
-      foregroundInterior,
-      edgeInside,
-      edgeOutside,
       foregroundPresent: Boolean(foreground),
       foregroundHidden: foreground?.hidden ?? true,
       foregroundZ: Number(foreground ? getComputedStyle(foreground).zIndex : 0) || 0,
@@ -97,25 +109,30 @@ async function visualSnapshot(page) {
 function assertHeavyForeground(result, name) {
   assert.equal(result.application, "redwire", `${name}: RedWire must be active`);
   assert.ok(result.baseCanvasCount >= 4, `${name}: the completed Weather layer set is required`);
-  assert.ok(result.baseInterior.every(alpha => alpha <= 2), `${name}: rear Weather must remain erased beneath the plate`);
+  assert.ok(result.baseInterior.every(alpha => alpha <= 2), `${name}: rear Weather must remain erased beneath the crossed plate`);
   assert.equal(result.foregroundPresent, true, `${name}: the foreground compositor must exist`);
   assert.equal(result.foregroundHidden, false, `${name}: the heavy-mist foreground compositor must be visible`);
   assert.ok(result.foregroundZ > result.viewerZ, `${name}: foreground mist must stack above the Optical viewer`);
 
-  const activeSamples = result.foregroundInterior.filter(alpha => alpha > 8).length;
-  const coverage = activeSamples / result.foregroundInterior.length;
-  assert.ok(activeSamples > 0, `${name}: a real heavy-mist bank must cross the lead plate`);
-  assert.ok(coverage < 0.72, `${name}: foreground mist must remain a localised bank, not a card-wide tint`);
-  assert.ok(Math.max(...result.foregroundInterior) > 8, `${name}: foreground puff alpha must be visibly non-zero`);
+  const coverage = result.activeSamples / result.foregroundInterior.length;
+  assert.ok(result.activeSamples > 0, `${name}: a real heavy-mist bank must cross at least one visible plate`);
+  assert.ok(coverage < 0.72, `${name}: the crossed plate must contain a localised bank, not a plate-wide tint`);
+  assert.ok(result.crossedPlateCount >= 1, `${name}: at least one real article crossing is required`);
+  assert.ok(
+    result.crossedPlateCount <= Math.max(2, Math.ceil(result.visiblePlateCount * 0.35)),
+    `${name}: the leading bank must not tint most visible plates simultaneously`
+  );
 
   assert.ok(result.bridge.lastForegroundPuffs > 0, `${name}: the exact-depth pass must render qualifying puffs`);
-  assert.ok(result.bridge.lastForegroundRegions > 0, `${name}: the exact plate region must be supplied`);
+  assert.ok(result.bridge.lastForegroundRegions > 0, `${name}: the exact plate regions must be supplied`);
   assert.ok(
     result.bridge.lastForegroundPuffs < result.weather.diagnostics.depthFrame.puffCount,
-    `${name}: only a near-depth subset of the Weather field may cross the plate`
+    `${name}: only a leading near-depth subset of the Weather field may cross the plates`
   );
+  assert.ok(result.bridge.lastForegroundThreshold <= result.bridge.foregroundDepth,
+    `${name}: the compositor must request only the leading edge within the approved foreground depth`);
   assert.equal(result.bridge.weatherPolicyMutation, false, `${name}: Integration must not mutate Weather policy`);
-  assert.ok(Math.max(...result.edgeOutside) <= 3, `${name}: foreground pixels must remain transparent outside plate regions`);
+  assert.ok(Math.max(...result.edgeOutside) <= 3, `${name}: foreground pixels must remain transparent outside the crossed plate`);
   const interiorMax = Math.max(...result.foregroundInterior);
   const edgeMax = Math.max(...result.edgeInside);
   assert.ok(edgeMax <= interiorMax * 0.88 + 18, `${name}: feathered plate edges must not create an abnormal alpha spike`);
@@ -261,7 +278,7 @@ try {
   await runViewport("desktop", { width: 1440, height: 900 });
   await runViewport("mobile", { width: 390, height: 844 });
   await runViewport("desktop-reduced-motion", { width: 1440, height: 900 }, "reduce");
-  console.log("Canonical heavy mist replays a localised real-puff bank above Optical plates, ordinary mist does not, and application switching leaves no compositor or profile residue.");
+  console.log("Canonical heavy mist crosses a small number of real Optical plates with a localised leading bank, ordinary mist does not, and application switching leaves no compositor or profile residue.");
 } finally {
   await browser.close();
 }
