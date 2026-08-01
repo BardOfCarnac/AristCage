@@ -17,10 +17,12 @@ assert.ok(policy, "Weather must publish its preset-owned depth-flow policy.");
 assert.equal(presets.mist.depthFlow, -0.018, "Ordinary mist must retain its accepted preset baseline.");
 assert.equal(presets["heavy-mist"].depthFlow, -0.72, "Heavy mist must declare a deliberate forward chamber flow.");
 assert.ok(policy.snapshot().heavyOffset < -0.7, "Heavy mist must add a substantial preset-owned foreground push.");
+assert.equal(policy.snapshot().foregroundSurgeDepth, 5.35, "The Weather-owned surge must sit just in front of the Optical plate plane.");
 assert.equal(compositorSource.includes("setWind"), false, "The Integration compositor must not mutate Weather simulation policy.");
 
 const calls = [];
 function createFakeWeather() {
+  const subscribers = [];
   const state = {
     enabled: false,
     preset: "clear",
@@ -28,6 +30,13 @@ function createFakeWeather() {
     wind: { x: 0, y: 0, z: 0 },
     diagnostics: { source: "fake-weather" }
   };
+  const baseDepthFrame = Object.freeze({
+    elapsedMs: 400,
+    renderForeground() {
+      calls.push({ type: "baseForeground" });
+      return 0;
+    }
+  });
 
   const snapshot = () => Object.freeze({
     ...state,
@@ -68,6 +77,16 @@ function createFakeWeather() {
       return true;
     },
     destroy() { return true; },
+    getDepthFrame() { return baseDepthFrame; },
+    subscribeAfterRender(listener) {
+      subscribers.push(listener);
+      const release = () => true;
+      release.active = () => true;
+      return release;
+    },
+    emitFrame() {
+      subscribers.forEach(listener => listener({ type: "render", depthFrame: baseDepthFrame }));
+    },
     snapshot
   };
 }
@@ -75,6 +94,32 @@ function createFakeWeather() {
 context.window.createNCNWeatherDepartment = () => createFakeWeather();
 const factory = context.window.createNCNWeatherDepartment;
 assert.equal(factory.__ncnPresetDepthFlowPolicy, true, "The accepted Weather factory must be wrapped before installation.");
+
+function surgeContext() {
+  const draws = [];
+  return {
+    draws,
+    fillStyle: "",
+    save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, clip() {},
+    createRadialGradient() {
+      return { addColorStop() {} };
+    },
+    fillRect(...args) { draws.push(args); }
+  };
+}
+
+const foregroundOptions = {
+  viewport: { left: 0, top: 0, width: 390, height: 844 },
+  regions: [{
+    nearerThan: 5.45,
+    polygons: [[
+      { x: 24, y: 110 },
+      { x: 364, y: 110 },
+      { x: 364, y: 290 },
+      { x: 24, y: 290 }
+    ]]
+  }]
+};
 
 (async () => {
   const weather = factory({ owner: "weather-policy-test" });
@@ -93,6 +138,18 @@ assert.equal(factory.__ncnPresetDepthFlowPolicy, true, "The accepted Weather fac
   assert.ok(heavyInternal.z < -0.7, "The heavy-mist profile must deliver its configured depth flow inside Weather.");
   assert.equal(heavyPublic.diagnostics.presetDepthFlow.preset, "heavy-mist");
   assert.ok(heavyPublic.diagnostics.presetDepthFlow.internalWindZ < -0.7);
+  assert.equal(heavyPublic.diagnostics.presetDepthFlow.foregroundSurgeActive, true);
+
+  const heavyFrame = weather.getDepthFrame();
+  const heavyContext = surgeContext();
+  assert.equal(heavyFrame.presetSurgeDepth, 5.35);
+  assert.ok(heavyFrame.renderForeground(heavyContext, foregroundOptions) > 0, "Heavy Weather must publish a near-plate surge through its depth frame.");
+  assert.ok(heavyContext.draws.length > 0, "The surge must draw visible Weather ink inside the supplied region.");
+
+  let subscribedFrame = null;
+  weather.subscribeAfterRender(payload => { subscribedFrame = payload.depthFrame; });
+  weather.emitFrame();
+  assert.equal(subscribedFrame.presetSurgeDepth, 5.35, "Completed-frame subscribers must receive the decorated Weather depth frame.");
 
   weather.applyProfile({
     enabled: true,
@@ -103,6 +160,9 @@ assert.equal(factory.__ncnPresetDepthFlowPolicy, true, "The accepted Weather fac
   const ordinaryInternal = calls.filter(call => call.type === "applyProfile").at(-1).profile.wind;
   assert.deepEqual(ordinaryInternal, { x: 0.22, y: 0, z: 0 }, "Ordinary mist must retain the accepted depth baseline without an added push.");
   assert.deepEqual(plain(weather.snapshot().wind), { x: 0.22, y: 0, z: 0 });
+  const ordinaryContext = surgeContext();
+  assert.equal(weather.getDepthFrame().renderForeground(ordinaryContext, foregroundOptions), 0, "Ordinary mist must not publish the near-plate surge.");
+  assert.equal(ordinaryContext.draws.length, 0);
 
   weather.setPreset("heavy-mist");
   assert.ok(calls.filter(call => call.type === "setWind").at(-1).wind.z < -0.7, "Direct heavy-mist selection must apply the Weather-owned depth flow.");
@@ -112,9 +172,10 @@ assert.equal(factory.__ncnPresetDepthFlowPolicy, true, "The accepted Weather fac
   weather.applyProfile({ enabled: false, preset: "clear", wind: { x: 0, y: 0, z: 0 } });
   const disabled = weather.snapshot();
   assert.equal(disabled.diagnostics.presetDepthFlow.offset, 0, "Disabled Weather must retain no heavy-mist policy residue.");
+  assert.equal(disabled.diagnostics.presetDepthFlow.foregroundSurgeActive, false);
   assert.deepEqual(plain(disabled.wind), { x: 0, y: 0, z: 0 });
 
-  console.log("Heavy mist owns its forward chamber flow inside Weather while ordinary mist and public wind remain unchanged.");
+  console.log("Heavy mist owns its forward flow and near-plate surge inside Weather while ordinary mist and public wind remain unchanged.");
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
