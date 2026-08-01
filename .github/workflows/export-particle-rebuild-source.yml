@@ -1,24 +1,77 @@
-name: Export particle rebuild source
+name: Publish canonical particle rebuild
 
 on:
   push:
     branches:
       - agent/particle-rebuild-source-export
-  pull_request:
-    branches:
-      - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/upload-artifact@v4
         with:
-          name: particle-rebuild-source
-          path: .
-          include-hidden-files: true
-          if-no-files-found: error
+          fetch-depth: 0
+      - name: Rebuild particle branch from current main
+        run: |
+          set -euo pipefail
+          cat .particle-rebuild/part-*.b64 | base64 -d > /tmp/canonical-particles.patch
+          git fetch origin main
+          git checkout --detach origin/main
+          git apply --check /tmp/canonical-particles.patch
+          git apply /tmp/canonical-particles.patch
+          node --check departments/weather/weather-particles.js
+          node --check departments/weather/weather-module.js
+          node departments/weather/tests/weather-module.node.test.js
+          node departments/weather/tests/weather-particles-canonical.node.test.js
+          node departments/weather/tests/weather-mist-visual-contract.test.js
+          node tests/heavy-mist-weather-policy.test.js
+          node tests/weather-after-render-contract.test.js
+          node tests/redwire-weather-card-occlusion.test.js
+          node tests/environment-profile-contract.test.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/chamber-presentation-restoration.yml \
+            .github/workflows/integration-host-check.yml \
+            .github/workflows/redwire-weather-card-occlusion.yml \
+            .github/workflows/weather-department-check.yml \
+            .github/workflows/weather-particle-field.yml \
+            departments/weather/tests/weather-module.node.test.js \
+            departments/weather/tests/weather-module.test.js \
+            departments/weather/tests/weather-particles-canonical.node.test.js \
+            departments/weather/tests/weather-pr86-host.test.js \
+            departments/weather/weather-manifest.js \
+            departments/weather/weather-module.js \
+            departments/weather/weather-particles.js \
+            index.html js/integration-harness.js \
+            tests/weather-after-render-contract.test.js \
+            tests/weather-particles-render.mjs
+          expected=$(cat <<'FILES'
+.github/workflows/chamber-presentation-restoration.yml
+.github/workflows/integration-host-check.yml
+.github/workflows/redwire-weather-card-occlusion.yml
+.github/workflows/weather-department-check.yml
+.github/workflows/weather-particle-field.yml
+departments/weather/tests/weather-module.node.test.js
+departments/weather/tests/weather-module.test.js
+departments/weather/tests/weather-particles-canonical.node.test.js
+departments/weather/tests/weather-pr86-host.test.js
+departments/weather/weather-manifest.js
+departments/weather/weather-module.js
+departments/weather/weather-particles.js
+index.html
+js/integration-harness.js
+tests/weather-after-render-contract.test.js
+tests/weather-particles-render.mjs
+FILES
+          )
+          actual=$(git diff --cached --name-only | sort)
+          if [ "$actual" != "$(printf '%s\n' "$expected" | sort)" ]; then
+            printf 'Unexpected canonical rebuild file set:\n%s\n' "$actual"
+            exit 1
+          fi
+          git commit -m "Integrate depth-aware particles into canonical Weather"
+          git push origin HEAD:agent/depth-aware-weather-particles --force
