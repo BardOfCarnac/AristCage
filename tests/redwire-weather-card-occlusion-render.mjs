@@ -109,7 +109,11 @@ function assertHeavyForeground(result, name) {
   const interiorMax = Math.max(...result.foregroundInterior);
   const edgeMax = Math.max(...result.edgeInside);
   assert.ok(edgeMax <= interiorMax * 0.88 + 18, `${name}: feathered plate edges must not create an abnormal alpha spike`);
-  assert.deepEqual(result.weather.wind, { x: 0, y: 0, z: 0 }, `${name}: heavy flow must not alter external Weather wind state`);
+  assert.equal(result.weather.wind.z, 0, `${name}: preset-owned depth motion must not leak into the public wind contract`);
+  assert.ok(
+    result.weather.diagnostics?.presetDepthFlow?.internalWindZ < -0.7,
+    `${name}: Weather must apply the heavy-mist preset's internal forward flow`
+  );
 }
 
 async function runViewport(name, viewport, reducedMotion = "no-preference") {
@@ -138,7 +142,6 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
     const heavy = await visualSnapshot(page);
     assertHeavyForeground(heavy, `${name} heavy`);
     const firstGeneration = heavy.bridge.foregroundGeneration;
-    const initialWind = heavy.weather.wind;
     await page.screenshot({ path: `${artifactRoot}/${name}-heavy.png`, fullPage: true });
 
     await page.evaluate(() => {
@@ -161,7 +164,8 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
 
     const ordinary = await visualSnapshot(page);
     assert.ok(Math.max(...ordinary.foregroundInterior) <= 2, `${name}: ordinary mist must not receive a foreground replay`);
-    assert.deepEqual(ordinary.weather.wind, initialWind, `${name}: ordinary mist must preserve external wind state`);
+    assert.equal(ordinary.weather.wind.z, 0, `${name}: ordinary mist must have no preset depth-flow residue`);
+    assert.equal(ordinary.weather.diagnostics?.presetDepthFlow?.offset, 0, `${name}: ordinary mist must clear the heavy preset offset`);
 
     await page.evaluate(async () => {
       await window.NCNApplications.switchTo("dripfeed", { animate: false, reason: "foreground-lifecycle-proof" });
@@ -179,7 +183,8 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
     assert.equal(dripfeed.foreground, false, `${name}: Dripfeed must contain no foreground compositor residue`);
     assert.equal(dripfeed.bridge.active, false, `${name}: Dripfeed must release the RedWire Weather subscription`);
     if (dripfeed.weather?.wind) {
-      assert.deepEqual(dripfeed.weather.wind, initialWind, `${name}: application switching must leave no altered Weather wind residue`);
+      assert.equal(dripfeed.weather.wind.z, 0, `${name}: application switching must leave no preset depth-flow residue`);
+      assert.equal(dripfeed.weather.diagnostics?.presetDepthFlow?.offset || 0, 0, `${name}: disabled or non-heavy Weather must clear the preset offset`);
     }
 
     await page.evaluate(async () => {
