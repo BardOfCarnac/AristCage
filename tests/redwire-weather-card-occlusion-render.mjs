@@ -7,6 +7,42 @@ const artifactRoot = "artifacts/redwire-weather-card-occlusion";
 const browser = await chromium.launch({ headless: true });
 fs.mkdirSync(artifactRoot, { recursive: true });
 
+async function waitForVisiblePlateCrossing(page) {
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector("canvas.ncn-redwire-weather-foreground");
+    if (!canvas || canvas.hidden) return false;
+    const canvasRect = canvas.getBoundingClientRect();
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context || canvasRect.width <= 0 || canvasRect.height <= 0) return false;
+
+    const plates = [...document.querySelectorAll(
+      ".optical-mode .optical-semantic-item[data-optical-role='plate'] .optical-plate-surface"
+    )].filter(node => {
+      const rect = node.getBoundingClientRect();
+      const style = getComputedStyle(node);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && Number(style.opacity) !== 0;
+    });
+
+    for (const node of plates) {
+      const rect = node.getBoundingClientRect();
+      for (const fx of [0.1, 0.25, 0.4, 0.55, 0.7, 0.85]) {
+        for (const fy of [0.12, 0.3, 0.5, 0.7, 0.88]) {
+          const pageX = rect.left + rect.width * fx;
+          const pageY = rect.top + rect.height * fy;
+          if (pageX < canvasRect.left || pageX > canvasRect.right
+            || pageY < canvasRect.top || pageY > canvasRect.bottom) continue;
+          const x = Math.max(0, Math.min(canvas.width - 1,
+            Math.floor((pageX - canvasRect.left) * canvas.width / canvasRect.width)));
+          const y = Math.max(0, Math.min(canvas.height - 1,
+            Math.floor((pageY - canvasRect.top) * canvas.height / canvasRect.height)));
+          if (context.getImageData(x, y, 1, 1).data[3] > 8) return true;
+        }
+      }
+    }
+    return false;
+  }, null, { timeout: 30_000, polling: 100 });
+}
+
 async function visualSnapshot(page) {
   return page.evaluate(() => {
     const plateNodes = [...document.querySelectorAll(
@@ -187,12 +223,7 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
     ), null, { timeout: 30_000 });
 
     await applyHeavyMistControl(page, "heavy-mist-control-proof");
-    await page.waitForFunction(() => {
-      const bridge = window.NCNRedWireWeatherCardOcclusion?.snapshot?.();
-      const canvas = document.querySelector("canvas.ncn-redwire-weather-foreground");
-      return bridge?.lastForegroundPuffs > 0 && canvas && !canvas.hidden;
-    }, null, { timeout: 30_000 });
-    await page.waitForTimeout(320);
+    await waitForVisiblePlateCrossing(page);
 
     const heavy = await visualSnapshot(page);
     assertHeavyForeground(heavy, `${name} heavy`);
@@ -254,14 +285,10 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
       && window.NCNRedWireWeatherCardOcclusion?.snapshot?.().active === true
     ), null, { timeout: 15_000 });
     await applyHeavyMistControl(page, "foreground-return-proof");
-    await page.waitForFunction(previousGeneration => {
-      const bridge = window.NCNRedWireWeatherCardOcclusion?.snapshot?.();
-      const canvas = document.querySelector("canvas.ncn-redwire-weather-foreground");
-      return bridge?.active === true
-        && bridge.foregroundGeneration > previousGeneration
-        && bridge.lastForegroundPuffs > 0
-        && canvas && !canvas.hidden;
-    }, firstGeneration, { timeout: 30_000 });
+    await page.waitForFunction(previousGeneration => (
+      window.NCNRedWireWeatherCardOcclusion?.snapshot?.().foregroundGeneration > previousGeneration
+    ), firstGeneration, { timeout: 15_000 });
+    await waitForVisiblePlateCrossing(page);
 
     const returned = await visualSnapshot(page);
     assertHeavyForeground(returned, `${name} returned heavy`);
