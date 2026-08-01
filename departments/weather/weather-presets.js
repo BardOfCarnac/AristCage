@@ -45,7 +45,7 @@ window.NCNWeatherPresets = (() => {
       moisture: 0.92,
       turbulence: 0.28,
       drift: 0.12,
-      depthFlow: -0.018,
+      depthFlow: -0.72,
       verticalFill: 0.82,
       bankScale: 1.08,
       bankMultiplier: 1.85
