@@ -30,6 +30,11 @@ html.diagnostics-on .diagnostics-toggle {
   pointer-events: auto !important;
 }
 
+.diagnostics-panel button {
+  min-height: 34px;
+  touch-action: manipulation;
+}
+
 /* A manual developer override temporarily raises the terminal environment above
    Dripfeed. This is presentation-only: the canonical Weather service still owns
    all four canvases and the shared runtime task. */
@@ -60,6 +65,32 @@ html[data-debug-weather-hidden-layers~="near"] .ncn-department-weather-near {
   font-size: .52rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: .1em;
+}
+
+.diagnostics-app-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.diagnostics-app-switch button {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 80, 50, .34);
+  background: rgba(0, 0, 0, .48);
+  color: rgba(255, 180, 110, .78);
+  font: 600 .55rem/1.1 var(--font-main);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.diagnostics-app-switch button.active,
+.diagnostics-app-switch button[aria-pressed="true"] {
+  color: var(--white);
+  border-color: var(--orange);
+  background: rgba(255, 70, 35, .11);
+  box-shadow: inset 0 0 10px rgba(255, 70, 30, .08), 0 0 8px rgba(255, 80, 35, .12);
 }
 
 .diagnostics-lab {
@@ -163,8 +194,8 @@ html[data-debug-weather-hidden-layers~="near"] .ncn-department-weather-near {
 }
 
 .diagnostics-subheading button {
-  min-height: 25px;
-  padding: 3px 6px;
+  min-height: 34px;
+  padding: 5px 8px;
   border: 1px solid rgba(255, 80, 50, .3);
   background: rgba(0, 0, 0, .42);
   color: rgba(255, 190, 130, .72);
@@ -219,6 +250,8 @@ html[data-debug-weather-hidden-layers~="near"] .ncn-department-weather-near {
   box-shadow: inset 0 0 10px rgba(255, 70, 30, .08), 0 0 8px rgba(255, 80, 35, .12);
 }
 
+.diagnostics-app-switch button:hover,
+.diagnostics-app-switch button:focus-visible,
 .diagnostics-control-grid button:hover,
 .diagnostics-control-grid button:focus-visible,
 .diagnostics-restore-profile:hover,
@@ -231,6 +264,7 @@ html[data-debug-weather-hidden-layers~="near"] .ncn-department-weather-near {
   outline: none;
 }
 
+.diagnostics-app-switch button:active,
 .diagnostics-control-grid button:active,
 .diagnostics-restore-profile:active,
 .diagnostics-subheading button:active {
@@ -308,7 +342,7 @@ html[data-debug-weather-hidden-layers~="near"] .ncn-department-weather-near {
 .diagnostics-field-control input,
 .diagnostics-field-control select {
   width: 100%;
-  min-height: 29px;
+  min-height: 34px;
   border: 1px solid rgba(255, 80, 50, .28);
   border-radius: 0;
   background: rgba(0, 0, 0, .62);
@@ -364,6 +398,13 @@ html[data-debug-weather-hidden-layers~="near"] .ncn-department-weather-near {
     max-height: 72vh;
     left: 7px;
     bottom: calc(48px + env(safe-area-inset-bottom));
+  }
+
+  .diagnostics-panel button,
+  .diagnostics-panel input,
+  .diagnostics-panel select,
+  .diagnostics-lab > summary {
+    min-height: 42px;
   }
 
   .diagnostics-control-grid--presets {
