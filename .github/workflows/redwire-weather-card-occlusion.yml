@@ -10,6 +10,7 @@ on:
       - "tests/heavy-mist-weather-policy.test.js"
       - "tests/redwire-weather-card-occlusion.test.js"
       - "tests/redwire-weather-card-occlusion-render.mjs"
+      - "tests/redwire-weather-wiring-render.mjs"
       - ".github/workflows/redwire-weather-card-occlusion.yml"
   workflow_dispatch:
 
@@ -32,6 +33,7 @@ jobs:
           node --check tests/heavy-mist-weather-policy.test.js
           node --check tests/redwire-weather-card-occlusion.test.js
           node --check tests/redwire-weather-card-occlusion-render.mjs
+          node --check tests/redwire-weather-wiring-render.mjs
       - name: Run Weather-owned flow contract
         run: |
           node tests/heavy-mist-weather-policy.test.js
@@ -67,7 +69,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.54.1
           npx playwright install --with-deps chromium
-      - name: Prove exact-depth foreground composition and lifecycle
+      - name: Prove installed Weather foreground publication
         run: |
           set -euo pipefail
           mkdir -p artifacts/redwire-weather-card-occlusion
@@ -78,6 +80,7 @@ jobs:
             if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
             sleep 1
           done
+          node tests/redwire-weather-wiring-render.mjs
           node tests/redwire-weather-card-occlusion-render.mjs
       - name: Upload heavy-mist evidence
         if: always()
