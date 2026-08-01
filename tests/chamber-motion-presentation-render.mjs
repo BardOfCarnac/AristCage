@@ -149,7 +149,7 @@ async function runViewport(name, viewport) {
 
   const samples = [];
   const captures = new Map();
-  for (let index = 0; index < 100 && captures.size < 3; index += 1) {
+  for (let index = 0; index < 100 && (captures.size < 3 || samples.length < 6); index += 1) {
     const current = await sample(page);
     samples.push(current);
     const key = phaseKey(current.phases);

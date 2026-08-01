@@ -22,12 +22,19 @@ async function pageSnapshot(page) {
     const motion = window.NCNIntegration?.getService?.("chamber-motion")?.snapshot?.() || null;
     const effects = window.NCNIntegration?.getService?.("effects")?.snapshot?.() || null;
     const canvases = [...document.querySelectorAll("canvas.ncn-department-weather-canvas")];
+    const particleCanvases = canvases.filter(canvas => canvas.classList.contains("ncn-department-weather-particle-canvas"));
+    const baseWeatherCanvases = canvases.filter(canvas => !canvas.classList.contains("ncn-department-weather-particle-canvas"));
     let visibleWeatherCanvases = 0;
+    let visibleParticleCanvases = 0;
+    let visibleBaseWeatherCanvases = 0;
     let weatherInk = 0;
 
     for (const canvas of canvases) {
-      if (!canvas.hidden && getComputedStyle(canvas).visibility !== "hidden") {
+      const visible = !canvas.hidden && getComputedStyle(canvas).visibility !== "hidden";
+      if (visible) {
         visibleWeatherCanvases += 1;
+        if (canvas.classList.contains("ncn-department-weather-particle-canvas")) visibleParticleCanvases += 1;
+        else visibleBaseWeatherCanvases += 1;
       }
       if (!canvas.width || !canvas.height) continue;
       try {
@@ -49,7 +56,11 @@ async function pageSnapshot(page) {
       motion,
       effects,
       weatherCanvasCount: canvases.length,
+      baseWeatherCanvasCount: baseWeatherCanvases.length,
+      particleWeatherCanvasCount: particleCanvases.length,
       visibleWeatherCanvases,
+      visibleBaseWeatherCanvases,
+      visibleParticleCanvases,
       weatherInk,
       activePanel: state?.activePanel || null,
       expandedEntryId: state?.expandedEntryId || null,
@@ -180,8 +191,12 @@ async function runViewport(viewportName, viewport) {
     assert.deepEqual(initial.visibleRoots, ["redwire-root"], `${viewportName}: only RedWire should be visible initially`);
     assert.equal(initial.weather?.enabled, true, `${viewportName}: Weather should be enabled for RedWire`);
     assert.ok(Number(initial.weather?.targetIntensity ?? initial.weather?.currentIntensity ?? 0) > 0, `${viewportName}: RedWire should request visible mist`);
-    assert.equal(initial.weatherCanvasCount, 4, `${viewportName}: Weather should own four canvases`);
-    assert.equal(initial.visibleWeatherCanvases, 4, `${viewportName}: RedWire Weather canvases should be visible`);
+    assert.equal(initial.baseWeatherCanvasCount, 4, `${viewportName}: Weather should retain its four canonical canvases`);
+    assert.equal(initial.particleWeatherCanvasCount, 4, `${viewportName}: Weather should own four particle depth canvases`);
+    assert.equal(initial.weatherCanvasCount, 8, `${viewportName}: Weather should own eight canvases in total`);
+    assert.equal(initial.visibleBaseWeatherCanvases, 4, `${viewportName}: canonical RedWire Weather canvases should be visible`);
+    assert.equal(initial.visibleParticleCanvases, 4, `${viewportName}: RedWire particle canvases should be visible`);
+    assert.equal(initial.visibleWeatherCanvases, 8, `${viewportName}: all RedWire Weather canvases should be visible`);
 
     await openPanel(page, "filter");
     await verifyFilterContract(page);
@@ -211,7 +226,8 @@ async function runViewport(viewportName, viewport) {
     const dripfeed = await capture(page, viewportName, "dripfeed-wall", records);
     assert.deepEqual(dripfeed.visibleRoots, ["dripfeed-root"], `${viewportName}: only Dripfeed should be visible after switching`);
     assert.equal(Number(dripfeed.weather?.targetIntensity ?? 0), 0, `${viewportName}: Dripfeed should request zero Weather intensity`);
-    assert.equal(dripfeed.visibleWeatherCanvases, 0, `${viewportName}: Weather canvases should be hidden in Dripfeed`);
+    assert.equal(dripfeed.visibleWeatherCanvases, 0, `${viewportName}: all Weather canvases should be hidden in Dripfeed`);
+    assert.equal(dripfeed.visibleParticleCanvases, 0, `${viewportName}: particle canvases should be hidden in Dripfeed`);
 
     await page.locator("#dripfeed-root .listing-tile").first().click();
     await page.waitForSelector("#dripfeed-root [data-overlay='reader'].reader-resolved", {
@@ -236,7 +252,9 @@ async function runViewport(viewportName, viewport) {
     const returned = await capture(page, viewportName, "redwire-return", records);
     assert.deepEqual(returned.visibleRoots, ["redwire-root"], `${viewportName}: only RedWire should be visible after the round trip`);
     assert.ok(Number(returned.weather?.targetIntensity ?? returned.weather?.currentIntensity ?? 0) > 0, `${viewportName}: RedWire mist intensity should be restored`);
-    assert.equal(returned.visibleWeatherCanvases, 4, `${viewportName}: all Weather canvases should return`);
+    assert.equal(returned.visibleBaseWeatherCanvases, 4, `${viewportName}: canonical Weather canvases should return`);
+    assert.equal(returned.visibleParticleCanvases, 4, `${viewportName}: particle canvases should return`);
+    assert.equal(returned.visibleWeatherCanvases, 8, `${viewportName}: all Weather canvases should return`);
 
     assert.deepEqual(pageErrors, [], `${viewportName}: no uncaught page errors are allowed`);
     assert.deepEqual(consoleErrors, [], `${viewportName}: no browser console errors are allowed`);

@@ -1,0 +1,82 @@
+name: Weather Particle Field
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "departments/weather/weather-manifest.js"
+      - "departments/weather/weather-particles.js"
+      - "departments/weather/tests/weather-particles.node.test.js"
+      - "tests/weather-particles-render.mjs"
+      - "js/redwire-weather-card-occlusion.js"
+      - ".github/workflows/weather-particle-field.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check particle publication syntax
+        run: |
+          node --check departments/weather/weather-particles.js
+          node --check departments/weather/tests/weather-particles.node.test.js
+          node --check tests/weather-particles-render.mjs
+      - name: Run deterministic particle contract
+        run: node departments/weather/tests/weather-particles.node.test.js
+      - name: Check production load order
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const html = fs.readFileSync("index.html", "utf8");
+          const moduleIndex = html.indexOf("departments/weather/weather-module.js");
+          const particleIndex = html.indexOf("departments/weather/weather-particles.js");
+          const installerIndex = html.indexOf("js/integration-departments.js");
+          if (moduleIndex < 0 || particleIndex <= moduleIndex || installerIndex <= particleIndex) {
+            throw new Error("Weather particles must decorate the accepted factory after Weather publication and before department installation.");
+          }
+          if ((html.match(/departments\/weather\/weather-particles\.js/g) || []).length !== 1) {
+            throw new Error("Weather particle publication must load exactly once.");
+          }
+          console.log("Weather particle production load order is correct.");
+          NODE
+
+  rendered:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1
+          npx playwright install --with-deps chromium
+      - name: Render particle field proof
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/weather-particle-field
+          python3 -m http.server 4173 > /tmp/ncn-weather-particles-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/weather-particles-render.mjs
+      - name: Upload particle evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-particle-field
+          path: |
+            artifacts/weather-particle-field/
+            /tmp/ncn-weather-particles-http.log
+          if-no-files-found: warn
