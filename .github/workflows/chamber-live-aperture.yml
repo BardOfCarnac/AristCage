@@ -25,12 +25,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
       - name: Apply chamber-owned presentation publication
-        env:
-          CLEAN_WORKFLOW_B64: "bmFtZTogQ2hhbWJlciBMaXZlIEFwZXJ0dXJlCgpvbjoKICBwdWxsX3JlcXVlc3Q6CiAgICBwYXRoczoKICAgICAgLSAianMvbGF5ZXJlZC1jaGFtYmVyLmpzIgogICAgICAtICJqcy9jaGFtYmVyLWNhbWVyYS5qcyIKICAgICAgLSAiZGVwYXJ0bWVudHMvd2VhdGhlci8qKiIKICAgICAgLSAidGVzdHMvY2hhbWJlci1saXZlLXByZXNlbnRhdGlvbi50ZXN0LmpzIgogICAgICAtICJ0ZXN0cy9jaGFtYmVyLWxpdmUtYXBlcnR1cmUtcmVuZGVyLm1qcyIKICAgICAgLSAiLmdpdGh1Yi93b3JrZmxvd3MvY2hhbWJlci1saXZlLWFwZXJ0dXJlLnltbCIKICB3b3JrZmxvd19kaXNwYXRjaDoKCnBlcm1pc3Npb25zOgogIGNvbnRlbnRzOiByZWFkCgpqb2JzOgogIGNvbnRyYWN0OgogICAgcnVucy1vbjogdWJ1bnR1LWxhdGVzdAogICAgc3RlcHM6CiAgICAgIC0gdXNlczogYWN0aW9ucy9jaGVja291dEB2NAogICAgICAtIHVzZXM6IGFjdGlvbnMvc2V0dXAtbm9kZUB2NAogICAgICAgIHdpdGg6CiAgICAgICAgICBub2RlLXZlcnNpb246IDI0CiAgICAgIC0gbmFtZTogQ2hlY2sgcHVibGljYXRpb24gc3ludGF4CiAgICAgICAgcnVuOiB8CiAgICAgICAgICBub2RlIC0tY2hlY2sganMvbGF5ZXJlZC1jaGFtYmVyLmpzCiAgICAgICAgICBub2RlIC0tY2hlY2sganMvY2hhbWVyLWNhbWVyYS5qcwogICAgICAgICAgbm9kZSAtLWNoZWNrIHRlc3RzL2NoYW1iZXItbGl2ZS1wcmVzZW50YXRpb24udGVzdC5qcwogICAgICAgICAgbm9kZSAtLWNoZWNrIHRlc3RzL2NoYW1iZXItbGl2ZS1hcGVydHVyZS1yZW5kZXIubWpzCiAgICAgIC0gbmFtZTogUnVuIGF1dGhvcml0YXRpdmUgcHJlc2VudGF0aW9uIGNvbnRyYWN0CiAgICAgICAgcnVuOiBub2RlIHRlc3RzL2NoYW1iZXItbGl2ZS1wcmVzZW50YXRpb24udGVzdC5qcwoKICByZW5kZXJlZDoKICAgIHJ1bnMtb246IHVidW50dS1sYXRlc3QKICAgIHRpbWVvdXQtbWludXRlczogMjUKICAgIHN0ZXBzOgogICAgICAtIHVzZXM6IGFjdGlvbnMvY2hlY2tvdXRAdjQKICAgICAgLSB1c2VzOiBhY3Rpb25zL3NldHVwLW5vZGVAdjQKICAgICAgICB3aXRoOgogICAgICAgICAgbm9kZS12ZXJzaW9uOiAyNAogICAgICAtIG5hbWU6IEluc3RhbGwgYnJvd3NlciBydW5uZXIKICAgICAgICBydW46IHwKICAgICAgICAgIG5wbSBpbnN0YWxsIC0tbm8tc2F2ZSAtLW5vLXBhY2thZ2UtbG9jayBwbGF5d3JpZ2h0QDEuNTQuMQogICAgICAgICAgbnB4IHBsYXl3cmlnaHQgaW5zdGFsbCAtLXdpdGgtZGVwcyBjaHJvbWl1bQogICAgICAtIG5hbWU6IFJ1biBsaXZlIGFwZXJ0dXJlIHByb29mCiAgICAgICAgcnVuOiB8CiAgICAgICAgICBzZXQgLWV1byBwaXBlZmFpbAogICAgICAgICAgbWtkaXIgLXAgYXJ0aWZhY3RzL2NoYW1iZXItbGl2ZS1hcGVydHVyZQogICAgICAgICAgcHl0aG9uMyAtbSBodHRwLnNlcnZlciA0MTczID4gL3RtcC9uY24tbGl2ZS1hcGVydHVyZS1odHRwLmxvZyAyPiYxICYKICAgICAgICAgIHNlcnZlcl9waWQ9JCEKICAgICAgICAgIHRyYXAgJ2tpbGwgIiRzZXJ2ZXJfcGlkIiAyPi9kZXYvbnVsbCB8fCB0cnVlJyBFWElUCiAgICAgICAgICBmb3IgYXR0ZW1wdCBpbiAkKHNlcSAxIDMwKTsgZG8KICAgICAgICAgICAgaWYgY3VybCAtLWZhaWwgLS1zaWxlbnQgaHR0cDovLzEyNy4wLjAuMTo0MTczLyA+L2Rldi9udWxsOyB0aGVuIGJyZWFrOyBmaQogICAgICAgICAgICBzbGVlcCAxCiAgICAgICAgICBkb25lCiAgICAgICAgICBub2RlIHRlc3RzL2NoYW1iZXItbGl2ZS1hcGVydHVyZS1yZW5kZXIubWpzCiAgICAgIC0gbmFtZTogVXBsb2FkIHJlbmRlcmVkIGV2aWRlbmNlCiAgICAgICAgaWY6IGFsd2F5cygpCiAgICAgICAgdXNlczogYWN0aW9ucy91cGxvYWQtYXJ0aWZhY3RAdjQKICAgICAgICB3aXRoOgogICAgICAgICAgbmFtZTogY2hhbWJlci1saXZlLWFwZXJ0dXJlCiAgICAgICAgICBwYXRoOiB8CiAgICAgICAgICAgIGFydGlmYWN0cy9jaGFtYmVyLWxpdmUtYXBlcnR1cmUvCiAgICAgICAgICAgIC90bXAvbmNuLWxpdmUtYXBlcnR1cmUtaHR0cC5sb2cKICAgICAgICAgIGlmLW5vLWZpbGVzLWZvdW5kOiB3YXJuCg=="
         run: |
           python3 <<'PY'
-          import base64
-          import os
           from pathlib import Path
 
           def replace_once(text, old, new, label):
@@ -47,11 +43,6 @@ jobs:
           chamber = replace_once(chamber, '  function visibleHalfWidth(s) {\n    return geometry.halfWidth + geometry.wallShiftCells * geometry.cell * s.wallOpen;\n  }\n\n  function apertureAt(z, halfWidth) {\n', '  function visibleHalfWidth(s) {\n    return geometry.halfWidth + geometry.wallShiftCells * geometry.cell * s.wallOpen;\n  }\n\n  function settledPresentationSnapshot() {\n    return Object.freeze({\n      elapsed: timing.done,\n      progress: 1,\n      wallOpen: 1,\n      visibleHalfWidth: finalHalfWidth(),\n      rearDepth: geometry.near + geometry.finalDepthCells * geometry.cell,\n      settled: true,\n      active: false\n    });\n  }\n\n  function presentationSnapshot(now = performance.now()) {\n    if (mode === MODES.OFF || !mounted || !startedAt) return settledPresentationSnapshot();\n    const presentation = presentationState(now);\n    return Object.freeze({\n      elapsed: presentation.t,\n      progress: clamp01(presentation.t / timing.done),\n      wallOpen: presentation.wallOpen,\n      visibleHalfWidth: visibleHalfWidth(presentation),\n      rearDepth: rearDepth(presentation),\n      settled: presentation.t >= timing.done,\n      active: presentation.t < timing.done + timing.breathDuration || injectedDuration > 0\n    });\n  }\n\n  function apertureAt(z, halfWidth) {\n', "presentation snapshot")
           chamber = replace_once(chamber, '    setScroll,\n    injectEnergy,\n    toggleDiagnostics: () => {\n', '    setScroll,\n    injectEnergy,\n    getPresentationSnapshot: presentationSnapshot,\n    toggleDiagnostics: () => {\n', "presentation export")
           chamber_path.write_text(chamber)
-
-          Path(".github/workflows/chamber-live-aperture.yml").write_bytes(
-              base64.b64decode(os.environ["CLEAN_WORKFLOW_B64"])
-          )
-          Path(".github/workflows/apply-live-aperture-review.yml").unlink(missing_ok=True)
           PY
       - name: Validate correction
         run: |
@@ -68,7 +59,7 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add js/layered-chamber.js
           git commit -m "Publish authoritative chamber presentation [live-aperture-review-applied]"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
