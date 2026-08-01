@@ -3,60 +3,88 @@ name: RedWire Weather Card Occlusion
 on:
   pull_request:
     paths:
-      - ".github/workflows/redwire-weather-card-occlusion.yml"
+      - "index.html"
+      - "js/redwire-weather-card-occlusion.js"
       - "departments/weather/weather-presets.js"
       - "departments/weather/weather-module.js"
-      - "js/redwire-weather-card-occlusion.js"
       - "tests/heavy-mist-weather-policy.test.js"
       - "tests/redwire-weather-card-occlusion.test.js"
       - "tests/redwire-weather-card-occlusion-render.mjs"
+      - ".github/workflows/redwire-weather-card-occlusion.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply-weather-policy:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'agent/heavy-mist-foreground-surge'
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-      - name: Apply Weather-owned preset depth flow
+          node-version: 24
+      - name: Check foreground and Weather policy syntax
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          path = Path("departments/weather/weather-module.js")
-          text = path.read_text()
-          old = '        depthFlow: APPROVED_MIST.depthFlow + state.wind.z,\n'
-          new = '''        depthFlow: APPROVED_MIST.depthFlow
-          + (state.config.depthFlow - (Number(PRESETS.mist?.depthFlow) || 0))
-          + state.wind.z,
-'''
-          if new not in text:
-              if old not in text:
-                  raise SystemExit("Missing mist depth-flow anchor")
-              text = text.replace(old, new, 1)
-              path.write_text(text)
-          PY
-      - name: Validate Weather publication
-        run: |
+          node --check js/redwire-weather-card-occlusion.js
           node --check departments/weather/weather-presets.js
           node --check departments/weather/weather-module.js
           node --check tests/heavy-mist-weather-policy.test.js
+          node --check tests/redwire-weather-card-occlusion.test.js
+          node --check tests/redwire-weather-card-occlusion-render.mjs
+      - name: Run Weather-owned flow contract
+        run: |
           node tests/heavy-mist-weather-policy.test.js
           node departments/weather/tests/weather-module.node.test.js
-      - name: Commit Weather renderer policy
+      - name: Run mounted foreground lifecycle contract
+        run: node tests/redwire-weather-card-occlusion.test.js
+      - name: Check production load order
         run: |
-          if git diff --quiet -- departments/weather/weather-module.js; then
-            echo "Weather renderer policy already applied."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add departments/weather/weather-module.js
-          git commit -m "Let Weather presets own mist depth flow"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const departments = html.indexOf('js/integration-departments.js');
+          const occlusion = html.indexOf('js/redwire-weather-card-occlusion.js');
+          const article = html.indexOf('js/article-mist-descent.js');
+          if (departments < 0 || occlusion < departments || article < occlusion) {
+            throw new Error('Weather card composition must load after accepted departments and before article composition.');
+          }
+          if ((html.match(/js\/redwire-weather-card-occlusion\.js/g) || []).length !== 1) {
+            throw new Error('Weather card composition must load exactly once.');
+          }
+          console.log('Weather card composition production load order is correct.');
+          NODE
+
+  rendered-heavy-mist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1
+          npx playwright install --with-deps chromium
+      - name: Prove exact-depth foreground composition and lifecycle
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/redwire-weather-card-occlusion
+          python3 -m http.server 4173 > /tmp/ncn-card-occlusion-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/redwire-weather-card-occlusion-render.mjs
+      - name: Upload heavy-mist evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redwire-weather-card-occlusion
+          path: |
+            artifacts/redwire-weather-card-occlusion/
+            /tmp/ncn-card-occlusion-http.log
+          if-no-files-found: warn
