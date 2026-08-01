@@ -1,116 +1,91 @@
-name: Apply canonical heavy mist proof
+name: RedWire Weather Card Occlusion
 
 on:
   pull_request:
     paths:
-      - ".github/workflows/redwire-weather-card-occlusion.yml"
-      - "departments/weather/tests/weather-module.node.test.js"
+      - "index.html"
       - "js/redwire-weather-card-occlusion.js"
+      - "departments/weather/weather-presets.js"
+      - "departments/weather/weather-module.js"
+      - "departments/weather/tests/weather-module.node.test.js"
+      - "tests/heavy-mist-weather-policy.test.js"
+      - "tests/redwire-weather-card-occlusion.test.js"
+      - "tests/redwire-weather-card-occlusion-render.mjs"
+      - ".github/workflows/redwire-weather-card-occlusion.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply-canonical-proof:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'agent/heavy-mist-foreground-surge'
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-      - name: Tighten canonical Weather and compositor proof
+          node-version: 24
+      - name: Check canonical Weather and compositor syntax
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          compositor_path = Path("js/redwire-weather-card-occlusion.js")
-          compositor = compositor_path.read_text()
-          old = '''    const depthFrame = weatherService?.getDepthFrame?.(payload?.token ?? payload?.runtimeToken)
-      || payload?.depthFrame
-      || null;
-'''
-          new = '''    const depthFrame = payload?.depthFrame
-      || weatherService?.getDepthFrame?.(payload?.token ?? payload?.runtimeToken)
-      || null;
-'''
-          if new not in compositor:
-              if old not in compositor:
-                  raise SystemExit("Missing completed-frame compositor anchor")
-              compositor = compositor.replace(old, new, 1)
-              compositor_path.write_text(compositor)
-
-          test_path = Path("departments/weather/tests/weather-module.node.test.js")
-          test = test_path.read_text()
-          old = '''  const heavyDepthFrame = weather.getDepthFrame();
-  assert.ok(heavyDepthFrame.puffCount >= heavy.particles.mist * 3,
-    'heavy mist must publish an exact-depth puff field for every active bank');
-
-  weather.applyProfile({ enabled: true, preset: 'mist', intensity: 0.42, seed: 2045 });
-'''
-          new = '''  const heavyDepthFrame = weather.getDepthFrame();
-  assert.ok(heavyDepthFrame.puffCount >= heavy.particles.mist * 3,
-    'heavy mist must publish an exact-depth puff field for every active bank');
-  assert.equal(heavy.wind.z, 0,
-    'heavy-mist preset motion must not be hidden inside the public wind contract');
-  assert.equal(heavy.diagnostics.effectiveDepthFlow.configured, -0.72,
-    'heavy mist must expose the declared preset depth flow');
-  assert.ok(heavy.diagnostics.effectiveDepthFlow.mist < -0.8,
-    'the canonical mist renderer must calculate one truthful forward depth flow');
-  assert.equal(heavyDepthFrame.mistDepthFlow, heavy.diagnostics.effectiveDepthFlow.mist,
-    'the completed depth frame and service diagnostics must report the same mist flow');
-  assert.equal(heavy.diagnostics.effectiveDepthFlow.heavyMistPrimeCount, 1,
-    'selecting heavy mist must prime one real near-depth chamber bank');
-  const heavyForegroundContext = new FakeContext();
-  const heavyForeground = heavyDepthFrame.renderForeground(heavyForegroundContext, { nearerThan: 5.45 });
-  assert.ok(heavyForeground > 0,
-    'the canonical heavy-mist field must contain genuine puffs in front of the Optical plate plane');
-  assert.ok(heavyForeground < heavyDepthFrame.puffCount * 0.45,
-    'the foreground pass must remain a localised bank subset rather than tinting the whole field');
-  assert.ok(heavyForegroundContext.radialGradientCalls >= heavyForeground,
-    'foreground heavy mist must replay real Weather puff rendering');
-
-  weather.applyProfile({ enabled: true, preset: 'mist', intensity: 0.42, seed: 2045 });
-'''
-          if new not in test:
-              if old not in test:
-                  raise SystemExit("Missing heavy Weather acceptance anchor")
-              test = test.replace(old, new, 1)
-          old2 = '''  runtime.step(16, 40);
-  assert.equal(renders.linear, 0, 'Weather must not draw a floor veil or general haze gradient');
-
-  const depthFrame = weather.getDepthFrame();
-'''
-          new2 = '''  runtime.step(16, 40);
-  const ordinaryAfterHeavy = weather.snapshot();
-  assert.equal(ordinaryAfterHeavy.diagnostics.effectiveDepthFlow.mist, -0.12,
-    'ordinary mist must retain the accepted baseline depth flow');
-  assert.equal(ordinaryAfterHeavy.diagnostics.effectiveDepthFlow.particles, -0.018,
-    'non-mist particles must receive one configured depth contribution');
-  assert.equal(renders.linear, 0, 'Weather must not draw a floor veil or general haze gradient');
-
-  const depthFrame = weather.getDepthFrame();
-'''
-          if new2 not in test:
-              if old2 not in test:
-                  raise SystemExit("Missing ordinary Weather acceptance anchor")
-              test = test.replace(old2, new2, 1)
-          test_path.write_text(test)
-          PY
-      - name: Validate canonical proof
-        run: |
+          node --check departments/weather/weather-presets.js
+          node --check departments/weather/weather-module.js
           node --check js/redwire-weather-card-occlusion.js
-          node --check departments/weather/tests/weather-module.node.test.js
-          node departments/weather/tests/weather-module.node.test.js
-      - name: Commit canonical proof
+          node --check tests/heavy-mist-weather-policy.test.js
+          node --check tests/redwire-weather-card-occlusion.test.js
+          node --check tests/redwire-weather-card-occlusion-render.mjs
+      - name: Run canonical Weather ownership contract
         run: |
-          if git diff --quiet -- js/redwire-weather-card-occlusion.js departments/weather/tests/weather-module.node.test.js; then
-            echo "Canonical proof already applied."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add js/redwire-weather-card-occlusion.js departments/weather/tests/weather-module.node.test.js
-          git commit -m "Prove canonical heavy-mist puff replay"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          node tests/heavy-mist-weather-policy.test.js
+          node departments/weather/tests/weather-module.node.test.js
+      - name: Run mounted foreground lifecycle contract
+        run: node tests/redwire-weather-card-occlusion.test.js
+      - name: Check production load order
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const departments = html.indexOf('js/integration-departments.js');
+          const occlusion = html.indexOf('js/redwire-weather-card-occlusion.js');
+          const article = html.indexOf('js/article-mist-descent.js');
+          if (departments < 0 || occlusion < departments || article < occlusion) {
+            throw new Error('Weather card composition must load after accepted departments and before article composition.');
+          }
+          if ((html.match(/js\/redwire-weather-card-occlusion\.js/g) || []).length !== 1) {
+            throw new Error('Weather card composition must load exactly once.');
+          }
+          console.log('Weather card composition production load order is correct.');
+          NODE
+
+  rendered-heavy-mist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1
+          npx playwright install --with-deps chromium
+      - name: Prove localised real-puff foreground composition
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/redwire-weather-card-occlusion
+          python3 -m http.server 4173 > /tmp/ncn-card-occlusion-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/redwire-weather-card-occlusion-render.mjs
+      - name: Upload heavy-mist evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redwire-weather-card-occlusion
+          path: |
+            artifacts/redwire-weather-card-occlusion/
+            /tmp/ncn-card-occlusion-http.log
+          if-no-files-found: warn
