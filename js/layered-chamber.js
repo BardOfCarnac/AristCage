@@ -239,11 +239,19 @@ window.LayeredChamber = (() => {
     return injectedEnergy * Math.exp(-5.2 * n) * (0.82 + 0.18 * Math.cos(n * Math.PI * 7));
   }
 
+  function presentationState(now) {
+    const t = Math.max(0, (now - startedAt) / 1000);
+    return {
+      t,
+      travel: easeTravel((t - timing.travelStart) / timing.travelDuration),
+      returning: easeReturn((t - timing.returnStart) / timing.returnDuration),
+      wallOpen: easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration)
+    };
+  }
+
   function state(now) {
-    const t = (now - startedAt) / 1000;
-    const travel = easeTravel((t - timing.travelStart) / timing.travelDuration);
-    const returning = easeReturn((t - timing.returnStart) / timing.returnDuration);
-    const wallOpen = easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration);
+    const presentation = presentationState(now);
+    const { t, travel, returning, wallOpen } = presentation;
     const rearLock = sharpPulse(t, timing.returnStart + timing.returnDuration, 0.22);
     const wallLock = softPulse(t, timing.wallOpenStart + timing.wallOpenDuration, 0.38);
     const base = bootEnergy(t);
@@ -255,10 +263,7 @@ window.LayeredChamber = (() => {
       ? Math.sin(breathPhase * Math.PI * 2) * breathEnvelope * energy.settleBreath
       : 0;
     return {
-      t,
-      travel,
-      returning,
-      wallOpen,
+      ...presentation,
       energy: clamp01(base + rearLock * energy.rearLockPulse + wallLock * energy.wallLockPulse + breath + injectedEnergyAt(now)),
       lab: mode === MODES.LAB ? easeOut((t - timing.done - timing.labDelay) / 0.55) : 0,
       done: t >= timing.done + timing.breathDuration && injectedDuration === 0
@@ -280,6 +285,32 @@ window.LayeredChamber = (() => {
 
   function visibleHalfWidth(s) {
     return geometry.halfWidth + geometry.wallShiftCells * geometry.cell * s.wallOpen;
+  }
+
+  function settledPresentationSnapshot() {
+    return Object.freeze({
+      elapsed: timing.done,
+      progress: 1,
+      wallOpen: 1,
+      visibleHalfWidth: finalHalfWidth(),
+      rearDepth: geometry.near + geometry.finalDepthCells * geometry.cell,
+      settled: true,
+      active: false
+    });
+  }
+
+  function presentationSnapshot(now = performance.now()) {
+    if (mode === MODES.OFF || !mounted || !startedAt) return settledPresentationSnapshot();
+    const presentation = presentationState(now);
+    return Object.freeze({
+      elapsed: presentation.t,
+      progress: clamp01(presentation.t / timing.done),
+      wallOpen: presentation.wallOpen,
+      visibleHalfWidth: visibleHalfWidth(presentation),
+      rearDepth: rearDepth(presentation),
+      settled: presentation.t >= timing.done,
+      active: presentation.t < timing.done + timing.breathDuration || injectedDuration > 0
+    });
   }
 
   function apertureAt(z, halfWidth) {
@@ -691,6 +722,7 @@ window.LayeredChamber = (() => {
     refresh: requestDraw,
     setScroll,
     injectEnergy,
+    getPresentationSnapshot: presentationSnapshot,
     toggleDiagnostics: () => {
       lab.diagnostics = !lab.diagnostics;
       requestDraw();

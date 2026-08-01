@@ -1,0 +1,66 @@
+name: Chamber Live Aperture
+
+on:
+  pull_request:
+    paths:
+      - "js/layered-chamber.js"
+      - "js/chamber-camera.js"
+      - "departments/weather/**"
+      - "tests/chamber-live-presentation.test.js"
+      - "tests/chamber-live-aperture-render.mjs"
+      - ".github/workflows/chamber-live-aperture.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check publication syntax
+        run: |
+          node --check js/layered-chamber.js
+          node --check js/chamber-camera.js
+          node --check tests/chamber-live-presentation.test.js
+          node --check tests/chamber-live-aperture-render.mjs
+      - name: Run authoritative presentation contract
+        run: node tests/chamber-live-presentation.test.js
+
+  rendered:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1
+          npx playwright install --with-deps chromium
+      - name: Run live aperture proof
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/chamber-live-aperture
+          python3 -m http.server 4173 > /tmp/ncn-live-aperture-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/chamber-live-aperture-render.mjs
+      - name: Upload rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chamber-live-aperture
+          path: |
+            artifacts/chamber-live-aperture/
+            /tmp/ncn-live-aperture-http.log
+          if-no-files-found: warn
