@@ -1,8 +1,13 @@
-/* Weather preset data and the preset-owned depth-flow policy installed before
-   the accepted Weather factory is consumed. Haze remains a compatibility field
-   but is intentionally zero in every profile. Ordinary mist retains the approved
-   renderer baseline; heavy mist adds a deliberate forward chamber flow. */
+/* Weather preset data and preset-owned heavy-mist motion installed before the
+   accepted Weather factory is consumed. Ordinary mist retains the approved floor
+   bank behaviour. Heavy mist adds both forward depth flow and a slowly pulsing
+   near-plate surge, published through Weather's existing depth-frame contract. */
 window.NCNWeatherPresets = (() => {
+  const HEAVY_MIST = "heavy-mist";
+  const FOREGROUND_SURGE_DEPTH = 5.35;
+  const SURGE_PERIOD_MS = 11000;
+  const SURGE_ACTIVE_MS = 4200;
+
   const preset = values => Object.freeze({
     mist: 0,
     smoke: 0,
@@ -107,9 +112,102 @@ window.NCNWeatherPresets = (() => {
   }
 
   function presetDepthOffset(name) {
-    if (String(name || "clear") !== "heavy-mist") return 0;
-    return clamp((Number(presets["heavy-mist"].depthFlow) || 0)
+    if (String(name || "clear") !== HEAVY_MIST) return 0;
+    return clamp((Number(presets[HEAVY_MIST].depthFlow) || 0)
       - (Number(presets.mist.depthFlow) || 0));
+  }
+
+  function regionBounds(region) {
+    const points = Array.from(region?.polygons || []).flatMap(polygon => Array.from(polygon || []));
+    if (!points.length) return null;
+    const xs = points.map(point => Number(point?.x)).filter(Number.isFinite);
+    const ys = points.map(point => Number(point?.y)).filter(Number.isFinite);
+    if (!xs.length || !ys.length) return null;
+    return Object.freeze({
+      left: Math.min(...xs),
+      top: Math.min(...ys),
+      right: Math.max(...xs),
+      bottom: Math.max(...ys),
+      width: Math.max(1, Math.max(...xs) - Math.min(...xs)),
+      height: Math.max(1, Math.max(...ys) - Math.min(...ys))
+    });
+  }
+
+  function traceRegion(targetContext, region, originX, originY) {
+    const polygons = Array.from(region?.polygons || []);
+    if (!polygons.length) return false;
+    targetContext.beginPath?.();
+    let traced = false;
+    polygons.forEach(polygon => {
+      const points = Array.from(polygon || []);
+      if (points.length < 3) return;
+      targetContext.moveTo?.(Number(points[0].x) - originX, Number(points[0].y) - originY);
+      for (let index = 1; index < points.length; index += 1) {
+        targetContext.lineTo?.(Number(points[index].x) - originX, Number(points[index].y) - originY);
+      }
+      targetContext.closePath?.();
+      traced = true;
+    });
+    return traced;
+  }
+
+  function renderHeavyMistSurge(targetContext, options, elapsedMs) {
+    const regions = Array.from(options?.regions || [])
+      .filter(region => Number(region?.nearerThan) > FOREGROUND_SURGE_DEPTH)
+      .map(region => ({ region, bounds: regionBounds(region) }))
+      .filter(item => item.bounds);
+    if (!regions.length) return 0;
+
+    const cycle = ((Math.max(0, Number(elapsedMs) || 0) % SURGE_PERIOD_MS) + SURGE_PERIOD_MS) % SURGE_PERIOD_MS;
+    if (cycle > SURGE_ACTIVE_MS) return 0;
+
+    const progress = cycle / SURGE_ACTIVE_MS;
+    const pulse = 0.42 + Math.sin(progress * Math.PI) * 0.58;
+    const viewport = options?.viewport || { left: 0, top: 0 };
+    const originX = Number(viewport.left) || 0;
+    const originY = Number(viewport.top) || 0;
+    let rendered = 0;
+
+    regions.forEach(({ region, bounds }, regionIndex) => {
+      targetContext.save?.();
+      if (typeof targetContext.clip === "function" && traceRegion(targetContext, region, originX, originY)) {
+        targetContext.clip();
+      }
+
+      const localLeft = bounds.left - originX;
+      const localTop = bounds.top - originY;
+      const travel = (progress * 1.5 - 0.25 + regionIndex * 0.17) % 1.5;
+      const centreX = localLeft + bounds.width * travel;
+      const centreY = localTop + bounds.height * (0.46 + Math.sin(progress * Math.PI * 2 + regionIndex) * 0.12);
+      const radius = Math.max(bounds.width, bounds.height) * 0.86;
+      const gradient = targetContext.createRadialGradient?.(
+        centreX,
+        centreY,
+        radius * 0.04,
+        centreX,
+        centreY,
+        radius
+      );
+
+      if (gradient) {
+        gradient.addColorStop?.(0, `rgba(238,30,45,${(0.24 * pulse).toFixed(4)})`);
+        gradient.addColorStop?.(0.38, `rgba(208,16,34,${(0.16 * pulse).toFixed(4)})`);
+        gradient.addColorStop?.(0.72, `rgba(146,6,24,${(0.07 * pulse).toFixed(4)})`);
+        gradient.addColorStop?.(1, "rgba(90,0,15,0)");
+        targetContext.fillStyle = gradient;
+        targetContext.fillRect?.(
+          localLeft - bounds.width * 0.2,
+          localTop - bounds.height * 0.35,
+          bounds.width * 1.4,
+          bounds.height * 1.7
+        );
+      }
+
+      targetContext.restore?.();
+      rendered += 1;
+    });
+
+    return rendered;
   }
 
   function wrapFactory(factory) {
@@ -123,6 +221,7 @@ window.NCNWeatherPresets = (() => {
       let publicWind = normaliseWind(initial.wind);
       let selectedPreset = String(initial.targetPreset || initial.preset || "clear");
       let presetOffset = presetDepthOffset(selectedPreset);
+      const decoratedFrames = new WeakMap();
 
       const internalWind = () => freezeWind({
         x: publicWind.x,
@@ -131,6 +230,25 @@ window.NCNWeatherPresets = (() => {
       });
 
       const applyInternalWind = () => weather.setWind(internalWind());
+
+      function decorateDepthFrame(frame) {
+        if (!frame || typeof frame !== "object" || typeof frame.renderForeground !== "function") return frame;
+        if (decoratedFrames.has(frame)) return decoratedFrames.get(frame);
+
+        const decorated = Object.freeze({
+          ...frame,
+          presetSurgeDepth: FOREGROUND_SURGE_DEPTH,
+          renderForeground(targetContext, options = {}) {
+            let rendered = Number(frame.renderForeground(targetContext, options)) || 0;
+            if (selectedPreset === HEAVY_MIST) {
+              rendered += renderHeavyMistSurge(targetContext, options, frame.elapsedMs);
+            }
+            return rendered;
+          }
+        });
+        decoratedFrames.set(frame, decorated);
+        return decorated;
+      }
 
       function snapshot() {
         const current = weather.snapshot?.() || {};
@@ -144,7 +262,9 @@ window.NCNWeatherPresets = (() => {
               configured: Number(presets[selectedPreset]?.depthFlow) || 0,
               offset: presetOffset,
               publicWindZ: publicWind.z,
-              internalWindZ: internalWind().z
+              internalWindZ: internalWind().z,
+              foregroundSurgeDepth: FOREGROUND_SURGE_DEPTH,
+              foregroundSurgeActive: selectedPreset === HEAVY_MIST
             })
           })
         });
@@ -223,6 +343,23 @@ window.NCNWeatherPresets = (() => {
         return weather.destroy(...args);
       }
 
+      function getDepthFrame(...args) {
+        return decorateDepthFrame(weather.getDepthFrame?.(...args));
+      }
+
+      function subscribeAfterRender(listener) {
+        if (typeof listener !== "function" || typeof weather.subscribeAfterRender !== "function") {
+          return weather.subscribeAfterRender?.(listener);
+        }
+        return weather.subscribeAfterRender(payload => {
+          if (payload?.type !== "render" || !payload.depthFrame) return listener(payload);
+          return listener(Object.freeze({
+            ...payload,
+            depthFrame: decorateDepthFrame(payload.depthFrame)
+          }));
+        });
+      }
+
       return Object.freeze({
         ...weather,
         init,
@@ -233,6 +370,8 @@ window.NCNWeatherPresets = (() => {
         setEnabled,
         reset,
         destroy,
+        getDepthFrame,
+        subscribeAfterRender,
         snapshot
       });
     };
@@ -259,10 +398,14 @@ window.NCNWeatherPresets = (() => {
     window.NCNWeatherPresetDepthFlowPolicy = Object.freeze({
       presetDepthOffset,
       wrapFactory,
+      renderHeavyMistSurge,
       snapshot: () => Object.freeze({
         ordinaryDepthFlow: presets.mist.depthFlow,
-        heavyDepthFlow: presets["heavy-mist"].depthFlow,
-        heavyOffset: presetDepthOffset("heavy-mist")
+        heavyDepthFlow: presets[HEAVY_MIST].depthFlow,
+        heavyOffset: presetDepthOffset(HEAVY_MIST),
+        foregroundSurgeDepth: FOREGROUND_SURGE_DEPTH,
+        surgePeriodMs: SURGE_PERIOD_MS,
+        surgeActiveMs: SURGE_ACTIVE_MS
       })
     });
     return true;
