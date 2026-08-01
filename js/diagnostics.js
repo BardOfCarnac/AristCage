@@ -28,6 +28,7 @@ let diagnosticsCameraFocal;
 let diagnosticsCameraAperture;
 let diagnosticsOpticalLayers;
 let diagnosticsLiveListenersBound = false;
+let diagnosticsTransition = Promise.resolve();
 let diagnosticMarkTapCount = 0;
 let diagnosticMarkTapTimer;
 
@@ -162,7 +163,7 @@ function ensureDiagnosticsInterface() {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "diagnostics-toggle";
-  toggle.addEventListener("click", toggleDiagnostics);
+  toggle.addEventListener("click", () => { void toggleDiagnostics(); });
 
   panel.querySelectorAll("[data-debug-app]").forEach(button => {
     button.addEventListener("click", () => {
@@ -170,7 +171,6 @@ function ensureDiagnosticsInterface() {
     });
   });
 
-  window.addEventListener("ncn:application-change", updateApplicationDiagnostics);
   document.body.append(panel, toggle);
   diagnosticsPanel = panel;
   diagnosticsToggle = toggle;
@@ -244,6 +244,7 @@ function bindDiagnosticsLiveListeners() {
   window.addEventListener("scroll", updateDiagnosticsLiveValues, { passive: true });
   window.addEventListener("resize", updateDiagnosticsLiveValues);
   window.addEventListener("ncn:chamber-camera-change", updateDiagnosticsLiveValues);
+  window.addEventListener("ncn:application-change", updateApplicationDiagnostics);
   diagnosticsLiveListenersBound = true;
 }
 
@@ -252,10 +253,11 @@ function unbindDiagnosticsLiveListeners() {
   window.removeEventListener("scroll", updateDiagnosticsLiveValues);
   window.removeEventListener("resize", updateDiagnosticsLiveValues);
   window.removeEventListener("ncn:chamber-camera-change", updateDiagnosticsLiveValues);
+  window.removeEventListener("ncn:application-change", updateApplicationDiagnostics);
   diagnosticsLiveListenersBound = false;
 }
 
-function setDiagnosticsEnabled(enabled) {
+async function commitDiagnosticsEnabled(enabled) {
   if (enabled) {
     ensureDiagnosticsInterface();
     document.documentElement.classList.add("diagnostics-on");
@@ -263,24 +265,32 @@ function setDiagnosticsEnabled(enabled) {
     window.localStorage.setItem(NCN_DIAGNOSTICS_KEY, "1");
     bindDiagnosticsLiveListeners();
     updateDiagnosticsLiveValues();
-    return;
+    await Promise.resolve(window.NCNDevPanel?.setDiagnosticsActive?.(true));
+    return true;
   }
 
+  await Promise.resolve(window.NCNDevPanel?.setDiagnosticsActive?.(false));
   document.documentElement.classList.remove("diagnostics-on");
   if (diagnosticsToggle) diagnosticsToggle.textContent = "Dev off";
   window.localStorage.setItem(NCN_DIAGNOSTICS_KEY, "0");
   unbindDiagnosticsLiveListeners();
+  return false;
+}
+
+function setDiagnosticsEnabled(enabled) {
+  diagnosticsTransition = diagnosticsTransition.then(() => commitDiagnosticsEnabled(Boolean(enabled)));
+  return diagnosticsTransition;
 }
 
 function toggleDiagnostics() {
-  setDiagnosticsEnabled(!document.documentElement.classList.contains("diagnostics-on"));
+  return setDiagnosticsEnabled(!document.documentElement.classList.contains("diagnostics-on"));
 }
 
 function bindDiagnosticsActivationTriggers() {
   document.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "d") {
       event.preventDefault();
-      toggleDiagnostics();
+      void toggleDiagnostics();
     }
   });
 
@@ -290,7 +300,7 @@ function bindDiagnosticsActivationTriggers() {
 
     if (diagnosticMarkTapCount >= 3) {
       diagnosticMarkTapCount = 0;
-      toggleDiagnostics();
+      void toggleDiagnostics();
       return;
     }
 
@@ -303,5 +313,5 @@ function bindDiagnosticsActivationTriggers() {
 bindDiagnosticsActivationTriggers();
 
 if (diagnosticsEnabledFromEnvironment()) {
-  setDiagnosticsEnabled(true);
+  void setDiagnosticsEnabled(true);
 }
