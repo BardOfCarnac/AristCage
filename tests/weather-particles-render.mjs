@@ -55,10 +55,10 @@ async function sample(page) {
       const scaleY = rect.height / canvas.height;
       let ink = 0;
       let outside = 0;
-      for (let y = 0; y < canvas.height; y += 5) {
-        for (let x = 0; x < canvas.width; x += 5) {
+      for (let y = 0; y < canvas.height; y += 2) {
+        for (let x = 0; x < canvas.width; x += 2) {
           const alpha = data[(y * canvas.width + x) * 4 + 3];
-          if (alpha <= 8) continue;
+          if (alpha <= 2) continue;
           ink += 1;
           if (aperture) {
             const pageX = rect.left + x * scaleX;
@@ -147,6 +147,9 @@ async function runCase(name, viewport, profile, expectations, reducedMotion = "n
     await page.waitForTimeout(700);
 
     const result = await sample(page);
+    fs.writeFileSync(`${artifactRoot}/${name}.json`, JSON.stringify(result, null, 2));
+    await page.screenshot({ path: `${artifactRoot}/${name}.png`, fullPage: true });
+
     assertCommon(result, name, expectations.minimumLayers || 3);
     const field = result.snapshot.particles.depthField;
     if (expectations.ash) assert.ok(field.kinds.ash > 0, `${name}: dark ash silhouettes are required`);
@@ -155,9 +158,6 @@ async function runCase(name, viewport, profile, expectations, reducedMotion = "n
     if (expectations.lightCatch) assert.ok(field.lightCaught > 0, `${name}: particles must become visible in chamber light`);
     if (expectations.smoke) assert.ok(field.smokeSuppressed > 0, `${name}: smoke must suppress some embedded particle light`);
     if (expectations.maximumActive) assert.ok(field.active <= expectations.maximumActive, `${name}: reduced-motion pool must remain bounded`);
-
-    fs.writeFileSync(`${artifactRoot}/${name}.json`, JSON.stringify(result, null, 2));
-    await page.screenshot({ path: `${artifactRoot}/${name}.png`, fullPage: true });
   } finally {
     await page.close();
   }
