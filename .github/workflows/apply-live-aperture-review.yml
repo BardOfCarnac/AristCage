@@ -1,0 +1,135 @@
+name: Apply live aperture review
+
+on:
+  push:
+    branches:
+      - agent/live-chamber-weather-aperture
+
+permissions:
+  contents: write
+
+jobs:
+  apply-review:
+    if: ${{ !contains(github.event.head_commit.message, '[live-aperture-review-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/live-chamber-weather-aperture
+          fetch-depth: 0
+
+      - name: Publish chamber-owned presentation
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f"Missing anchor: {label}")
+              return text.replace(old, new, 1)
+
+          path = Path("js/layered-chamber.js")
+          text = path.read_text()
+          text = replace_once(text,
+          '''  function state(now) {
+            const t = (now - startedAt) / 1000;
+            const travel = easeTravel((t - timing.travelStart) / timing.travelDuration);
+            const returning = easeReturn((t - timing.returnStart) / timing.returnDuration);
+            const wallOpen = easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration);
+            const rearLock = sharpPulse(t, timing.returnStart + timing.returnDuration, 0.22);
+          ''',
+          '''  function presentationState(now) {
+            const t = Math.max(0, (now - startedAt) / 1000);
+            return {
+              t,
+              travel: easeTravel((t - timing.travelStart) / timing.travelDuration),
+              returning: easeReturn((t - timing.returnStart) / timing.returnDuration),
+              wallOpen: easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration)
+            };
+          }
+
+          function state(now) {
+            const presentation = presentationState(now);
+            const { t, travel, returning, wallOpen } = presentation;
+            const rearLock = sharpPulse(t, timing.returnStart + timing.returnDuration, 0.22);
+          ''', "shared presentation state")
+          text = replace_once(text,
+          '''    return {
+              t,
+              travel,
+              returning,
+              wallOpen,
+              energy: clamp01(base + rearLock * energy.rearLockPulse + wallLock * energy.wallLockPulse + breath + injectedEnergyAt(now)),
+          ''',
+          '''    return {
+              ...presentation,
+              energy: clamp01(base + rearLock * energy.rearLockPulse + wallLock * energy.wallLockPulse + breath + injectedEnergyAt(now)),
+          ''', "state publication reuse")
+          text = replace_once(text,
+          '''  function visibleHalfWidth(s) {
+            return geometry.halfWidth + geometry.wallShiftCells * geometry.cell * s.wallOpen;
+          }
+
+          function apertureAt(z, halfWidth) {
+          ''',
+          '''  function visibleHalfWidth(s) {
+            return geometry.halfWidth + geometry.wallShiftCells * geometry.cell * s.wallOpen;
+          }
+
+          function settledPresentationSnapshot() {
+            return Object.freeze({
+              elapsed: timing.done,
+              progress: 1,
+              wallOpen: 1,
+              visibleHalfWidth: finalHalfWidth(),
+              rearDepth: geometry.near + geometry.finalDepthCells * geometry.cell,
+              settled: true,
+              active: false
+            });
+          }
+
+          function presentationSnapshot(now = performance.now()) {
+            if (mode === MODES.OFF || !mounted || !startedAt) return settledPresentationSnapshot();
+            const presentation = presentationState(now);
+            return Object.freeze({
+              elapsed: presentation.t,
+              progress: clamp01(presentation.t / timing.done),
+              wallOpen: presentation.wallOpen,
+              visibleHalfWidth: visibleHalfWidth(presentation),
+              rearDepth: rearDepth(presentation),
+              settled: presentation.t >= timing.done,
+              active: presentation.t < timing.done + timing.breathDuration || injectedDuration > 0
+            });
+          }
+
+          function apertureAt(z, halfWidth) {
+          ''', "presentation snapshot")
+          text = replace_once(text,
+          '''    setScroll,
+            injectEnergy,
+            toggleDiagnostics: () => {
+          ''',
+          '''    setScroll,
+            injectEnergy,
+            getPresentationSnapshot: presentationSnapshot,
+            toggleDiagnostics: () => {
+          ''', "presentation export")
+          path.write_text(text)
+          Path(".github/workflows/apply-live-aperture-review.yml").unlink()
+          PY
+
+      - name: Validate correction
+        run: |
+          node --check js/layered-chamber.js
+          node --check js/chamber-camera.js
+          node --check tests/chamber-live-presentation.test.js
+          node --check tests/chamber-live-aperture-render.mjs
+          node tests/chamber-live-presentation.test.js
+
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish authoritative chamber presentation [live-aperture-review-applied]"
+          git push origin HEAD:agent/live-chamber-weather-aperture
