@@ -116,13 +116,33 @@ function assertHeavyForeground(result, name) {
   );
 }
 
+async function applyHeavyMistControl(page, reason) {
+  await page.evaluate(controlReason => {
+    const weather = window.NCNIntegration.getService("weather");
+    weather.applyProfile({
+      enabled: true,
+      preset: "heavy-mist",
+      intensity: 1,
+      wind: { x: 0.22, y: 0, z: 0 },
+      quality: "high"
+    }, {
+      application: "redwire",
+      reason: controlReason
+    });
+  }, reason);
+
+  await page.waitForFunction(() => {
+    const weather = window.NCNIntegration?.getService?.("weather")?.snapshot?.();
+    return weather?.targetPreset === "heavy-mist"
+      && weather?.diagnostics?.presetDepthFlow?.foregroundSurgeActive === true;
+  }, null, { timeout: 15_000 });
+}
+
 async function runViewport(name, viewport, reducedMotion = "no-preference") {
   const page = await browser.newPage({ viewport });
   await page.emulateMedia({ reducedMotion });
   try {
-    const url = new URL(baseUrl);
-    url.searchParams.set("weatherTest", "heavy");
-    await page.goto(url.toString(), { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
 
     await page.waitForFunction(() => (
       window.NCNIntegratedDepartments?.isReady?.() === true
@@ -132,6 +152,7 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
       ).length > 0
     ), null, { timeout: 30_000 });
 
+    await applyHeavyMistControl(page, "heavy-mist-control-proof");
     await page.waitForFunction(() => {
       const bridge = window.NCNRedWireWeatherCardOcclusion?.snapshot?.();
       const canvas = document.querySelector("canvas.ncn-redwire-weather-foreground");
@@ -189,19 +210,16 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
 
     await page.evaluate(async () => {
       await window.NCNApplications.switchTo("redwire", { animate: false, reason: "foreground-return-proof" });
-      const weather = window.NCNIntegration.getService("weather");
-      weather.applyProfile({
-        enabled: true,
-        preset: "heavy-mist",
-        intensity: 0.98,
-        wind: { x: 0, y: 0, z: 0 }
-      }, { reason: "foreground-return-proof" });
     });
+    await page.waitForFunction(() => (
+      window.NCNApplications.current() === "redwire"
+      && window.NCNRedWireWeatherCardOcclusion?.snapshot?.().active === true
+    ), null, { timeout: 15_000 });
+    await applyHeavyMistControl(page, "foreground-return-proof");
     await page.waitForFunction(previousGeneration => {
       const bridge = window.NCNRedWireWeatherCardOcclusion?.snapshot?.();
       const canvas = document.querySelector("canvas.ncn-redwire-weather-foreground");
-      return window.NCNApplications.current() === "redwire"
-        && bridge?.active === true
+      return bridge?.active === true
         && bridge.foregroundGeneration > previousGeneration
         && bridge.lastForegroundPuffs > 0
         && canvas && !canvas.hidden;
