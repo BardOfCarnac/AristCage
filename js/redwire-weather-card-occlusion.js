@@ -1,10 +1,9 @@
 /*==================================================
   REDWIRE WEATHER CARD OCCLUSION
 
-  Integration-owned bridge. Weather publishes a completed frame; this bridge
-  removes rear Weather pixels beneath the rendered Optical plates, then restores
-  only the nearest heavy-mist puffs above those plates. It does not simulate a
-  second weather field or create a private animation loop.
+  Integration-owned completed-frame compositor. Rear Weather is removed beneath
+  rendered Optical plates. During heavy mist, only Weather puffs genuinely nearer
+  than the approved foreground threshold are replayed above those plates.
 ==================================================*/
 (() => {
   "use strict";
@@ -17,13 +16,15 @@
   const FOREGROUND_CLASS = "ncn-redwire-weather-foreground";
   const HEAVY_MIST_PRESET = "heavy-mist";
   const HEAVY_FRONT_DEPTH = 3.35;
-  const HEAVY_FORWARD_WIND = -0.72;
-  const FOREGROUND_ALPHA = 0.86;
+  const FOREGROUND_Z_INDEX = 24;
+  const EDGE_FEATHER = 6;
 
   let releaseWeather = null;
   let weatherService = null;
   let foregroundCanvas = null;
   let foregroundContext = null;
+  let maskCanvas = null;
+  let maskContext = null;
   let foregroundWidth = 0;
   let foregroundHeight = 0;
   let foregroundDpr = 1;
@@ -32,9 +33,7 @@
   let lastCanvasCount = 0;
   let lastForegroundPuffs = 0;
   let lastForegroundRegions = 0;
-  let automaticDepthWind = false;
-  let previousDepthWind = 0;
-  let injectedDepthWind = null;
+  let foregroundGeneration = 0;
 
   function activeApplication() {
     return window.NCNApplications?.current?.()
@@ -48,10 +47,9 @@
   }
 
   function isHeavyMist(snapshot = weatherSnapshot()) {
-    return Boolean(
-      snapshot?.enabled
-      && (snapshot.targetPreset === HEAVY_MIST_PRESET || snapshot.preset === HEAVY_MIST_PRESET)
-    );
+    if (!snapshot?.enabled) return false;
+    const selectedPreset = snapshot.targetPreset || snapshot.preset;
+    return selectedPreset === HEAVY_MIST_PRESET;
   }
 
   function visiblePlateRects() {
@@ -76,7 +74,8 @@
           width: rect.width,
           height: rect.height
         });
-      });
+      })
+      .sort((a, b) => a.top - b.top || a.left - b.left);
   }
 
   function visibleWeatherCanvases() {
@@ -120,31 +119,42 @@
     return erased;
   }
 
-  function ensureForegroundCanvas() {
-    if (foregroundCanvas?.isConnected) return foregroundCanvas;
-    if (!document.createElement || !document.body?.append) return null;
+  function createCanvas() {
+    const canvas = document.createElement?.("canvas") || null;
+    if (canvas) canvas.setAttribute?.("aria-hidden", "true");
+    return canvas;
+  }
 
-    foregroundCanvas = document.createElement("canvas");
+  function ensureForegroundCanvas() {
+    if (foregroundCanvas?.isConnected && foregroundContext && maskCanvas && maskContext) return foregroundCanvas;
+    if (!document.body?.append) return null;
+
+    foregroundCanvas = createCanvas();
+    maskCanvas = createCanvas();
+    if (!foregroundCanvas || !maskCanvas) return null;
+
     foregroundCanvas.className = FOREGROUND_CLASS;
-    foregroundCanvas.setAttribute?.("aria-hidden", "true");
     foregroundCanvas.hidden = true;
     Object.assign(foregroundCanvas.style || {}, {
       position: "fixed",
       inset: "0",
       width: "100vw",
       height: "100vh",
-      zIndex: "16",
+      zIndex: String(FOREGROUND_Z_INDEX),
       pointerEvents: "none",
       background: "transparent",
-      contain: "strict"
+      contain: "strict",
+      isolation: "isolate"
     });
     document.body.append(foregroundCanvas);
     foregroundContext = foregroundCanvas.getContext?.("2d", { alpha: true }) || null;
-    return foregroundContext ? foregroundCanvas : null;
+    maskContext = maskCanvas.getContext?.("2d", { alpha: true }) || null;
+    foregroundGeneration += 1;
+    return foregroundContext && maskContext ? foregroundCanvas : null;
   }
 
   function foregroundViewport() {
-    if (!ensureForegroundCanvas() || !foregroundContext) return null;
+    if (!ensureForegroundCanvas() || !foregroundContext || !maskContext) return null;
     const width = Math.max(1, Number(globalThis.innerWidth) || Number(document.documentElement?.clientWidth) || 1);
     const height = Math.max(1, Number(globalThis.innerHeight) || Number(document.documentElement?.clientHeight) || 1);
     const dpr = Math.min(1.5, Math.max(1, Number(globalThis.devicePixelRatio) || 1));
@@ -153,11 +163,14 @@
       foregroundWidth = width;
       foregroundHeight = height;
       foregroundDpr = dpr;
-      foregroundCanvas.width = Math.max(1, Math.round(width * dpr));
-      foregroundCanvas.height = Math.max(1, Math.round(height * dpr));
+      [foregroundCanvas, maskCanvas].forEach(canvas => {
+        canvas.width = Math.max(1, Math.round(width * dpr));
+        canvas.height = Math.max(1, Math.round(height * dpr));
+      });
       foregroundCanvas.style.width = `${width}px`;
       foregroundCanvas.style.height = `${height}px`;
       foregroundContext.setTransform?.(dpr, 0, 0, dpr, 0, 0);
+      maskContext.setTransform?.(dpr, 0, 0, dpr, 0, 0);
     }
 
     return Object.freeze({ left: 0, top: 0, right: width, bottom: height, width, height });
@@ -166,6 +179,9 @@
   function clearForeground(hide = true) {
     if (foregroundContext && foregroundWidth > 0 && foregroundHeight > 0) {
       foregroundContext.clearRect?.(0, 0, foregroundWidth, foregroundHeight);
+    }
+    if (maskContext && foregroundWidth > 0 && foregroundHeight > 0) {
+      maskContext.clearRect?.(0, 0, foregroundWidth, foregroundHeight);
     }
     if (foregroundCanvas && hide) foregroundCanvas.hidden = true;
     lastForegroundPuffs = 0;
@@ -184,6 +200,40 @@
     }));
   }
 
+  function drawFeatherMask(plates, viewport) {
+    if (!maskContext || !maskCanvas) return false;
+    maskContext.clearRect?.(0, 0, viewport.width, viewport.height);
+    maskContext.save?.();
+    maskContext.filter = `blur(${EDGE_FEATHER}px)`;
+    maskContext.fillStyle = "rgba(255,255,255,1)";
+    plates.forEach(rect => {
+      const inset = EDGE_FEATHER * 0.65;
+      const left = rect.left + inset;
+      const top = rect.top + inset;
+      const width = Math.max(0, rect.width - inset * 2);
+      const height = Math.max(0, rect.height - inset * 2);
+      if (width <= 0 || height <= 0) return;
+      maskContext.beginPath?.();
+      if (typeof maskContext.roundRect === "function") {
+        maskContext.roundRect(left, top, width, height, Math.min(16, height * 0.08));
+        maskContext.fill?.();
+      } else {
+        maskContext.fillRect?.(left, top, width, height);
+      }
+    });
+    maskContext.restore?.();
+    return true;
+  }
+
+  function applyFeatherMask(plates, viewport) {
+    if (!foregroundContext || !drawFeatherMask(plates, viewport)) return false;
+    foregroundContext.save?.();
+    foregroundContext.globalCompositeOperation = "destination-in";
+    foregroundContext.drawImage?.(maskCanvas, 0, 0, viewport.width, viewport.height);
+    foregroundContext.restore?.();
+    return true;
+  }
+
   function renderHeavyMistForeground(payload, plates, snapshot) {
     const depthFrame = payload?.depthFrame || weatherService?.getDepthFrame?.() || null;
     if (!plates.length || !isHeavyMist(snapshot) || typeof depthFrame?.renderForeground !== "function") {
@@ -194,10 +244,7 @@
     const viewport = foregroundViewport();
     if (!viewport || !foregroundContext) return 0;
     const regions = foregroundRegions(plates);
-    foregroundCanvas.hidden = false;
     foregroundContext.clearRect?.(0, 0, viewport.width, viewport.height);
-    foregroundContext.save?.();
-    foregroundContext.globalAlpha = FOREGROUND_ALPHA;
     let rendered = 0;
     try {
       rendered = Number(depthFrame.renderForeground(foregroundContext, {
@@ -205,51 +252,17 @@
         regions,
         includeAttenuation: false
       })) || 0;
-    } finally {
-      foregroundContext.restore?.();
+    } catch (error) {
+      console.error("[NCN Integration] Heavy-mist foreground render failed", error);
+      clearForeground();
+      return 0;
     }
 
+    if (rendered > 0) applyFeatherMask(plates, viewport);
     lastForegroundPuffs = rendered;
     lastForegroundRegions = regions.length;
-    if (!rendered) foregroundCanvas.hidden = true;
+    foregroundCanvas.hidden = rendered <= 0;
     return rendered;
-  }
-
-  function syncHeavyMistDepthWind(snapshot = weatherSnapshot()) {
-    if (!weatherService || typeof weatherService.setWind !== "function" || !snapshot) return false;
-    const heavy = isHeavyMist(snapshot);
-    const current = snapshot.wind || { x: 0, y: 0, z: 0 };
-
-    if (heavy && !automaticDepthWind) {
-      previousDepthWind = Number(current.z) || 0;
-      injectedDepthWind = Math.min(previousDepthWind, HEAVY_FORWARD_WIND);
-      automaticDepthWind = true;
-      if (Math.abs(previousDepthWind - injectedDepthWind) > 0.001) {
-        weatherService.setWind({
-          x: Number(current.x) || 0,
-          y: Number(current.y) || 0,
-          z: injectedDepthWind
-        });
-      }
-      return true;
-    }
-
-    if (!heavy && automaticDepthWind) {
-      const currentDepthWind = Number(current.z) || 0;
-      if (injectedDepthWind !== null && Math.abs(currentDepthWind - injectedDepthWind) <= 0.001) {
-        weatherService.setWind({
-          x: Number(current.x) || 0,
-          y: Number(current.y) || 0,
-          z: previousDepthWind
-        });
-      }
-      automaticDepthWind = false;
-      previousDepthWind = 0;
-      injectedDepthWind = null;
-      return true;
-    }
-
-    return false;
   }
 
   function onWeatherFrame(payload) {
@@ -265,42 +278,23 @@
     const erased = eraseWeatherUnderPlates(plates, canvases);
     const foreground = renderHeavyMistForeground(payload, plates, snapshot);
     renderedFrames += 1;
-
-    /* setWind invalidates the just-published depth frame, so apply the automatic
-       heavy-mist push only after this completed frame has been composited. */
-    queueMicrotask(() => syncHeavyMistDepthWind(weatherSnapshot()));
     return erased + foreground;
   }
 
   function ensureSubscription() {
+    if (activeApplication() !== "redwire") return false;
     const candidate = window.NCNIntegration?.getService?.("weather") || null;
     if (!candidate || typeof candidate.subscribeAfterRender !== "function") return false;
 
     if (candidate === weatherService && releaseWeather?.active?.()) return true;
 
-    try { releaseWeather?.(); } catch (error) { console.error(error); }
+    try { releaseWeather?.("weather-service-replaced"); } catch (error) { console.error(error); }
     weatherService = candidate;
     releaseWeather = candidate.subscribeAfterRender(onWeatherFrame);
     return Boolean(releaseWeather);
   }
 
   function release(reason = "redwire-weather-card-occlusion-release") {
-    const snapshot = weatherSnapshot();
-    if (automaticDepthWind && snapshot) {
-      const current = snapshot.wind || { x: 0, y: 0, z: 0 };
-      if (injectedDepthWind !== null && Math.abs((Number(current.z) || 0) - injectedDepthWind) <= 0.001) {
-        try {
-          weatherService?.setWind?.({
-            x: Number(current.x) || 0,
-            y: Number(current.y) || 0,
-            z: previousDepthWind
-          });
-        } catch (error) { console.error(error); }
-      }
-    }
-    automaticDepthWind = false;
-    previousDepthWind = 0;
-    injectedDepthWind = null;
     try { releaseWeather?.(reason); } catch (error) { console.error(error); }
     releaseWeather = null;
     weatherService = null;
@@ -308,29 +302,36 @@
     foregroundCanvas?.remove?.();
     foregroundCanvas = null;
     foregroundContext = null;
+    maskCanvas = null;
+    maskContext = null;
     foregroundWidth = 0;
     foregroundHeight = 0;
+    foregroundDpr = 1;
+    return true;
   }
 
-  function resubscribeAfterEnvironmentChange(event) {
+  function onApplicationEnvironmentChange(event) {
     const detail = event?.detail || {};
     if (detail.phase === "active" && detail.next === "redwire") {
       queueMicrotask(ensureSubscription);
       return;
     }
-    if (detail.next && detail.next !== "redwire") clearForeground();
+    if (detail.next && detail.next !== "redwire") {
+      release(`application-switch:${detail.next}`);
+    }
   }
 
   async function start() {
     await window.NCNIntegratedDepartments?.ready?.();
-    ensureSubscription();
+    if (activeApplication() === "redwire") ensureSubscription();
   }
 
-  window.addEventListener("ncn:application-environment-phase", resubscribeAfterEnvironmentChange);
+  window.addEventListener("ncn:application-environment-phase", onApplicationEnvironmentChange);
   window.addEventListener("pagehide", () => release("pagehide"), { once: true });
 
   window.NCNRedWireWeatherCardOcclusion = Object.freeze({
     apply: eraseWeatherUnderPlates,
+    compose: onWeatherFrame,
     ensureSubscription,
     release,
     snapshot: () => Object.freeze({
@@ -342,8 +343,10 @@
       lastForegroundPuffs,
       lastForegroundRegions,
       foregroundDepth: HEAVY_FRONT_DEPTH,
-      automaticDepthWind,
-      injectedDepthWind
+      foregroundZIndex: FOREGROUND_Z_INDEX,
+      foregroundGeneration,
+      foregroundConnected: Boolean(foregroundCanvas?.isConnected),
+      weatherPolicyMutation: false
     })
   });
 
