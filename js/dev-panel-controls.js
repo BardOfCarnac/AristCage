@@ -3,7 +3,7 @@
 
   A diagnostics-only Weather laboratory plus the existing application and
   Chamber Movement overrides. The panel observes public service snapshots and
-  never creates another renderer, timer-driven simulation or Weather service.
+  never creates another renderer, private timer or Weather service.
 ==================================================*/
 (() => {
   "use strict";
@@ -20,7 +20,7 @@
   });
   const WEATHER_LAYERS = Object.freeze(["far", "rear", "middle", "near"]);
   const WEATHER_QUALITY = Object.freeze(["auto", "reduced", "low", "medium", "high"]);
-  const TELEMETRY_INTERVAL = 700;
+  const TELEMETRY_TASK = "diagnostics:weather-laboratory";
 
   let panel = null;
   let controls = null;
@@ -30,14 +30,16 @@
   let motionStatus = null;
   let motionEventsService = null;
   let departmentReadyAttempt = null;
-  let telemetryTimer = null;
-  let diagnosticsObserver = null;
+  let telemetryTask = null;
   let diagnosticsActive = false;
+  let diagnosticBindingsActive = false;
   let selectedWeather = "mist";
   let hiddenWeatherLayers = new Set();
+  let diagnosticUnsubscribers = [];
   let lastAction = null;
   let lastWeatherFrame = null;
   let lastWeatherFrameAt = 0;
+  let overrideActive = false;
 
   const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, Number(value) || 0));
   const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -268,8 +270,7 @@
   }
 
   function inputNumber(name, fallback, minimum, maximum) {
-    const value = finite(inputElement(name)?.value, fallback);
-    return clamp(value, minimum, maximum);
+    return clamp(finite(inputElement(name)?.value, fallback), minimum, maximum);
   }
 
   function currentWeatherControls() {
@@ -360,12 +361,14 @@
         throw new Error("Weather has no usable profile entry point.");
       }
 
+      overrideActive = true;
       setEnvironmentPreview(selected !== "clear", `weather:${selected}`);
-      const snapshot = weather.snapshot?.() || result || null;
-      recordAction("weather", selected, "complete", snapshot);
-      setMessage(`Weather target: ${snapshot?.targetPreset || snapshot?.preset || profile.preset}.`);
+      const snapshotValue = weather.snapshot?.() || result || null;
+      recordAction("weather", selected, "complete", snapshotValue);
+      setMessage(`Weather target: ${snapshotValue?.targetPreset || snapshotValue?.preset || profile.preset}.`);
       updateReadouts();
-      return snapshot;
+      telemetryTask?.wake?.("diagnostics:weather-applied");
+      return snapshotValue;
     } catch (error) {
       recordAction("weather", selected, "error", String(error?.message || error));
       setMessage(`Weather failed: ${String(error?.message || error)}`, true);
@@ -386,9 +389,11 @@
       const weather = await resolveService("weather");
       if (typeof weather.setSeed !== "function") throw new Error("Weather does not publish setSeed().");
       const resolved = await Promise.resolve(weather.setSeed(settings.seed));
+      overrideActive = true;
       recordAction("weather-seed", settings.seed, "complete", resolved);
       setMessage(`Weather seed replayed: ${settings.seed}.`);
       updateReadouts();
+      telemetryTask?.wake?.("diagnostics:weather-reseeded");
       return resolved;
     } catch (error) {
       recordAction("weather-seed", settings.seed, "error", String(error?.message || error));
@@ -425,6 +430,7 @@
     if (!WEATHER_LAYERS.includes(selected)) return publishLayerIsolation();
     if (hiddenWeatherLayers.has(selected)) hiddenWeatherLayers.delete(selected);
     else hiddenWeatherLayers.add(selected);
+    overrideActive = true;
     recordAction("weather-layer", selected, hiddenWeatherLayers.has(selected) ? "hidden" : "visible");
     return publishLayerIsolation();
   }
@@ -453,6 +459,7 @@
       hiddenLayers: Object.freeze([...hiddenWeatherLayers]),
       weather: currentService("weather")?.snapshot?.() || null,
       camera: cameraSnapshot(),
+      developerPanel: snapshot(),
       lastAction
     });
   }
@@ -487,12 +494,12 @@
     });
   }
 
-  function motionIsActive(snapshot = currentService("chamber-motion")?.snapshot?.()) {
-    return Number(snapshot?.activeSequenceCount || 0) > 0;
+  function motionIsActive(snapshotValue = currentService("chamber-motion")?.snapshot?.()) {
+    return Number(snapshotValue?.activeSequenceCount || 0) > 0;
   }
 
-  function weatherIsActive(snapshot = currentService("weather")?.snapshot?.()) {
-    return Boolean(snapshot && snapshot.enabled !== false && Number(snapshot.targetIntensity ?? snapshot.intensity ?? 0) > 0.002);
+  function weatherIsActive(snapshotValue = currentService("weather")?.snapshot?.()) {
+    return Boolean(snapshotValue && snapshotValue.enabled !== false && Number(snapshotValue.targetIntensity ?? snapshotValue.intensity ?? 0) > 0.002);
   }
 
   function refreshEnvironmentPreview() {
@@ -514,7 +521,6 @@
         recordAction("motion", selected, "complete", result);
         setMessage("Requested a clean chamber settle.");
         updateReadouts();
-        window.setTimeout(refreshEnvironmentPreview, 560);
         return result;
       }
 
@@ -543,6 +549,7 @@
         throw new Error("Chamber Movement has no usable profile entry point.");
       }
 
+      overrideActive = true;
       setEnvironmentPreview(true, `motion:${selected}`);
       const result = await Promise.resolve(motion.trigger({
         pattern: "extract-rotate-settle",
@@ -568,24 +575,26 @@
     }
   }
 
-  async function restoreApplicationProfile() {
-    setMessage(`Restoring ${currentApplication()} profile…`);
-    recordAction("profile", currentApplication(), "requested");
+  async function restoreApplicationProfile(options = {}) {
+    const application = currentApplication();
+    if (!options.quiet) setMessage(`Restoring ${application} profile…`);
+    recordAction("profile", application, "requested", options.reason || null);
 
     try {
       const motion = currentService("chamber-motion");
-      await Promise.resolve(motion?.cancel?.({ reason: "dev-panel-profile-restore" }));
-      const result = window.NCNIntegration?.syncApplicationProfile?.("dev-panel-profile-restore")
-        || Object.freeze({ application: currentApplication(), applied: [] });
+      await Promise.resolve(motion?.cancel?.({ reason: options.reason || "dev-panel-profile-restore" }));
+      const result = window.NCNIntegration?.syncApplicationProfile?.(options.reason || "dev-panel-profile-restore")
+        || Object.freeze({ application, applied: [] });
       setEnvironmentPreview(false);
       showAllWeatherLayers();
-      recordAction("profile", result.application || currentApplication(), "complete", result);
-      setMessage(`Restored ${result.application || currentApplication()} environment profile.`);
-      window.setTimeout(updateReadouts, 50);
+      overrideActive = false;
+      recordAction("profile", result.application || application, "complete", result);
+      if (!options.quiet) setMessage(`Restored ${result.application || application} environment profile.`);
+      if (diagnosticsActive) telemetryTask?.wake?.("diagnostics:profile-restored");
       return result;
     } catch (error) {
-      recordAction("profile", currentApplication(), "error", String(error?.message || error));
-      setMessage(`Profile restore failed: ${String(error?.message || error)}`, true);
+      recordAction("profile", application, "error", String(error?.message || error));
+      if (!options.quiet) setMessage(`Profile restore failed: ${String(error?.message || error)}`, true);
       return null;
     }
   }
@@ -599,9 +608,11 @@
       const result = await Promise.resolve(window.NCNApplications?.switchTo?.(selected));
       setEnvironmentPreview(false);
       showAllWeatherLayers();
+      overrideActive = false;
       recordAction("application", selected, "complete", result);
       setMessage(result === false ? `${selected} is already active.` : `Switched to ${selected}.`);
       updateReadouts();
+      telemetryTask?.wake?.("diagnostics:application-switch");
       return result;
     } catch (error) {
       recordAction("application", selected, "error", String(error?.message || error));
@@ -632,37 +643,37 @@
     node.title = String(title || value || "");
   }
 
-  function transitionText(snapshot) {
-    const transition = snapshot?.transition;
+  function transitionText(snapshotValue) {
+    const transition = snapshotValue?.transition;
     if (!transition) return "settled";
     const duration = Math.max(1, finite(transition.duration, 1));
     const elapsed = clamp(transition.elapsed, 0, duration);
     return `${transition.name} · ${Math.round(elapsed / duration * 100)}%`;
   }
 
-  function weatherHealth(snapshot) {
-    if (!snapshot) return { state: "error", label: "Unavailable", detail: "The canonical Weather service is not registered." };
-    if (snapshot.destroyed) return { state: "error", label: "Destroyed", detail: "The Weather instance has been destroyed and cannot render." };
-    if (!snapshot.initialised) return { state: "warning", label: "Not initialised", detail: "Weather exists but has not mounted its runtime resources." };
-    if (snapshot.suspended) return { state: "warning", label: "Suspended", detail: "Weather is suspended by the viewer lifecycle." };
-    if (snapshot.enabled === false || finite(snapshot.targetIntensity) <= 0.002) {
+  function weatherHealth(snapshotValue) {
+    if (!snapshotValue) return { state: "error", label: "Unavailable", detail: "The canonical Weather service is not registered." };
+    if (snapshotValue.destroyed) return { state: "error", label: "Destroyed", detail: "The Weather instance has been destroyed and cannot render." };
+    if (!snapshotValue.initialised) return { state: "warning", label: "Not initialised", detail: "Weather exists but has not mounted its runtime resources." };
+    if (snapshotValue.suspended) return { state: "warning", label: "Suspended", detail: "Weather is suspended by the viewer lifecycle." };
+    if (snapshotValue.enabled === false || finite(snapshotValue.targetIntensity) <= 0.002) {
       return { state: "off", label: "Off", detail: "Weather is deliberately disabled by the current profile or Clear preset." };
     }
-    if (snapshot.director?.allowed === false) {
-      return { state: "warning", label: "Director blocked", detail: `The Visual Director is suppressing environment output in ${snapshot.director.mode || "the current mode"}.` };
+    if (snapshotValue.director?.allowed === false) {
+      return { state: "warning", label: "Director blocked", detail: `The Visual Director is suppressing environment output in ${snapshotValue.director.mode || "the current mode"}.` };
     }
-    if (finite(snapshot.resources?.canvases) !== 4 || snapshot.resources?.runtimeTask !== true) {
-      return { state: "error", label: "Resources incomplete", detail: `${finite(snapshot.resources?.canvases)} of 4 canvases; runtime task ${snapshot.resources?.runtimeTask ? "present" : "missing"}.` };
+    if (finite(snapshotValue.resources?.canvases) !== 4 || snapshotValue.resources?.runtimeTask !== true) {
+      return { state: "error", label: "Resources incomplete", detail: `${finite(snapshotValue.resources?.canvases)} of 4 canvases; runtime task ${snapshotValue.resources?.runtimeTask ? "present" : "missing"}.` };
     }
-    if (finite(snapshot.resources?.visibleCanvases) !== 4) {
-      return { state: "warning", label: "Canvases hidden", detail: `${finite(snapshot.resources?.visibleCanvases)} of 4 Weather canvases are service-visible.` };
+    if (finite(snapshotValue.resources?.visibleCanvases) !== 4) {
+      return { state: "warning", label: "Canvases hidden", detail: `${finite(snapshotValue.resources?.visibleCanvases)} of 4 Weather canvases are service-visible.` };
     }
-    if (!document.hidden && lastWeatherFrame !== null && snapshot.frameCount === lastWeatherFrame
-      && performance.now() - lastWeatherFrameAt > TELEMETRY_INTERVAL * 2.5) {
+    if (!document.hidden && lastWeatherFrame !== null && snapshotValue.frameCount === lastWeatherFrame
+      && performance.now() - lastWeatherFrameAt > 1800) {
       return { state: "warning", label: "Frame stalled", detail: "Weather is enabled but its shared-runtime frame counter is not advancing." };
     }
-    if (snapshot.transition) return { state: "transition", label: "Transitioning", detail: transitionText(snapshot) };
-    if (!snapshot.diagnostics?.depthFrame?.available) {
+    if (snapshotValue.transition) return { state: "transition", label: "Transitioning", detail: transitionText(snapshotValue) };
+    if (!snapshotValue.diagnostics?.depthFrame?.available) {
       return { state: "warning", label: "No depth frame", detail: "Weather is active but has not published a current immutable depth frame." };
     }
     return { state: "healthy", label: "Healthy", detail: "One canonical service, four canvases and a live shared-runtime depth frame." };
@@ -670,66 +681,66 @@
 
   function updateWeatherReadout() {
     if (!weatherStatus) return;
-    const snapshot = currentService("weather")?.snapshot?.();
-    const health = weatherHealth(snapshot);
+    const snapshotValue = currentService("weather")?.snapshot?.();
+    const health = weatherHealth(snapshotValue);
     weatherStatus.textContent = health.label;
     weatherStatus.dataset.state = health.state;
     if (weatherStatusDetail) weatherStatusDetail.textContent = health.detail;
 
-    if (!snapshot) {
+    if (!snapshotValue) {
       ["preset", "intensity", "transition", "quality", "particles", "depth", "canvases", "runtime", "wind", "flow", "zones", "director", "seed", "geometry"]
         .forEach(name => setMetric(name, "—"));
       return;
     }
 
-    const particles = snapshot.particles || {};
-    const depth = snapshot.diagnostics?.depthFrame || {};
-    const flow = snapshot.diagnostics?.effectiveDepthFlow || {};
-    const resources = snapshot.resources || {};
-    const geometry = snapshot.geometry || {};
-    const wind = snapshot.wind || {};
-    const zones = snapshot.zones || {};
-    const director = snapshot.director;
+    const particles = snapshotValue.particles || {};
+    const depth = snapshotValue.diagnostics?.depthFrame || {};
+    const flow = snapshotValue.diagnostics?.effectiveDepthFlow || {};
+    const resources = snapshotValue.resources || {};
+    const geometry = snapshotValue.geometry || {};
+    const wind = snapshotValue.wind || {};
+    const zones = snapshotValue.zones || {};
+    const director = snapshotValue.director;
 
-    setMetric("preset", `${snapshot.preset || "clear"} → ${snapshot.targetPreset || snapshot.preset || "clear"}`);
-    setMetric("intensity", `${formatNumber(snapshot.intensity)} → ${formatNumber(snapshot.targetIntensity)}`);
-    setMetric("transition", transitionText(snapshot));
-    setMetric("quality", `${snapshot.quality || "—"} (${snapshot.qualityOverride || "auto"})`);
+    setMetric("preset", `${snapshotValue.preset || "clear"} → ${snapshotValue.targetPreset || snapshotValue.preset || "clear"}`);
+    setMetric("intensity", `${formatNumber(snapshotValue.intensity)} → ${formatNumber(snapshotValue.targetIntensity)}`);
+    setMetric("transition", transitionText(snapshotValue));
+    setMetric("quality", `${snapshotValue.quality || "—"} (${snapshotValue.qualityOverride || "auto"})`);
     setMetric("particles", `${finite(particles.mist)} / ${finite(particles.dust)} / ${finite(particles.rain)}`,
       `Capacities: ${finite(particles.capacities?.mist)} / ${finite(particles.capacities?.dust)} / ${finite(particles.capacities?.rain)}`);
     setMetric("depth", depth.available ? `${finite(depth.puffCount)} puffs · live` : "unavailable",
       `${depth.convention || "no convention"}; subscribers ${finite(depth.afterRenderSubscribers)}`);
     setMetric("canvases", `${finite(resources.visibleCanvases)} visible / ${finite(resources.canvases)} total`);
-    setMetric("runtime", `${formatInteger(snapshot.frameCount)} frames · ${formatNumber(snapshot.lastDelta, 1)} ms`);
+    setMetric("runtime", `${formatInteger(snapshotValue.frameCount)} frames · ${formatNumber(snapshotValue.lastDelta, 1)} ms`);
     setMetric("wind", `${formatNumber(wind.x)} / ${formatNumber(wind.y)} / ${formatNumber(wind.z)}`);
     setMetric("flow", `${formatNumber(flow.mist, 3)} mist / ${formatNumber(flow.particles, 3)} particles`,
       `Configured ${formatNumber(flow.configured, 3)} + wind ${formatNumber(flow.wind, 3)}`);
     setMetric("zones", `${zones.reading ? "reading" : "open"} / ${finite(zones.controls)} controls`);
     setMetric("director", director ? `${director.mode || "—"} · ${director.allowed === false ? "blocked" : formatNumber(director.intensity)}` : "not sampled");
-    setMetric("seed", `${snapshot.seed ?? "—"} / ${particles.fingerprint ?? "—"}`);
+    setMetric("seed", `${snapshotValue.seed ?? "—"} / ${particles.fingerprint ?? "—"}`);
     setMetric("geometry", `${finite(geometry.cameraReads)} camera / ${finite(geometry.layerMeasurements)} layers / ${finite(geometry.zoneReads)} zones`);
 
-    const frame = finite(snapshot.frameCount, 0);
+    const frame = finite(snapshotValue.frameCount, 0);
     if (lastWeatherFrame === null || frame !== lastWeatherFrame) {
       lastWeatherFrame = frame;
       lastWeatherFrameAt = typeof performance !== "undefined" ? performance.now() : Date.now();
     }
 
-    const targetName = Object.entries(WEATHER_PRESETS).find(([, definition]) => definition.preset === snapshot.targetPreset)?.[0];
+    const targetName = Object.entries(WEATHER_PRESETS).find(([, definition]) => definition.preset === snapshotValue.targetPreset)?.[0];
     if (targetName) selectWeatherButton(targetName);
   }
 
   function updateMotionReadout() {
     if (!motionStatus) return;
-    const snapshot = currentService("chamber-motion")?.snapshot?.();
-    if (!snapshot) {
+    const snapshotValue = currentService("chamber-motion")?.snapshot?.();
+    if (!snapshotValue) {
       motionStatus.textContent = "Unavailable";
       motionStatus.dataset.state = "error";
       return;
     }
-    const active = Number(snapshot.activeSequenceCount || 0);
-    const phase = snapshot.activeSequences?.[0]?.phase || snapshot.activeSequences?.[0]?.currentPose?.phase || null;
-    if (snapshot.enabled === false) {
+    const active = Number(snapshotValue.activeSequenceCount || 0);
+    const phase = snapshotValue.activeSequences?.[0]?.phase || snapshotValue.activeSequences?.[0]?.currentPose?.phase || null;
+    if (snapshotValue.enabled === false) {
       motionStatus.textContent = "Off";
       motionStatus.dataset.state = "off";
     } else if (active) {
@@ -755,7 +766,7 @@
   }
 
   function updateReadouts() {
-    if (!controls?.isConnected) return;
+    if (!controls?.isConnected || !diagnosticsActive) return;
     updateControlOutputs();
     updateWeatherReadout();
     updateMotionReadout();
@@ -770,15 +781,29 @@
     if (state) state.textContent = String(window.NCNViewerLifecycle?.current?.() || "ready").toUpperCase();
   }
 
+  function handleMotionEvent() {
+    updateReadouts();
+    refreshEnvironmentPreview();
+    telemetryTask?.wake?.("diagnostics:motion-event");
+  }
+
+  function unbindMotionEvents() {
+    if (!motionEventsService?.removeEventListener) {
+      motionEventsService = null;
+      return;
+    }
+    ["blockmove:start", "blockmove:extract", "blockmove:settle", "blockmove:complete", "blockmove:cancel", "blockmove:error"]
+      .forEach(type => motionEventsService.removeEventListener(type, handleMotionEvent));
+    motionEventsService = null;
+  }
+
   function bindMotionEvents() {
     const motion = currentService("chamber-motion");
     if (!motion?.addEventListener || motionEventsService === motion) return;
+    unbindMotionEvents();
     motionEventsService = motion;
     ["blockmove:start", "blockmove:extract", "blockmove:settle", "blockmove:complete", "blockmove:cancel", "blockmove:error"]
-      .forEach(type => motion.addEventListener(type, () => {
-        updateReadouts();
-        refreshEnvironmentPreview();
-      }));
+      .forEach(type => motion.addEventListener(type, handleMotionEvent));
   }
 
   function ensureControls() {
@@ -802,35 +827,115 @@
 
     selectWeatherButton(selectedWeather);
     updateReadouts();
-    bindMotionEvents();
+    return true;
+  }
+
+  function telemetryStep() {
+    if (!diagnosticsActive || !controls?.isConnected) return false;
+    updateReadouts();
     return true;
   }
 
   function startTelemetry() {
-    if (telemetryTimer || !diagnosticsActive) return false;
-    telemetryTimer = window.setInterval(updateReadouts, TELEMETRY_INTERVAL);
+    if (telemetryTask) return true;
+    const runtime = window.NCNViewerRuntime;
+    if (!runtime?.register) throw new Error("Shared viewer runtime is unavailable for diagnostics telemetry.");
+    telemetryTask = runtime.register(TELEMETRY_TASK, telemetryStep, {
+      group: "diagnostics",
+      priority: -100,
+      maxFps: 2,
+      enabled: true
+    });
     return true;
   }
 
   function stopTelemetry() {
-    if (!telemetryTimer) return false;
-    window.clearInterval(telemetryTimer);
-    telemetryTimer = null;
+    if (!telemetryTask) return false;
+    telemetryTask.disable?.();
+    telemetryTask.unregister?.();
+    telemetryTask = null;
     lastWeatherFrame = null;
     lastWeatherFrameAt = 0;
     return true;
   }
 
-  function setDiagnosticsActive(enabled) {
-    diagnosticsActive = Boolean(enabled);
-    if (!diagnosticsActive) {
-      stopTelemetry();
-      return false;
+  function handleApplicationChange() {
+    setEnvironmentPreview(false);
+    showAllWeatherLayers();
+    overrideActive = false;
+    bindMotionEvents();
+    updateReadouts();
+    telemetryTask?.wake?.("diagnostics:application-change");
+  }
+
+  function handleLifecycleChange() {
+    updateReadouts();
+    telemetryTask?.wake?.("diagnostics:lifecycle-change");
+  }
+
+  function bindDiagnosticBindings() {
+    if (diagnosticBindingsActive) return true;
+    document.addEventListener("click", handleControlClick, true);
+    document.addEventListener("input", handleControlInput, true);
+    window.addEventListener("ncn:application-change", handleApplicationChange);
+    window.addEventListener("ncn:lifecycle-change", handleLifecycleChange);
+
+    const profileUnsubscribe = window.NCNEvents?.on?.("integration:profile-applied", handleLifecycleChange);
+    const installUnsubscribe = window.NCNEvents?.on?.("integration:department-installed", () => {
+      bindMotionEvents();
+      handleLifecycleChange();
+    });
+    diagnosticUnsubscribers = [profileUnsubscribe, installUnsubscribe].filter(unsubscribe => typeof unsubscribe === "function");
+    bindMotionEvents();
+    diagnosticBindingsActive = true;
+    return true;
+  }
+
+  function unbindDiagnosticBindings() {
+    if (diagnosticBindingsActive) {
+      document.removeEventListener("click", handleControlClick, true);
+      document.removeEventListener("input", handleControlInput, true);
+      window.removeEventListener("ncn:application-change", handleApplicationChange);
+      window.removeEventListener("ncn:lifecycle-change", handleLifecycleChange);
     }
-    const mounted = ensureControls();
-    if (mounted) startTelemetry();
-    else stopTelemetry();
-    return mounted;
+    diagnosticUnsubscribers.splice(0).forEach(unsubscribe => {
+      try { unsubscribe(); } catch (error) { console.error("[NCN Dev Panel] unsubscribe failed", error); }
+    });
+    unbindMotionEvents();
+    diagnosticBindingsActive = false;
+    return true;
+  }
+
+  async function setDiagnosticsActive(enabled) {
+    const requested = Boolean(enabled);
+    const wasActive = diagnosticsActive;
+
+    if (requested) {
+      diagnosticsActive = true;
+      const mounted = ensureControls();
+      if (!mounted) {
+        diagnosticsActive = false;
+        return false;
+      }
+      bindDiagnosticBindings();
+      startTelemetry();
+      updateReadouts();
+      telemetryTask?.wake?.("diagnostics:enabled");
+      return true;
+    }
+
+    diagnosticsActive = false;
+    stopTelemetry();
+    unbindDiagnosticBindings();
+    showAllWeatherLayers();
+    setEnvironmentPreview(false);
+
+    if (wasActive) {
+      await restoreApplicationProfile({ quiet: true, reason: "diagnostics-disabled" });
+    } else {
+      overrideActive = false;
+    }
+    return false;
   }
 
   function controlFromEvent(event) {
@@ -864,10 +969,15 @@
       diagnosticsActive,
       panelConnected: Boolean(panel?.isConnected),
       controlsConnected: Boolean(controls?.isConnected),
-      telemetryActive: Boolean(telemetryTimer),
+      telemetryActive: Boolean(telemetryTask),
+      telemetryTask: telemetryTask?.snapshot?.() || null,
+      bindingsActive: diagnosticBindingsActive,
+      motionBindingsActive: Boolean(motionEventsService),
+      eventSubscriptionCount: diagnosticUnsubscribers.length,
       environmentPreview: document.documentElement?.dataset?.devEnvironmentPreview === "true",
       selectedWeather,
       hiddenWeatherLayers: Object.freeze([...hiddenWeatherLayers]),
+      overrideActive,
       lastAction,
       weather: currentService("weather")?.snapshot?.() || null,
       chamberMotion: currentService("chamber-motion")?.snapshot?.() || null
@@ -892,27 +1002,7 @@
     snapshot
   });
 
-  if (typeof document !== "undefined" && document.body) {
-    document.addEventListener("click", handleControlClick, true);
-    document.addEventListener("input", handleControlInput, true);
-
-    diagnosticsObserver = new MutationObserver(() => {
-      setDiagnosticsActive(diagnosticsEnabled());
-    });
-    diagnosticsObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-
-    window.addEventListener("ncn:application-change", () => {
-      setEnvironmentPreview(false);
-      showAllWeatherLayers();
-      window.setTimeout(updateReadouts, 40);
-    });
-    window.addEventListener("ncn:lifecycle-change", updateReadouts);
-    window.NCNEvents?.on?.("integration:profile-applied", updateReadouts);
-    window.NCNEvents?.on?.("integration:department-installed", () => {
-      bindMotionEvents();
-      updateReadouts();
-    });
-
-    setDiagnosticsActive(diagnosticsEnabled());
+  if (typeof document !== "undefined" && document.body && diagnosticsEnabled()) {
+    void setDiagnosticsActive(true);
   }
 })();
