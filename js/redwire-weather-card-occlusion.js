@@ -235,8 +235,8 @@
   }
 
   function renderHeavyMistForeground(payload, plates, snapshot) {
-    const depthFrame = weatherService?.getDepthFrame?.(payload?.token ?? payload?.runtimeToken)
-      || payload?.depthFrame
+    const depthFrame = payload?.depthFrame
+      || weatherService?.getDepthFrame?.(payload?.token ?? payload?.runtimeToken)
       || null;
     if (!plates.length || !isHeavyMist(snapshot) || typeof depthFrame?.renderForeground !== "function") {
       clearForeground();
