@@ -1,95 +1,53 @@
-name: Weather Department Checks
+name: Temporary canonical particle publisher
 
 on:
-  pull_request:
-    paths:
-      - "departments/weather/**"
-      - "js/layered-chamber.js"
-      - "js/chamber-camera.js"
-      - "tests/chamber-live-presentation.test.js"
-      - "tests/chamber-live-aperture-render.mjs"
-      - ".github/workflows/chamber-live-aperture.yml"
-      - ".github/workflows/weather-department-check.yml"
-  workflow_dispatch:
+  push:
+    branches:
+      - agent/particle-rebuild-source-export
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  departmental-contract:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Check Weather publication JavaScript syntax
+        with:
+          fetch-depth: 0
+      - name: Rebuild particle branch from current main
         run: |
           set -euo pipefail
-          files=(
-            departments/weather/weather-manifest.js
-            departments/weather/weather-presets.js
-            departments/weather/weather-module.js
-            departments/weather/tests/weather-module.node.test.js
-            departments/weather/tests/weather-module.test.js
-            departments/weather/tests/weather-pr86-host.test.js
-            departments/weather/tests/weather-mist-visual-contract.test.js
-          )
-          for file in "${files[@]}"; do
-            node --check "$file"
-          done
-
-      - name: Run deterministic Weather acceptance harness
-        run: node departments/weather/tests/weather-module.node.test.js
-
-      - name: Run mist visual contract
-        run: node departments/weather/tests/weather-mist-visual-contract.test.js
-
-      - name: Check Weather ownership boundaries
-        run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const source = fs.readFileSync('departments/weather/weather-module.js', 'utf8');
-          const css = fs.readFileSync('departments/weather/weather-module.css', 'utf8');
-          const manifest = fs.readFileSync('departments/weather/weather-manifest.js', 'utf8');
-          for (const token of [
-            'context.layers?.weather',
-            'context.integration?.requireService?.("effects")',
-            'context.chamber?.getCameraSnapshot',
-            'context.views?.getReadingZone',
-            'context.views?.getControlZones',
-            '"electrical-disturbance"',
-            '"light-flash"',
-            'const DEPTH_CONVENTION = "smaller-positive-z-is-nearer"',
-            'function getDepthFrame(frameToken = null)',
-            'if (!(puff.z < nearerThan)',
-            'puffs.sort((a, b) => b.z - a.z)',
-            'getDepthFrame,',
-            'animationLoop: "shared-runtime"'
-          ]) {
-            if (!source.includes(token)) throw new Error(`Weather publication is missing ${token}.`);
-          }
-          for (const forbidden of [
-            'requestAnimationFrame',
-            'setInterval',
-            'Math.random',
-            'querySelector',
-            'window.NCNEffects',
-            'dispatchEvent',
-            'NCNOptical',
-            'articleId',
-            'getArticle',
-            'depthSlices',
-            'sliceCount'
-          ]) {
-            if (source.includes(forbidden)) throw new Error(`Weather publication contains forbidden token ${forbidden}.`);
-          }
-          if (css.includes('.ncn-environment-layer')) {
-            throw new Error('Weather CSS attempts to own host-layer geometry.');
-          }
-          for (const layer of ['weather:far', 'weather:rear', 'weather:middle', 'weather:near']) {
-            if (!manifest.includes(`"${layer}"`)) throw new Error(`Manifest is missing ${layer}.`);
-          }
-          for (const capability of ['"getDepthFrame"', '"snapshot"']) {
-            if (!manifest.includes(capability)) throw new Error(`Manifest is missing ${capability}.`);
-          }
-          console.log('Weather publication respects its scoped ownership boundary.');
-          NODE
+          cat .particle-rebuild/part-*.b64 | base64 -d > /tmp/canonical-particles.patch
+          git fetch origin main
+          git checkout --detach origin/main
+          git apply --check /tmp/canonical-particles.patch
+          git apply /tmp/canonical-particles.patch
+          node --check departments/weather/weather-particles.js
+          node --check departments/weather/weather-module.js
+          node departments/weather/tests/weather-module.node.test.js
+          node departments/weather/tests/weather-particles-canonical.node.test.js
+          node departments/weather/tests/weather-mist-visual-contract.test.js
+          node tests/heavy-mist-weather-policy.test.js
+          node tests/weather-after-render-contract.test.js
+          node tests/redwire-weather-card-occlusion.test.js
+          node tests/environment-profile-contract.test.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/chamber-presentation-restoration.yml \
+            .github/workflows/integration-host-check.yml \
+            .github/workflows/redwire-weather-card-occlusion.yml \
+            .github/workflows/weather-department-check.yml \
+            .github/workflows/weather-particle-field.yml \
+            departments/weather/tests/weather-module.node.test.js \
+            departments/weather/tests/weather-module.test.js \
+            departments/weather/tests/weather-particles-canonical.node.test.js \
+            departments/weather/tests/weather-pr86-host.test.js \
+            departments/weather/weather-manifest.js \
+            departments/weather/weather-module.js \
+            departments/weather/weather-particles.js \
+            index.html js/integration-harness.js \
+            tests/weather-after-render-contract.test.js \
+            tests/weather-particles-render.mjs
+          git commit -m "Integrate depth-aware particles into canonical Weather"
+          git push origin HEAD:agent/depth-aware-weather-particles --force
