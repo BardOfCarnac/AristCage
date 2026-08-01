@@ -36,8 +36,8 @@ async function visualSnapshot(page) {
     }
 
     const interiorPoints = [];
-    for (const fx of [0.2, 0.35, 0.5, 0.65, 0.8]) {
-      for (const fy of [0.2, 0.35, 0.5, 0.65, 0.8]) {
+    for (const fx of [0.08, 0.18, 0.28, 0.38, 0.5, 0.62, 0.72, 0.82, 0.92]) {
+      for (const fy of [0.1, 0.23, 0.36, 0.5, 0.64, 0.77, 0.9]) {
         interiorPoints.push({ x: plate.left + plate.width * fx, y: plate.top + plate.height * fy });
       }
     }
@@ -101,19 +101,32 @@ function assertHeavyForeground(result, name) {
   assert.equal(result.foregroundPresent, true, `${name}: the foreground compositor must exist`);
   assert.equal(result.foregroundHidden, false, `${name}: the heavy-mist foreground compositor must be visible`);
   assert.ok(result.foregroundZ > result.viewerZ, `${name}: foreground mist must stack above the Optical viewer`);
-  assert.ok(Math.max(...result.foregroundInterior) > 8, `${name}: heavy mist must have non-zero alpha over the real lead plate`);
+
+  const activeSamples = result.foregroundInterior.filter(alpha => alpha > 8).length;
+  const coverage = activeSamples / result.foregroundInterior.length;
+  assert.ok(activeSamples > 0, `${name}: a real heavy-mist bank must cross the lead plate`);
+  assert.ok(coverage < 0.72, `${name}: foreground mist must remain a localised bank, not a card-wide tint`);
+  assert.ok(Math.max(...result.foregroundInterior) > 8, `${name}: foreground puff alpha must be visibly non-zero`);
+
   assert.ok(result.bridge.lastForegroundPuffs > 0, `${name}: the exact-depth pass must render qualifying puffs`);
   assert.ok(result.bridge.lastForegroundRegions > 0, `${name}: the exact plate region must be supplied`);
+  assert.ok(
+    result.bridge.lastForegroundPuffs < result.weather.diagnostics.depthFrame.puffCount,
+    `${name}: only a near-depth subset of the Weather field may cross the plate`
+  );
   assert.equal(result.bridge.weatherPolicyMutation, false, `${name}: Integration must not mutate Weather policy`);
   assert.ok(Math.max(...result.edgeOutside) <= 3, `${name}: foreground pixels must remain transparent outside plate regions`);
   const interiorMax = Math.max(...result.foregroundInterior);
   const edgeMax = Math.max(...result.edgeInside);
   assert.ok(edgeMax <= interiorMax * 0.88 + 18, `${name}: feathered plate edges must not create an abnormal alpha spike`);
-  assert.equal(result.weather.wind.z, 0, `${name}: preset-owned depth motion must not leak into the public wind contract`);
-  assert.ok(
-    result.weather.diagnostics?.presetDepthFlow?.internalWindZ < -0.7,
-    `${name}: Weather must apply the heavy-mist preset's internal forward flow`
-  );
+
+  assert.equal(result.weather.wind.z, 0, `${name}: preset motion must not leak into the public wind contract`);
+  assert.equal(result.weather.diagnostics.effectiveDepthFlow.configured, -0.72,
+    `${name}: Weather must expose the declared heavy-mist depth flow`);
+  assert.ok(result.weather.diagnostics.effectiveDepthFlow.mist < -0.8,
+    `${name}: Weather must calculate the canonical effective forward flow`);
+  assert.ok(result.weather.diagnostics.effectiveDepthFlow.heavyMistPrimeCount >= 1,
+    `${name}: Weather must prime a genuine near-depth chamber bank`);
 }
 
 async function applyHeavyMistControl(page, reason) {
@@ -132,9 +145,13 @@ async function applyHeavyMistControl(page, reason) {
   }, reason);
 
   await page.waitForFunction(() => {
-    const weather = window.NCNIntegration?.getService?.("weather")?.snapshot?.();
+    const service = window.NCNIntegration?.getService?.("weather");
+    const weather = service?.snapshot?.();
+    const frame = service?.getDepthFrame?.();
     return weather?.targetPreset === "heavy-mist"
-      && weather?.diagnostics?.presetDepthFlow?.foregroundSurgeActive === true;
+      && weather?.diagnostics?.effectiveDepthFlow?.mist < -0.8
+      && weather?.diagnostics?.effectiveDepthFlow?.heavyMistPrimeCount >= 1
+      && frame?.mistDepthFlow < -0.8;
   }, null, { timeout: 15_000 });
 }
 
@@ -158,7 +175,7 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
       const canvas = document.querySelector("canvas.ncn-redwire-weather-foreground");
       return bridge?.lastForegroundPuffs > 0 && canvas && !canvas.hidden;
     }, null, { timeout: 30_000 });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(320);
 
     const heavy = await visualSnapshot(page);
     assertHeavyForeground(heavy, `${name} heavy`);
@@ -179,14 +196,16 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
       const bridge = window.NCNRedWireWeatherCardOcclusion?.snapshot?.();
       const canvas = document.querySelector("canvas.ncn-redwire-weather-foreground");
       return weather?.targetPreset === "mist"
+        && weather?.diagnostics?.effectiveDepthFlow?.mist === -0.12
         && bridge?.lastForegroundPuffs === 0
         && (!canvas || canvas.hidden);
     }, null, { timeout: 15_000 });
 
     const ordinary = await visualSnapshot(page);
     assert.ok(Math.max(...ordinary.foregroundInterior) <= 2, `${name}: ordinary mist must not receive a foreground replay`);
-    assert.equal(ordinary.weather.wind.z, 0, `${name}: ordinary mist must have no preset depth-flow residue`);
-    assert.equal(ordinary.weather.diagnostics?.presetDepthFlow?.offset, 0, `${name}: ordinary mist must clear the heavy preset offset`);
+    assert.equal(ordinary.weather.wind.z, 0, `${name}: ordinary mist must have no hidden depth wind`);
+    assert.equal(ordinary.weather.diagnostics.effectiveDepthFlow.mist, -0.12,
+      `${name}: ordinary mist must retain the accepted baseline flow`);
 
     await page.evaluate(async () => {
       await window.NCNApplications.switchTo("dripfeed", { animate: false, reason: "foreground-lifecycle-proof" });
@@ -203,9 +222,11 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
     assert.equal(dripfeed.application, "dripfeed");
     assert.equal(dripfeed.foreground, false, `${name}: Dripfeed must contain no foreground compositor residue`);
     assert.equal(dripfeed.bridge.active, false, `${name}: Dripfeed must release the RedWire Weather subscription`);
-    if (dripfeed.weather?.wind) {
-      assert.equal(dripfeed.weather.wind.z, 0, `${name}: application switching must leave no preset depth-flow residue`);
-      assert.equal(dripfeed.weather.diagnostics?.presetDepthFlow?.offset || 0, 0, `${name}: disabled or non-heavy Weather must clear the preset offset`);
+    if (dripfeed.weather) {
+      assert.notEqual(dripfeed.weather.targetPreset, "heavy-mist",
+        `${name}: Dripfeed must not retain the Heavy Mist profile`);
+      assert.equal(dripfeed.weather.wind.z, 0,
+        `${name}: application switching must leave no altered wind residue`);
     }
 
     await page.evaluate(async () => {
@@ -240,7 +261,7 @@ try {
   await runViewport("desktop", { width: 1440, height: 900 });
   await runViewport("mobile", { width: 390, height: 844 });
   await runViewport("desktop-reduced-motion", { width: 1440, height: 900 }, "reduce");
-  console.log("Heavy mist crosses real Optical plates above the viewer, ordinary mist does not, and application switching leaves no foreground or Weather-policy residue.");
+  console.log("Canonical heavy mist replays a localised real-puff bank above Optical plates, ordinary mist does not, and application switching leaves no compositor or profile residue.");
 } finally {
   await browser.close();
 }
