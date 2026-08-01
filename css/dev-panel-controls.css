@@ -1,6 +1,5 @@
-/* Shared developer launcher and service controls. */
+/* Shared developer launcher and diagnostics-only environment laboratory. */
 .diagnostics-toggle {
-  display: block !important;
   min-width: 58px;
   min-height: 34px;
   opacity: .76;
@@ -9,6 +8,7 @@
 }
 
 html.diagnostics-on .diagnostics-toggle {
+  display: block !important;
   opacity: 1;
   color: var(--white);
   border-color: var(--orange);
@@ -16,60 +16,184 @@ html.diagnostics-on .diagnostics-toggle {
 }
 
 .diagnostics-panel {
+  width: min(460px, calc(100vw - 74px));
+  max-height: min(78vh, 760px);
   pointer-events: auto !important;
   touch-action: manipulation;
 }
 
 .diagnostics-panel button,
 .diagnostics-panel input,
-.diagnostics-panel label {
+.diagnostics-panel select,
+.diagnostics-panel label,
+.diagnostics-panel summary {
   pointer-events: auto !important;
 }
 
-/* The terminal environment normally sits behind the application plane. A manual
-   developer override temporarily lifts it above Dripfeed so Weather and movement
-   tests are actually visible there. The shared title rail remains above both. */
+/* A manual developer override temporarily raises the terminal environment above
+   Dripfeed. This is presentation-only: the canonical Weather service still owns
+   all four canvases and the shared runtime task. */
 html[data-dev-environment-preview="true"] .ncn-environment-system {
   z-index: 35;
 }
 
-.diagnostics-service-block {
-  display: grid;
-  gap: 7px;
-  padding: 7px;
-  border: 1px solid rgba(255, 70, 40, .18);
+/* Debug-only canvas isolation. These selectors never change service visibility,
+   particle state, lifecycle or the immutable depth-frame publication. */
+html[data-debug-weather-hidden-layers~="far"] .ncn-department-weather-far,
+html[data-debug-weather-hidden-layers~="rear"] .ncn-department-weather-rear,
+html[data-debug-weather-hidden-layers~="middle"] .ncn-department-weather-middle,
+html[data-debug-weather-hidden-layers~="near"] .ncn-department-weather-near {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.diagnostics-heading--split,
+.diagnostics-subheading--inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.diagnostics-heading--split > :last-child {
+  color: rgba(255, 205, 150, .58);
+  font-size: .52rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .1em;
+}
+
+.diagnostics-lab {
+  border: 1px solid rgba(255, 70, 40, .24);
   background: rgba(255, 40, 20, .025);
 }
 
-.diagnostics-service-block + .diagnostics-service-block {
+.diagnostics-lab + .diagnostics-lab {
   margin-top: 7px;
 }
 
-.diagnostics-service-heading {
+.diagnostics-lab > summary {
   display: flex;
+  min-height: 37px;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
-  align-items: baseline;
+  padding: 7px 8px;
+  color: var(--white);
+  cursor: pointer;
+  font-weight: 600;
+  letter-spacing: .12em;
+  list-style: none;
+  text-transform: uppercase;
+  user-select: none;
 }
 
-.diagnostics-service-heading strong {
+.diagnostics-lab > summary::-webkit-details-marker {
+  display: none;
+}
+
+.diagnostics-lab > summary::before {
+  content: "+";
+  width: 1em;
+  color: var(--orange);
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnostics-lab[open] > summary::before {
+  content: "−";
+}
+
+.diagnostics-lab > summary > :first-child {
+  margin-right: auto;
+}
+
+.diagnostics-lab-body {
+  padding: 0 8px 8px;
+  border-top: 1px solid rgba(255, 70, 40, .16);
+}
+
+.diagnostics-health {
+  padding: 3px 5px;
+  border: 1px solid rgba(255, 100, 60, .22);
+  color: rgba(255, 205, 150, .7);
+  font-size: .52rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .08em;
+  text-align: right;
+}
+
+.diagnostics-health[data-state="healthy"] {
+  border-color: rgba(255, 180, 90, .4);
   color: var(--white);
-  font-weight: 600;
-  letter-spacing: .1em;
+  box-shadow: 0 0 8px rgba(255, 100, 45, .12);
+}
+
+.diagnostics-health[data-state="transition"] {
+  border-color: var(--orange);
+  color: var(--amber);
+}
+
+.diagnostics-health[data-state="warning"] {
+  border-color: rgba(255, 176, 58, .72);
+  color: #ffd59a;
+}
+
+.diagnostics-health[data-state="error"] {
+  border-color: rgba(255, 80, 70, .8);
+  color: #ff8175;
+}
+
+.diagnostics-health[data-state="off"] {
+  opacity: .58;
+}
+
+.diagnostics-status-detail {
+  min-height: 2.7em;
+  padding: 7px 0 2px;
+  color: rgba(255, 205, 150, .68);
+  font-size: .56rem;
+  line-height: 1.35;
+}
+
+.diagnostics-subheading {
+  margin: 9px 0 5px;
+  color: var(--orange);
+  font-size: .54rem;
+  letter-spacing: .16em;
   text-transform: uppercase;
 }
 
-.diagnostics-service-heading span {
-  color: var(--orange);
-  font-size: .56rem;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+.diagnostics-subheading button {
+  min-height: 25px;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 80, 50, .3);
+  background: rgba(0, 0, 0, .42);
+  color: rgba(255, 190, 130, .72);
+  font: 600 .48rem/1 var(--font-main);
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
 
 .diagnostics-control-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
+}
+
+.diagnostics-control-grid--presets {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.diagnostics-control-grid--actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 8px;
+}
+
+.diagnostics-control-grid--layers {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.diagnostics-control-grid--motion {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding-top: 8px;
 }
 
 .diagnostics-control-grid button,
@@ -77,20 +201,30 @@ html[data-dev-environment-preview="true"] .ncn-environment-system {
   min-width: 0;
   min-height: 34px;
   padding: 6px 5px;
-  border: 1px solid rgba(255, 80, 50, .36);
-  background: rgba(0, 0, 0, .42);
-  color: var(--amber);
-  font: 600 .55rem/1.1 var(--font-main);
-  letter-spacing: .08em;
+  border: 1px solid rgba(255, 80, 50, .34);
+  background: rgba(0, 0, 0, .48);
+  color: rgba(255, 180, 110, .78);
+  font: 600 .52rem/1.15 var(--font-main);
+  letter-spacing: .07em;
   text-transform: uppercase;
   cursor: pointer;
   touch-action: manipulation;
 }
 
+.diagnostics-control-grid button.active,
+.diagnostics-control-grid button[aria-pressed="true"] {
+  color: var(--white);
+  border-color: var(--orange);
+  background: rgba(255, 70, 35, .11);
+  box-shadow: inset 0 0 10px rgba(255, 70, 30, .08), 0 0 8px rgba(255, 80, 35, .12);
+}
+
 .diagnostics-control-grid button:hover,
 .diagnostics-control-grid button:focus-visible,
 .diagnostics-restore-profile:hover,
-.diagnostics-restore-profile:focus-visible {
+.diagnostics-restore-profile:focus-visible,
+.diagnostics-subheading button:hover,
+.diagnostics-subheading button:focus-visible {
   color: var(--white);
   border-color: var(--orange);
   box-shadow: 0 0 8px rgba(255, 100, 50, .18);
@@ -98,25 +232,70 @@ html[data-dev-environment-preview="true"] .ncn-environment-system {
 }
 
 .diagnostics-control-grid button:active,
-.diagnostics-restore-profile:active {
+.diagnostics-restore-profile:active,
+.diagnostics-subheading button:active {
   color: var(--white);
   background: rgba(255, 70, 40, .16);
   transform: translateY(1px);
 }
 
-.diagnostics-range-control {
+.diagnostics-telemetry {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 3.2em;
-  gap: 7px;
-  align-items: center;
-  color: rgba(255, 190, 130, .7);
-  font-size: .55rem;
-  letter-spacing: .1em;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.diagnostics-telemetry > div {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid rgba(255, 70, 40, .15);
+  background: rgba(0, 0, 0, .24);
+}
+
+.diagnostics-telemetry span {
+  display: block;
+  color: rgba(255, 190, 130, .56);
+  font-size: .47rem;
+  letter-spacing: .09em;
   text-transform: uppercase;
 }
 
-.diagnostics-range-control input {
+.diagnostics-telemetry strong {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: rgba(255, 235, 210, .9);
+  font-size: .56rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnostics-weather-settings {
+  display: grid;
+  gap: 5px;
+}
+
+.diagnostics-range-control,
+.diagnostics-field-control {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) 3.6em;
+  gap: 7px;
+  align-items: center;
+  color: rgba(255, 190, 130, .7);
+  font-size: .52rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.diagnostics-field-control {
+  grid-template-columns: 82px minmax(0, 1fr);
+}
+
+.diagnostics-range-control input[type="range"] {
   width: 100%;
+  margin: 0;
   accent-color: var(--orange);
 }
 
@@ -126,8 +305,36 @@ html[data-dev-environment-preview="true"] .ncn-environment-system {
   font-variant-numeric: tabular-nums;
 }
 
+.diagnostics-field-control input,
+.diagnostics-field-control select {
+  width: 100%;
+  min-height: 29px;
+  border: 1px solid rgba(255, 80, 50, .28);
+  border-radius: 0;
+  background: rgba(0, 0, 0, .62);
+  color: var(--white);
+  font: .58rem/1 var(--font-main);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.diagnostics-field-control input {
+  padding: 5px 7px;
+}
+
+.diagnostics-field-control select {
+  padding: 5px;
+  text-transform: uppercase;
+}
+
+.diagnostics-field-control input:focus,
+.diagnostics-field-control select:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 8px rgba(255, 90, 40, .14);
+}
+
 .diagnostics-environment-readout {
-  margin-top: 7px;
+  margin-top: 8px;
 }
 
 .diagnostics-restore-profile {
@@ -136,7 +343,7 @@ html[data-dev-environment-preview="true"] .ncn-environment-system {
 }
 
 .diagnostics-service-message {
-  min-height: 1.25em;
+  min-height: 1.35em;
   margin-top: 6px;
   color: rgba(255, 205, 150, .72);
   font-size: .56rem;
@@ -152,12 +359,32 @@ html[data-dev-environment-preview="true"] .ncn-environment-system {
     bottom: calc(7px + env(safe-area-inset-bottom));
   }
 
-  .diagnostics-control-grid {
+  .diagnostics-panel {
+    width: calc(100vw - 22px);
+    max-height: 72vh;
+    left: 7px;
+    bottom: calc(48px + env(safe-area-inset-bottom));
+  }
+
+  .diagnostics-control-grid--presets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .diagnostics-control-grid--motion,
+  .diagnostics-control-grid--actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .diagnostics-panel {
-    width: calc(100vw - 78px);
-    max-height: 62vh;
+  .diagnostics-telemetry {
+    grid-template-columns: 1fr;
+  }
+
+  .diagnostics-range-control,
+  .diagnostics-field-control {
+    grid-template-columns: 74px minmax(0, 1fr) 3.4em;
+  }
+
+  .diagnostics-field-control {
+    grid-template-columns: 74px minmax(0, 1fr);
   }
 }
