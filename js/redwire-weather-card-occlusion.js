@@ -15,7 +15,7 @@
   const WEATHER_CANVAS_SELECTOR = "canvas.ncn-department-weather-canvas";
   const FOREGROUND_CLASS = "ncn-redwire-weather-foreground";
   const HEAVY_MIST_PRESET = "heavy-mist";
-  const HEAVY_FRONT_DEPTH = 3.35;
+  const HEAVY_FRONT_DEPTH = 5.45;
   const FOREGROUND_Z_INDEX = 24;
   const EDGE_FEATHER = 6;
 
