@@ -20,6 +20,8 @@ window.NCNEnvironment = (() => {
         intensity: 0.46,
         mist: 0.46,
         wind: 0,
+        quality: "auto",
+        seed: 2045,
         readingAttenuation: 0.48,
         controlAttenuation: 0.68
       }),
@@ -39,7 +41,15 @@ window.NCNEnvironment = (() => {
       name: "dripfeed",
       chamber: "background",
       renderer: "application",
-      weather: Object.freeze({ enabled: false, preset: "clear", intensity: 0, mist: 0, wind: 0 }),
+      weather: Object.freeze({
+        enabled: false,
+        preset: "clear",
+        intensity: 0,
+        mist: 0,
+        wind: 0,
+        quality: "auto",
+        seed: 2045
+      }),
       effects: Object.freeze({ ambient: false, interaction: false }),
       chamberMotion: Object.freeze({ enabled: false })
     })
@@ -53,7 +63,15 @@ window.NCNEnvironment = (() => {
       name: String(name || "empty"),
       chamber: "background",
       renderer: "application",
-      weather: Object.freeze({ enabled: false, preset: "clear", intensity: 0, mist: 0, wind: 0 }),
+      weather: Object.freeze({
+        enabled: false,
+        preset: "clear",
+        intensity: 0,
+        mist: 0,
+        wind: 0,
+        quality: "auto",
+        seed: 2045
+      }),
       effects: Object.freeze({ ambient: false, interaction: false }),
       chamberMotion: Object.freeze({ enabled: false })
     });
@@ -105,7 +123,15 @@ window.NCNEnvironment = (() => {
   }
 
   function disablePresentation() {
-    routeProfile("weather", { enabled: false, preset: "clear", intensity: 0, mist: 0, wind: 0 }, () => {
+    routeProfile("weather", {
+      enabled: false,
+      preset: "clear",
+      intensity: 0,
+      mist: 0,
+      wind: 0,
+      quality: "auto",
+      seed: 2045
+    }, () => {
       window.NCNWeatherRenderer?.disable?.();
     }, { application: activeProfile, reason: "disable-presentation" });
     routeProfile("chamber-motion", { enabled: false }, () => {
@@ -233,6 +259,8 @@ window.NCNEnvironment = (() => {
         mist: desired.enabled ? 0 : 0.46,
         intensity: desired.enabled ? 0 : 0.46,
         wind: 0,
+        quality: "auto",
+        seed: 2045,
         readingAttenuation: 0.48,
         controlAttenuation: 0.68,
         preset: desired.enabled ? "clear" : "mist"
