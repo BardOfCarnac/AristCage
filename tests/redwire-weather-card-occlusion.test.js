@@ -9,6 +9,10 @@ assert.equal(source.includes('requestAnimationFrame'), false, 'Card occlusion mu
 assert.equal(source.includes('setInterval'), false, 'Card occlusion must not create an interval.');
 assert.ok(source.includes('subscribeAfterRender'), 'Card occlusion must consume Weather completed-frame publication.');
 assert.ok(source.includes('destination-out'), 'Card occlusion must subtract Weather rather than redesign Optical plates.');
+assert.ok(source.includes('renderForeground'), 'Heavy mist must reuse Weather exact-depth foreground rendering.');
+assert.ok(source.includes('HEAVY_FRONT_DEPTH'), 'Heavy mist must define a deliberate front-card depth band.');
+assert.ok(source.includes('HEAVY_FORWARD_WIND'), 'Heavy mist must receive an automatic forward chamber push.');
+assert.ok(source.includes('includeAttenuation: false'), 'Front-card mist must not be erased by the ordinary reading-zone attenuation pass.');
 
 const listeners = new Map();
 const subscriptions = [];
@@ -121,7 +125,7 @@ vm.runInContext(source, context, { filename: 'redwire-weather-card-occlusion.js'
   assert.equal(subscriptions.length, 2, 'The bridge should renew its Weather subscription after application switching clears it.');
   assert.equal(window.NCNRedWireWeatherCardOcclusion.snapshot().active, true, 'The renewed subscription should be active.');
 
-  console.log('RedWire Optical plates fully occlude completed Weather frames without private recurring work.');
+  console.log('RedWire Optical plates occlude rear Weather while preserving the exact-depth heavy-mist foreground pass.');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
