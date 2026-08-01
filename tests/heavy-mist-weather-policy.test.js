@@ -5,6 +5,7 @@ const vm = require("node:vm");
 
 const presetsSource = fs.readFileSync(path.resolve(__dirname, "..", "departments", "weather", "weather-presets.js"), "utf8");
 const compositorSource = fs.readFileSync(path.resolve(__dirname, "..", "js", "redwire-weather-card-occlusion.js"), "utf8");
+const plain = value => JSON.parse(JSON.stringify(value));
 
 const context = vm.createContext({ window: {}, console });
 vm.runInContext(presetsSource, context, { filename: "weather-presets.js" });
@@ -41,7 +42,7 @@ function createFakeWeather() {
       state.preset = String(profile.preset || (state.enabled ? state.preset : "clear"));
       state.targetPreset = state.preset;
       if (profile.wind && typeof profile.wind === "object") state.wind = { ...profile.wind };
-      calls.push({ type: "applyProfile", profile: JSON.parse(JSON.stringify(profile)) });
+      calls.push({ type: "applyProfile", profile: plain(profile) });
       return snapshot();
     },
     setPreset(name) {
@@ -88,7 +89,7 @@ assert.equal(factory.__ncnPresetDepthFlowPolicy, true, "The accepted Weather fac
 
   const heavyPublic = weather.snapshot();
   const heavyInternal = calls.filter(call => call.type === "applyProfile").at(-1).profile.wind;
-  assert.deepEqual(heavyPublic.wind, { x: 0.22, y: 0, z: 0 }, "Preset motion must not leak into the public wind contract.");
+  assert.deepEqual(plain(heavyPublic.wind), { x: 0.22, y: 0, z: 0 }, "Preset motion must not leak into the public wind contract.");
   assert.ok(heavyInternal.z < -0.7, "The heavy-mist profile must deliver its configured depth flow inside Weather.");
   assert.equal(heavyPublic.diagnostics.presetDepthFlow.preset, "heavy-mist");
   assert.ok(heavyPublic.diagnostics.presetDepthFlow.internalWindZ < -0.7);
@@ -101,7 +102,7 @@ assert.equal(factory.__ncnPresetDepthFlowPolicy, true, "The accepted Weather fac
   });
   const ordinaryInternal = calls.filter(call => call.type === "applyProfile").at(-1).profile.wind;
   assert.deepEqual(ordinaryInternal, { x: 0.22, y: 0, z: 0 }, "Ordinary mist must retain the accepted depth baseline without an added push.");
-  assert.deepEqual(weather.snapshot().wind, { x: 0.22, y: 0, z: 0 });
+  assert.deepEqual(plain(weather.snapshot().wind), { x: 0.22, y: 0, z: 0 });
 
   weather.setPreset("heavy-mist");
   assert.ok(calls.filter(call => call.type === "setWind").at(-1).wind.z < -0.7, "Direct heavy-mist selection must apply the Weather-owned depth flow.");
@@ -111,7 +112,7 @@ assert.equal(factory.__ncnPresetDepthFlowPolicy, true, "The accepted Weather fac
   weather.applyProfile({ enabled: false, preset: "clear", wind: { x: 0, y: 0, z: 0 } });
   const disabled = weather.snapshot();
   assert.equal(disabled.diagnostics.presetDepthFlow.offset, 0, "Disabled Weather must retain no heavy-mist policy residue.");
-  assert.deepEqual(disabled.wind, { x: 0, y: 0, z: 0 });
+  assert.deepEqual(plain(disabled.wind), { x: 0, y: 0, z: 0 });
 
   console.log("Heavy mist owns its forward chamber flow inside Weather while ordinary mist and public wind remain unchanged.");
 })().catch(error => {
