@@ -1,0 +1,55 @@
+name: Apply heavy mist Weather policy
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/apply-heavy-mist-weather-policy.yml"
+      - "departments/weather/weather-presets.js"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-policy:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'agent/heavy-mist-foreground-surge'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Apply Weather-owned preset depth flow
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path("departments/weather/weather-module.js")
+          text = path.read_text()
+          old = '        depthFlow: APPROVED_MIST.depthFlow + state.wind.z,\n'
+          new = '''        depthFlow: APPROVED_MIST.depthFlow
+          + (state.config.depthFlow - (Number(PRESETS.mist?.depthFlow) || 0))
+          + state.wind.z,
+'''
+          if new not in text:
+              if old not in text:
+                  raise SystemExit("Missing mist depth-flow anchor")
+              text = text.replace(old, new, 1)
+              path.write_text(text)
+          PY
+      - name: Validate Weather publication
+        run: |
+          node --check departments/weather/weather-presets.js
+          node --check departments/weather/weather-module.js
+          node departments/weather/tests/weather-module.node.test.js
+      - name: Commit Weather policy
+        run: |
+          if git diff --quiet -- departments/weather/weather-module.js; then
+            echo "Weather policy already applied."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add departments/weather/weather-module.js
+          git commit -m "Let Weather presets own mist depth flow"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
