@@ -73,11 +73,21 @@ async function verifyPanelGeometry(page, viewportName) {
     const panelRect = panel.getBoundingClientRect();
     const toggleRect = toggle.getBoundingClientRect();
     const buttons = [...panel.querySelectorAll("button")]
-      .filter(button => getComputedStyle(button).display !== "none")
       .map(button => {
+        const style = getComputedStyle(button);
         const rect = button.getBoundingClientRect();
-        return { width: rect.width, height: rect.height, left: rect.left, right: rect.right };
-      });
+        return {
+          label: button.textContent.trim(),
+          width: rect.width,
+          height: rect.height,
+          left: rect.left,
+          right: rect.right,
+          rendered: button.getClientRects().length > 0
+            && style.display !== "none"
+            && style.visibility !== "hidden"
+        };
+      })
+      .filter(button => button.rendered);
     return {
       panel: {
         left: panelRect.left,
@@ -112,7 +122,8 @@ async function verifyPanelGeometry(page, viewportName) {
     `${viewportName}: the diagnostics panel must not cover the Dev-off control`
   );
   assert.ok(geometry.buttons.length > 12, `${viewportName}: mounted laboratory should expose its real controls`);
-  assert.ok(geometry.buttons.every(button => button.height >= 30), `${viewportName}: all visible buttons should retain practical activation height`);
+  const undersized = geometry.buttons.filter(button => button.height < 30);
+  assert.deepEqual(undersized, [], `${viewportName}: all rendered buttons should retain practical activation height`);
   assert.ok(geometry.buttons.every(button => button.left >= geometry.panel.left - 1 && button.right <= geometry.panel.right + 1), `${viewportName}: buttons must stay inside the panel`);
 }
 
