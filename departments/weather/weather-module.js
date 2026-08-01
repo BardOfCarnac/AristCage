@@ -38,6 +38,9 @@ window.NCNWeatherDepartment = (() => {
     "light-flash": Object.freeze({ channel: "environment", purpose: "ambient", layer: "rear" })
   });
   const DEPTH_CONVENTION = "smaller-positive-z-is-nearer";
+  const HEAVY_MIST_PRESET = "heavy-mist";
+  const HEAVY_MIST_FOREGROUND_DEPTH = 5.45;
+  const MIST_PRESET_DEPTH_BASELINE = Number(PRESETS.mist?.depthFlow) || 0;
 
   const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, Number(value) || 0));
   const clamp01 = value => clamp(value, 0, 1);
@@ -130,7 +133,9 @@ window.NCNWeatherDepartment = (() => {
       geometry: { frames: 0, cameraReads: 0, layerMeasurements: 0, zoneReads: 0 },
       qualityChanges: 0,
       fpsUpdates: 0,
-      depthFrameSerial: 0
+      depthFrameSerial: 0,
+      heavyMistPrimePending: false,
+      heavyMistPrimeCount: 0
     };
 
     let random = seededRandom(state.seed);
@@ -345,6 +350,18 @@ window.NCNWeatherDepartment = (() => {
       return mix(minimum, maximum, random());
     }
 
+    function effectiveMistDepthFlow() {
+      const configured = Number(state.config.depthFlow) || 0;
+      const presetAdjustment = state.config.mist > 0
+        ? configured - MIST_PRESET_DEPTH_BASELINE
+        : configured;
+      return APPROVED_MIST.depthFlow + presetAdjustment + state.wind.z;
+    }
+
+    function effectiveParticleDepthFlow() {
+      return (Number(state.config.depthFlow) || 0) + state.wind.z;
+    }
+
     function resetMistBank(bank, bounds, initial = false) {
       bank.x = randomBetween(-bounds.halfWidth * 1.25, bounds.halfWidth * 1.25);
       bank.z = randomBetween(bounds.near + 0.2, bounds.far - 0.25);
@@ -361,7 +378,7 @@ window.NCNWeatherDepartment = (() => {
       bank.bias = randomBetween(-0.4, 0.4);
       bank.age = 0;
       if (!initial) {
-        const depthFlow = APPROVED_MIST.depthFlow + state.wind.z;
+        const depthFlow = effectiveMistDepthFlow();
         const drift = APPROVED_MIST.drift + state.wind.x;
         if (depthFlow < -0.02) bank.z = bounds.far - randomBetween(0, 0.6);
         else if (depthFlow > 0.02) bank.z = bounds.near + randomBetween(0.15, 0.65);
@@ -373,7 +390,7 @@ window.NCNWeatherDepartment = (() => {
     function makePool(type, count, bounds = null) {
       const pool = particles[type];
       while (pool.length < count) {
-        const particle = { active: false, type };
+        const particle = { active: false, type, slot: pool.length };
         if (type === "mist" && bounds) resetMistBank(particle, bounds, true);
         pool.push(particle);
       }
@@ -475,7 +492,7 @@ window.NCNWeatherDepartment = (() => {
         height: APPROVED_MIST.height * mix(1, 3.6, verticalFill),
         opacity: clamp(APPROVED_MIST.opacity * intensityRatio, 0, 1),
         drift: APPROVED_MIST.drift + state.wind.x,
-        depthFlow: APPROVED_MIST.depthFlow + state.wind.z,
+        depthFlow: effectiveMistDepthFlow(),
         turbulence: APPROVED_MIST.turbulence,
         softness: APPROVED_MIST.softness,
         verticalFill,
@@ -521,6 +538,27 @@ window.NCNWeatherDepartment = (() => {
       }
     }
 
+    function primeHeavyMistBank(bounds) {
+      if (!state.heavyMistPrimePending || state.targetPreset !== HEAVY_MIST_PRESET) return 0;
+      const bank = particles.mist.find(item => item.active);
+      if (!bank) return 0;
+      resetMistBank(bank, bounds, true);
+      bank.x = 0;
+      bank.z = clamp(HEAVY_MIST_FOREGROUND_DEPTH - 0.22, bounds.near + 0.18, bounds.far - 0.25);
+      bank.width = 1.72;
+      bank.depth = 0.82;
+      bank.lift = 0.18;
+      bank.verticalSeed = 0.72;
+      bank.scaleSeed = 1;
+      bank.alpha = 0.95;
+      bank.puffs = 4;
+      bank.bias = 0.04;
+      bank.speed = 0.92;
+      state.heavyMistPrimePending = false;
+      state.heavyMistPrimeCount += 1;
+      return 1;
+    }
+
     function updateParticle(particle, deltaSeconds, bounds) {
       if (!particle.active) return;
       particle.age += deltaSeconds;
@@ -529,12 +567,12 @@ window.NCNWeatherDepartment = (() => {
       if (particle.type === "rain") {
         particle.y -= (0.65 + state.config.fallSpeed * 1.55) * particle.velocity * deltaSeconds;
         particle.x += state.wind.x * 0.34 * deltaSeconds;
-        particle.z += (state.wind.z + state.config.depthFlow) * 0.26 * deltaSeconds;
+        particle.z += effectiveParticleDepthFlow() * 0.26 * deltaSeconds;
         if (particle.y < -bounds.halfHeight * 1.2) particle.active = false;
       } else {
         particle.x += (state.wind.x * 0.44 + wave * state.config.turbulence * 0.08) * particle.velocity * deltaSeconds;
         particle.y += (state.wind.y * 0.24 + Math.cos(particle.phase + particle.age) * 0.025) * deltaSeconds;
-        particle.z += (state.wind.z + state.config.depthFlow) * 0.20 * deltaSeconds;
+        particle.z += effectiveParticleDepthFlow() * 0.20 * deltaSeconds;
       }
       if (particle.x > bounds.halfWidth * 1.25) particle.x = -bounds.halfWidth * 1.25;
       if (particle.x < -bounds.halfWidth * 1.25) particle.x = bounds.halfWidth * 1.25;
@@ -856,6 +894,8 @@ window.NCNWeatherDepartment = (() => {
         frameNumber: state.frameCount,
         elapsedMs: state.elapsedMs,
         depthConvention: DEPTH_CONVENTION,
+        mistDepthFlow: effectiveMistDepthFlow(),
+        particleDepthFlow: effectiveParticleDepthFlow(),
         puffCount: puffs.length,
         depthRange,
         chamberClipped: true,
@@ -1016,6 +1056,7 @@ window.NCNWeatherDepartment = (() => {
         spawnToward("rain", counts.rain, 8, scene.bounds);
       }
       TYPES.forEach(type => deactivateSurplus(type, counts[type]));
+      primeHeavyMistBank(scene.bounds);
       particles.mist.forEach(bank => updateMistBank(bank, deltaSeconds, scene.bounds, settings));
       ["dust", "rain"].forEach(type => particles[type].forEach(particle => updateParticle(particle, deltaSeconds, scene.bounds)));
       render(intensity, scene, settings, frame);
@@ -1052,6 +1093,7 @@ window.NCNWeatherDepartment = (() => {
       state.targetPreset = selected.key;
       state.config = selected.values;
       state.transition = null;
+      state.heavyMistPrimePending = selected.key === HEAVY_MIST_PRESET;
       if (state.initialised && state.enabled && !state.suspended) runtimeHandle?.wake?.("weather:preset");
       return snapshot();
     }
@@ -1071,6 +1113,7 @@ window.NCNWeatherDepartment = (() => {
       state.targetPreset = "clear";
       state.config = clonePreset(PRESETS.clear);
       state.transition = null;
+      state.heavyMistPrimePending = false;
       state.currentIntensity = 0;
       state.targetIntensity = 0;
       state.lastEnvelope = null;
@@ -1105,6 +1148,7 @@ window.NCNWeatherDepartment = (() => {
       const selected = presetByName(name);
       const duration = Math.max(0, Number(options.duration) || 0);
       state.targetPreset = selected.key;
+      state.heavyMistPrimePending = selected.key === HEAVY_MIST_PRESET;
       if (!duration) return setPreset(selected.key);
       state.transition = { name: selected.key, from: clonePreset(state.config), to: selected.values, duration, elapsed: 0 };
       if (options.effect === true && state.enabled && !state.suspended) {
@@ -1155,6 +1199,7 @@ window.NCNWeatherDepartment = (() => {
       state.elapsedMs = 0;
       const bounds = { halfWidth: 4.2, halfHeight: 2.55, near: 2.5, far: 10.5 };
       particles.mist.forEach(bank => resetMistBank(bank, bounds, true));
+      state.heavyMistPrimePending = state.targetPreset === HEAVY_MIST_PRESET;
       deactivateAll(false);
       runtimeHandle?.wake?.("weather:seed");
       return state.seed;
@@ -1298,6 +1343,13 @@ window.NCNWeatherDepartment = (() => {
           generalHaze: false,
           frontEnergy: false,
           approvedMist: APPROVED_MIST,
+          effectiveDepthFlow: Object.freeze({
+            configured: Number(state.config.depthFlow) || 0,
+            wind: state.wind.z,
+            mist: effectiveMistDepthFlow(),
+            particles: effectiveParticleDepthFlow(),
+            heavyMistPrimeCount: state.heavyMistPrimeCount
+          }),
           depthFrame: Object.freeze({
             available: Boolean(getDepthFrame()),
             token: currentDepthFrame?.token || null,

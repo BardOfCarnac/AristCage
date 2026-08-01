@@ -5,6 +5,10 @@ on:
     paths:
       - "index.html"
       - "js/redwire-weather-card-occlusion.js"
+      - "departments/weather/weather-presets.js"
+      - "departments/weather/weather-module.js"
+      - "departments/weather/tests/weather-module.node.test.js"
+      - "tests/heavy-mist-weather-policy.test.js"
       - "tests/redwire-weather-card-occlusion.test.js"
       - "tests/redwire-weather-card-occlusion-render.mjs"
       - ".github/workflows/redwire-weather-card-occlusion.yml"
@@ -21,12 +25,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Check occlusion bridge syntax
+      - name: Check canonical Weather and compositor syntax
         run: |
+          node --check departments/weather/weather-presets.js
+          node --check departments/weather/weather-module.js
           node --check js/redwire-weather-card-occlusion.js
+          node --check tests/heavy-mist-weather-policy.test.js
           node --check tests/redwire-weather-card-occlusion.test.js
           node --check tests/redwire-weather-card-occlusion-render.mjs
-      - name: Run mounted occlusion contract
+      - name: Run canonical Weather ownership contract
+        run: |
+          node tests/heavy-mist-weather-policy.test.js
+          node departments/weather/tests/weather-module.node.test.js
+      - name: Run mounted foreground lifecycle contract
         run: node tests/redwire-weather-card-occlusion.test.js
       - name: Check production load order
         run: |
@@ -37,17 +48,17 @@ jobs:
           const occlusion = html.indexOf('js/redwire-weather-card-occlusion.js');
           const article = html.indexOf('js/article-mist-descent.js');
           if (departments < 0 || occlusion < departments || article < occlusion) {
-            throw new Error('Weather card occlusion must load after accepted departments and before article composition.');
+            throw new Error('Weather card composition must load after accepted departments and before article composition.');
           }
           if ((html.match(/js\/redwire-weather-card-occlusion\.js/g) || []).length !== 1) {
-            throw new Error('Weather card occlusion must load exactly once.');
+            throw new Error('Weather card composition must load exactly once.');
           }
-          console.log('Weather card occlusion production load order is correct.');
+          console.log('Weather card composition production load order is correct.');
           NODE
 
   rendered-heavy-mist:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,7 +68,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.54.1
           npx playwright install --with-deps chromium
-      - name: Prove heavy mist is absent inside card plates
+      - name: Prove localised real-puff foreground composition
         run: |
           set -euo pipefail
           mkdir -p artifacts/redwire-weather-card-occlusion
