@@ -9,63 +9,13 @@ on:
       - "tests/chamber-live-presentation.test.js"
       - "tests/chamber-live-aperture-render.mjs"
       - ".github/workflows/chamber-live-aperture.yml"
-      - ".github/workflows/apply-live-aperture-review.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply-review:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'agent/live-chamber-weather-aperture'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-      - name: Apply chamber-owned presentation publication
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          def replace_once(text, old, new, label):
-              if new in text:
-                  return text
-              if old not in text:
-                  raise SystemExit(f"Missing anchor: {label}")
-              return text.replace(old, new, 1)
-
-          chamber_path = Path("js/layered-chamber.js")
-          chamber = chamber_path.read_text()
-          chamber = replace_once(chamber, '  function state(now) {\n    const t = (now - startedAt) / 1000;\n    const travel = easeTravel((t - timing.travelStart) / timing.travelDuration);\n    const returning = easeReturn((t - timing.returnStart) / timing.returnDuration);\n    const wallOpen = easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration);\n    const rearLock = sharpPulse(t, timing.returnStart + timing.returnDuration, 0.22);\n', '  function presentationState(now) {\n    const t = Math.max(0, (now - startedAt) / 1000);\n    return {\n      t,\n      travel: easeTravel((t - timing.travelStart) / timing.travelDuration),\n      returning: easeReturn((t - timing.returnStart) / timing.returnDuration),\n      wallOpen: easeInOut((t - timing.wallOpenStart) / timing.wallOpenDuration)\n    };\n  }\n\n  function state(now) {\n    const presentation = presentationState(now);\n    const { t, travel, returning, wallOpen } = presentation;\n    const rearLock = sharpPulse(t, timing.returnStart + timing.returnDuration, 0.22);\n', "shared presentation state")
-          chamber = replace_once(chamber, '    return {\n      t,\n      travel,\n      returning,\n      wallOpen,\n      energy: clamp01(base + rearLock * energy.rearLockPulse + wallLock * energy.wallLockPulse + breath + injectedEnergyAt(now)),\n', '    return {\n      ...presentation,\n      energy: clamp01(base + rearLock * energy.rearLockPulse + wallLock * energy.wallLockPulse + breath + injectedEnergyAt(now)),\n', "state publication reuse")
-          chamber = replace_once(chamber, '  function visibleHalfWidth(s) {\n    return geometry.halfWidth + geometry.wallShiftCells * geometry.cell * s.wallOpen;\n  }\n\n  function apertureAt(z, halfWidth) {\n', '  function visibleHalfWidth(s) {\n    return geometry.halfWidth + geometry.wallShiftCells * geometry.cell * s.wallOpen;\n  }\n\n  function settledPresentationSnapshot() {\n    return Object.freeze({\n      elapsed: timing.done,\n      progress: 1,\n      wallOpen: 1,\n      visibleHalfWidth: finalHalfWidth(),\n      rearDepth: geometry.near + geometry.finalDepthCells * geometry.cell,\n      settled: true,\n      active: false\n    });\n  }\n\n  function presentationSnapshot(now = performance.now()) {\n    if (mode === MODES.OFF || !mounted || !startedAt) return settledPresentationSnapshot();\n    const presentation = presentationState(now);\n    return Object.freeze({\n      elapsed: presentation.t,\n      progress: clamp01(presentation.t / timing.done),\n      wallOpen: presentation.wallOpen,\n      visibleHalfWidth: visibleHalfWidth(presentation),\n      rearDepth: rearDepth(presentation),\n      settled: presentation.t >= timing.done,\n      active: presentation.t < timing.done + timing.breathDuration || injectedDuration > 0\n    });\n  }\n\n  function apertureAt(z, halfWidth) {\n', "presentation snapshot")
-          chamber = replace_once(chamber, '    setScroll,\n    injectEnergy,\n    toggleDiagnostics: () => {\n', '    setScroll,\n    injectEnergy,\n    getPresentationSnapshot: presentationSnapshot,\n    toggleDiagnostics: () => {\n', "presentation export")
-          chamber_path.write_text(chamber)
-          PY
-      - name: Validate correction
-        run: |
-          node --check js/layered-chamber.js
-          node --check js/chamber-camera.js
-          node --check tests/chamber-live-presentation.test.js
-          node --check tests/chamber-live-aperture-render.mjs
-          node tests/chamber-live-presentation.test.js
-      - name: Commit correction
-        run: |
-          if git diff --quiet; then
-            echo "Review correction already applied."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add js/layered-chamber.js
-          git commit -m "Publish authoritative chamber presentation [live-aperture-review-applied]"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
-
   contract:
-    needs: apply-review
-    if: always() && (needs.apply-review.result == 'success' || needs.apply-review.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,8 +32,6 @@ jobs:
         run: node tests/chamber-live-presentation.test.js
 
   rendered:
-    needs: apply-review
-    if: always() && (needs.apply-review.result == 'success' || needs.apply-review.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
