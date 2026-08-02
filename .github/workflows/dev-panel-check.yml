@@ -4,10 +4,12 @@ on:
   pull_request:
     paths:
       - "index.html"
+      - "js/diagnostics.js"
       - "js/dev-panel-controls.js"
       - "js/integration-service-gate.js"
       - "css/dev-panel-controls.css"
       - "tests/dev-panel-controls.test.js"
+      - "tests/dev-panel-browser.mjs"
       - "tests/integration-service-gate.test.js"
       - ".github/workflows/dev-panel-check.yml"
   workflow_dispatch:
@@ -23,15 +25,17 @@ jobs:
 
       - name: Check developer control syntax
         run: |
+          node --check js/diagnostics.js
           node --check js/dev-panel-controls.js
           node --check js/integration-service-gate.js
           node --check tests/dev-panel-controls.test.js
+          node --check tests/dev-panel-browser.mjs
           node --check tests/integration-service-gate.test.js
 
       - name: Run service capability gate harness
         run: node tests/integration-service-gate.test.js
 
-      - name: Run developer control execution harness
+      - name: Run developer control lifecycle harness
         run: node tests/dev-panel-controls.test.js
 
       - name: Check shared launcher and service wiring
@@ -39,6 +43,7 @@ jobs:
           node <<'NODE'
           const fs = require('fs');
           const html = fs.readFileSync('index.html', 'utf8');
+          const diagnosticsScript = fs.readFileSync('js/diagnostics.js', 'utf8');
           const script = fs.readFileSync('js/dev-panel-controls.js', 'utf8');
           const gate = fs.readFileSync('js/integration-service-gate.js', 'utf8');
           const css = fs.readFileSync('css/dev-panel-controls.css', 'utf8');
@@ -71,10 +76,25 @@ jobs:
             'dispatchControl',
             'resolveService',
             'syncApplicationProfile',
+            'setDiagnosticsActive',
+            'NCNViewerRuntime',
+            'diagnostics:weather-laboratory',
+            'unbindDiagnosticBindings',
+            'diagnostics-disabled',
             'chamber-motion',
             'weather'
           ]) {
             if (!script.includes(token)) throw new Error(`Developer controls are missing ${token}.`);
+          }
+
+          if (script.includes('new MutationObserver')) {
+            throw new Error('Developer controls must not observe the document while diagnostics are dormant.');
+          }
+          if (/\bsetInterval\s*\(/.test(script)) {
+            throw new Error('Developer telemetry must use the shared runtime rather than a private interval.');
+          }
+          if (!diagnosticsScript.includes('NCNDevPanel?.setDiagnosticsActive')) {
+            throw new Error('Projection Diagnostics does not coordinate the developer laboratory lifecycle.');
           }
 
           for (const token of [
@@ -88,10 +108,70 @@ jobs:
           }
 
           if (!css.includes('.diagnostics-toggle') || !css.includes('display: block !important')) {
-            throw new Error('The application-neutral developer launcher is not forced visible.');
+            throw new Error('The application-neutral developer launcher is not visible while diagnostics are active.');
           }
           if (!css.includes('data-dev-environment-preview')) {
             throw new Error('Developer Weather and movement previews are not lifted above Dripfeed.');
           }
-          console.log('Shared developer panel controls are wired correctly.');
+          console.log('Shared developer panel controls are lifecycle-gated and wired correctly.');
           NODE
+
+  mounted-browser-proof:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install browser runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.54.1 > /tmp/ncn-dev-panel-browser-install.log 2>&1
+          npx playwright install --with-deps chromium >> /tmp/ncn-dev-panel-browser-install.log 2>&1
+
+      - name: Run desktop and mobile laboratory proof
+        id: browser
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/dev-panel-browser
+          python3 -m http.server 4173 > /tmp/ncn-dev-panel-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          node tests/dev-panel-browser.mjs 2>&1 | tee artifacts/dev-panel-browser/test-output.log
+
+      - name: Print browser diagnostics
+        if: always()
+        run: |
+          echo "Mounted proof outcome: ${{ steps.browser.outcome }}"
+          find artifacts/dev-panel-browser -maxdepth 1 -type f -print 2>/dev/null || true
+          test ! -f artifacts/dev-panel-browser/test-output.log || cat artifacts/dev-panel-browser/test-output.log
+          for failure in artifacts/dev-panel-browser/*-failure.txt; do
+            test ! -e "$failure" || { echo "--- $failure"; cat "$failure"; }
+          done
+          echo "--- static server log"
+          test ! -f /tmp/ncn-dev-panel-http.log || tail -80 /tmp/ncn-dev-panel-http.log
+
+      - name: Upload mounted evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-panel-browser-proof
+          path: |
+            artifacts/dev-panel-browser
+            /tmp/ncn-dev-panel-http.log
+            /tmp/ncn-dev-panel-browser-install.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce mounted proof result
+        if: steps.browser.outcome != 'success'
+        run: exit 1

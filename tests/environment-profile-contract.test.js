@@ -99,6 +99,8 @@ assert.deepEqual(redwireWeather, {
   intensity: 0.46,
   mist: 0.46,
   wind: 0,
+  quality: 'auto',
+  seed: 2045,
   readingAttenuation: 0.48,
   controlAttenuation: 0.68
 });
@@ -110,7 +112,9 @@ assert.deepEqual(dripfeedWeather, {
   preset: 'clear',
   intensity: 0,
   mist: 0,
-  wind: 0
+  wind: 0,
+  quality: 'auto',
+  seed: 2045
 });
 
 assert.equal(typeof domReady, 'function', 'Environment manager must defer mounting until DOM readiness.');
@@ -136,6 +140,8 @@ assert.deepEqual(appliedProfiles.find(entry => entry.name === 'weather')?.profil
   intensity: 0,
   mist: 0,
   wind: 0,
+  quality: 'auto',
+  seed: 2045,
   readingAttenuation: 0.48,
   controlAttenuation: 0.68
 }, 'Diagnostics must disable Weather cleanly while retaining the next enabled profile policy.');
@@ -143,4 +149,4 @@ assert.deepEqual(appliedProfiles.find(entry => entry.name === 'weather')?.profil
 assert.equal(readout.profile.textContent, 'REDWIRE');
 assert.equal(readout.state.textContent, 'READY');
 
-console.log('Integration owns the RedWire broad-bank Weather profile, diagnostics reproduction and Dripfeed-disabled policy.');
+console.log('Integration owns the RedWire broad-bank Weather profile, canonical quality/seed, diagnostics reproduction and Dripfeed-disabled policy.');
