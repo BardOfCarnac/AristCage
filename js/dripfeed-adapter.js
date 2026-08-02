@@ -272,6 +272,14 @@ window.NCNDripfeed = (() => {
     effectiveColumns = computedColumns() ?? effectiveColumns;
   }
 
+  function repack() {
+    const app = instance();
+    if (!app || typeof app.repack !== 'function') return null;
+    const publication = app.repack();
+    scheduleResponsiveColumns('repack');
+    return publication;
+  }
+
   function destroy() {
     unbindResponsiveColumns();
     const element = root();
@@ -306,6 +314,7 @@ window.NCNDripfeed = (() => {
     suspend,
     resume,
     reset,
+    repack,
     destroy,
     isActive,
     snapshot: () => Object.freeze({
