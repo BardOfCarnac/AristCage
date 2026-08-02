@@ -16,6 +16,8 @@ window.NCNDripfeedChamber = (() => {
   const CONTROL_GAP = 4;
   const OCCLUSION_GAP = 8;
   const MIN_APERTURE_HEIGHT = 250;
+  const LIVE_PLANE_GAP_CELLS = 0.02;
+  const LATENT_PLANE_GAP_CELLS = 0.26;
 
   let active = false;
   let destroyed = false;
@@ -125,8 +127,8 @@ window.NCNDripfeedChamber = (() => {
     const viewportWidth = Math.max(1, finite(camera.width, window.innerWidth));
     const viewportHeight = Math.max(1, finite(camera.height, window.innerHeight));
     const railBottom = Math.max(0, finite(metrics.railBottom));
-    const filterHeight = Math.max(0, finite(metrics.filterHeight, 38));
-    const utilityHeight = Math.max(0, finite(metrics.utilityHeight, 42));
+    const filterHeight = Math.max(0, finite(metrics.filterHeight, 28));
+    const utilityHeight = Math.max(0, finite(metrics.utilityHeight, 38));
     const controlTop = railBottom + CONTROL_GAP;
     const utilityTop = controlTop + filterHeight + CONTROL_GAP;
     const controlsBottom = utilityTop + utilityHeight;
@@ -152,8 +154,11 @@ window.NCNDripfeedChamber = (() => {
     chosen ||= fallback;
     if (!chosen) return null;
 
-    const liveZ = chosen.lineZ + cell * 0.12;
-    const latentZ = liveZ + cell * 0.32;
+    // Keep the live wall immediately behind the occluding chamber line. This is
+    // the nearest truthful camera plane: it increases apparent proximity without
+    // applying an unreported CSS scale or allowing the cards to cross the grid.
+    const liveZ = chosen.lineZ + cell * LIVE_PLANE_GAP_CELLS;
+    const latentZ = liveZ + cell * LATENT_PLANE_GAP_CELLS;
     const readerZ = Math.max(near + cell * 0.04, chosen.lineZ - cell * 0.58);
     const live = planeProjection(camera, liveZ, chosen.aperture);
     const latent = planeProjection(camera, latentZ, chosen.aperture);
@@ -171,6 +176,10 @@ window.NCNDripfeedChamber = (() => {
       aperture: chosen.aperture,
       wallGutter,
       leadingClearance,
+      calibration: Object.freeze({
+        liveGapCells: LIVE_PLANE_GAP_CELLS,
+        latentGapCells: LATENT_PLANE_GAP_CELLS
+      }),
       controls: Object.freeze({
         top: controlTop,
         filterHeight,
@@ -248,8 +257,8 @@ window.NCNDripfeedChamber = (() => {
 
     let next = computeGeometry(camera, {
       railBottom: currentRailBottom(),
-      filterHeight: measureHeight(filter, 38),
-      utilityHeight: measureHeight(utility, 42)
+      filterHeight: measureHeight(filter, 28),
+      utilityHeight: measureHeight(utility, 38)
     });
     if (!next) return false;
 
