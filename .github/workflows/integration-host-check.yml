@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/integration-host-check.yml"
       - "tools/apply-persistent-weather-and-mist-recycling.py"
+      - "tools/remove-obsolete-mist-respawn.py"
   workflow_dispatch:
 
 permissions:
@@ -21,7 +22,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply source and regression-test patch
-        run: python3 tools/apply-persistent-weather-and-mist-recycling.py
+        run: |
+          python3 tools/apply-persistent-weather-and-mist-recycling.py
+          python3 tools/remove-obsolete-mist-respawn.py
 
       - name: Verify deterministic Weather and diagnostics sources
         run: |
