@@ -3,6 +3,8 @@
 
   The activation gestures are always available, but the diagnostics UI and
   live viewport listeners are created only while diagnostics are enabled.
+  The laboratory drains any in-flight control dispatches before this module
+  removes diagnostics mode, so canonical profile restoration remains final.
 ==================================================*/
 
 const NCN_DIAGNOSTICS_KEY = "ncn-diagnostics";
