@@ -219,25 +219,44 @@ function assertComposition(name, viewport, initial) {
   return planes;
 }
 
-async function exerciseControls(page, name) {
-  await page.locator('#dripfeed-root .filter-chip[data-category="items"]').click();
-  await page.waitForFunction(() => document.querySelector('#dripfeed-root .filter-chip[data-category="items"]')?.classList.contains('active'));
-  await page.locator('#dripfeed-root .filter-chip[data-category="all"]').click();
-
+async function exerciseControls(page, name, viewport) {
+  const items = page.locator('#dripfeed-root .filter-chip[data-category="items"]');
+  const all = page.locator('#dripfeed-root .filter-chip[data-category="all"]');
   const search = page.locator('#dripfeed-root #feed-search');
+  const reset = page.locator('#dripfeed-root [data-action="reset"]');
+
+  await items.click();
+  await page.waitForFunction(() => document.querySelector('#dripfeed-root .filter-chip[data-category="items"]')?.classList.contains('active'));
+  await all.click();
+
   await search.fill('airport');
   await page.waitForFunction(() => document.querySelectorAll('#dripfeed-root .live-wall .listing-tile').length > 0);
-  await search.fill('');
 
-  await page.locator('#dripfeed-root [data-action="reset"]').click();
-  await page.waitForFunction(() => document.querySelectorAll('#dripfeed-root .live-wall .listing-tile').length > 0);
+  if (viewport.width > 1050) {
+    await reset.click();
+    await page.waitForFunction(() => document.querySelectorAll('#dripfeed-root .live-wall .listing-tile').length > 0);
+  } else {
+    const resetPolicy = await reset.evaluate(element => ({
+      display: getComputedStyle(element).display,
+      visible: Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length)
+    }));
+    assert(resetPolicy.display === 'none' && resetPolicy.visible === false,
+      `${name}: accepted mobile Reset policy was not explicitly hidden.`);
+
+    // Restore the same filter/search state using only controls exposed by the
+    // accepted mobile composition rather than forcing a click on hidden UI.
+    await items.click();
+    await search.fill('');
+    await all.click();
+    await page.waitForFunction(() => document.querySelectorAll('#dripfeed-root .live-wall .listing-tile').length > 0);
+  }
 
   const state = await page.evaluate(() => ({
     query: document.querySelector('#dripfeed-root #feed-search')?.value || '',
     category: document.querySelector('#dripfeed-root .filter-chip.active')?.dataset.category || ''
   }));
-  assert(state.query === '', `${name}: reset did not clear search.`);
-  assert(state.category === 'all', `${name}: reset did not restore the all-category filter.`);
+  assert(state.query === '', `${name}: control round trip did not clear search.`);
+  assert(state.category === 'all', `${name}: control round trip did not restore the all-category filter.`);
 }
 
 async function runViewport(browser, name, viewport) {
@@ -252,7 +271,7 @@ async function runViewport(browser, name, viewport) {
   await waitForDripfeed(page);
   const initial = await captureComposition(page);
   const planes = assertComposition(name, viewport, initial);
-  await exerciseControls(page, name);
+  await exerciseControls(page, name, viewport);
   const transmitInitial = await openAndCloseTransmit(page, name, 'initial publication');
   await page.screenshot({ path: path.join(artifactDir, `${name}-initial.png`), fullPage: false });
 
