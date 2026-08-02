@@ -248,7 +248,8 @@ global.NCNIntegration = {
     return Object.freeze({ application: activeApplication, applied: Object.freeze(["weather", "chamber-motion"]) });
   }
 };
-global.NCNIntegratedDepartments = { ready: async () => { throw new Error("Live services should avoid stale readiness waits."); } };
+let departmentReadyHandler = async () => { throw new Error("Live services should avoid stale readiness waits."); };
+global.NCNIntegratedDepartments = { ready: () => departmentReadyHandler() };
 global.NCNApplications = {
   current: () => activeApplication,
   async switchTo(name) {
@@ -335,7 +336,47 @@ vm.runInThisContext(source, { filename: "dev-panel-controls.js" });
   assert.equal(busSubscriptions.size, 0, "diagnostic event subscriptions must be released");
   assert.equal(motionListeners.size, 0, "diagnostic movement listeners must be released");
 
-  console.log("Developer panel lifecycle harness passed.");
+  diagnosticsOn = true;
+  await global.NCNDevPanel.setDiagnosticsActive(true);
+  const restoreCountBeforeRace = profileRestoreCount;
+  let releaseDepartments;
+  departmentReadyHandler = () => new Promise(resolve => { releaseDepartments = resolve; });
+  services.delete("weather");
+  services.delete("chamber-motion");
+
+  const delayedWeather = global.NCNDevPanel.dispatchControl("weather", "heavy");
+  const delayedMotion = global.NCNDevPanel.dispatchControl("motion", "large");
+  await Promise.resolve();
+  assert.equal(global.NCNDevPanel.snapshot().pendingDispatchCount, 2,
+    "delayed laboratory actions must be visible as pending dispatches");
+
+  diagnosticsOn = false;
+  const delayedDisable = global.NCNDevPanel.setDiagnosticsActive(false);
+  await Promise.resolve();
+  assert.equal(profileRestoreCount, restoreCountBeforeRace,
+    "diagnostics-off must not restore ahead of pending laboratory actions");
+
+  services.set("weather", weather);
+  services.set("chamber-motion", motion);
+  releaseDepartments();
+  await Promise.all([delayedWeather, delayedMotion, delayedDisable]);
+
+  const raceCleaned = global.NCNDevPanel.snapshot();
+  assert.equal(profileRestoreCount, restoreCountBeforeRace + 1,
+    "diagnostics-off must perform one final canonical restore after pending actions settle");
+  assert.equal(raceCleaned.pendingDispatchCount, 0, "all delayed laboratory dispatches must be drained");
+  assert.equal(raceCleaned.weather.targetPreset, "mist",
+    "a delayed Weather request must not overwrite the final RedWire profile");
+  assert.equal(raceCleaned.weather.targetIntensity, 0.46,
+    "a delayed Weather request must not retain laboratory intensity");
+  assert.equal(raceCleaned.chamberMotion.activeSequenceCount, 0,
+    "a delayed motion request must be cancelled by the final profile restore");
+  assert.equal(raceCleaned.overrideActive, false,
+    "the delayed-action round trip must leave no active developer override");
+  assert.equal(documentElement.dataset.devEnvironmentPreview, undefined,
+    "the delayed-action round trip must leave no preview lift");
+
+  console.log("Developer panel lifecycle and delayed-dispatch cleanup harness passed.");
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

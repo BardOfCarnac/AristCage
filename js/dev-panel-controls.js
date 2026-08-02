@@ -30,6 +30,7 @@
   let motionStatus = null;
   let motionEventsService = null;
   let departmentReadyAttempt = null;
+  let pendingDiagnosticDispatches = new Set();
   let telemetryTask = null;
   let diagnosticsActive = false;
   let diagnosticBindingsActive = false;
@@ -621,7 +622,7 @@
     }
   }
 
-  async function dispatchControl(type, value) {
+  async function executeControl(type, value) {
     if (type === "weather") return applyWeather(value, { usePresetDefaults: true });
     if (type === "weather-action") {
       if (value === "apply") return applyWeatherSettings();
@@ -634,6 +635,28 @@
     if (type === "application") return switchApplication(value);
     if (type === "profile") return restoreApplicationProfile();
     throw new RangeError(`Unknown developer control: ${type}${value ? `:${value}` : ""}`);
+  }
+
+  async function dispatchControl(type, value) {
+    if (!diagnosticsActive) {
+      recordAction("control", `${type}:${value || ""}`, "ignored", "diagnostics-inactive");
+      return null;
+    }
+
+    const operation = Promise.resolve().then(() => executeControl(type, value));
+    pendingDiagnosticDispatches.add(operation);
+    try {
+      return await operation;
+    } finally {
+      pendingDiagnosticDispatches.delete(operation);
+    }
+  }
+
+  async function settleDiagnosticDispatches() {
+    while (pendingDiagnosticDispatches.size) {
+      await Promise.allSettled([...pendingDiagnosticDispatches]);
+    }
+    return true;
   }
 
   function setMetric(name, value, title = "") {
@@ -931,6 +954,7 @@
     setEnvironmentPreview(false);
 
     if (wasActive) {
+      await settleDiagnosticDispatches();
       await restoreApplicationProfile({ quiet: true, reason: "diagnostics-disabled" });
     } else {
       overrideActive = false;
@@ -974,6 +998,7 @@
       bindingsActive: diagnosticBindingsActive,
       motionBindingsActive: Boolean(motionEventsService),
       eventSubscriptionCount: diagnosticUnsubscribers.length,
+      pendingDispatchCount: pendingDiagnosticDispatches.size,
       environmentPreview: document.documentElement?.dataset?.devEnvironmentPreview === "true",
       selectedWeather,
       hiddenWeatherLayers: Object.freeze([...hiddenWeatherLayers]),
