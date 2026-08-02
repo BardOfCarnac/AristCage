@@ -1,0 +1,158 @@
+from pathlib import Path
+
+
+def replace_once(path: Path, old: str, new: str) -> bool:
+    text = path.read_text()
+    if new in text:
+        return False
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"Expected one match in {path}, found {count}: {old[:80]!r}")
+    path.write_text(text.replace(old, new, 1))
+    return True
+
+
+panel = Path("js/dev-panel-controls.js")
+replace_once(
+    panel,
+    '  let departmentReadyAttempt = null;\n  let telemetryTask = null;',
+    '  let departmentReadyAttempt = null;\n  let pendingDiagnosticDispatches = new Set();\n  let telemetryTask = null;',
+)
+
+replace_once(
+    panel,
+    '''  async function dispatchControl(type, value) {
+    if (type === "weather") return applyWeather(value, { usePresetDefaults: true });
+    if (type === "weather-action") {
+      if (value === "apply") return applyWeatherSettings();
+      if (value === "reseed") return replayWeatherSeed();
+      if (value === "copy") return copyWeatherReport();
+      if (value === "show-all") return showAllWeatherLayers();
+    }
+    if (type === "weather-layer") return toggleWeatherLayer(value);
+    if (type === "motion") return triggerMotion(value);
+    if (type === "application") return switchApplication(value);
+    if (type === "profile") return restoreApplicationProfile();
+    throw new RangeError(`Unknown developer control: ${type}${value ? `:${value}` : ""}`);
+  }
+''',
+    '''  async function executeControl(type, value) {
+    if (type === "weather") return applyWeather(value, { usePresetDefaults: true });
+    if (type === "weather-action") {
+      if (value === "apply") return applyWeatherSettings();
+      if (value === "reseed") return replayWeatherSeed();
+      if (value === "copy") return copyWeatherReport();
+      if (value === "show-all") return showAllWeatherLayers();
+    }
+    if (type === "weather-layer") return toggleWeatherLayer(value);
+    if (type === "motion") return triggerMotion(value);
+    if (type === "application") return switchApplication(value);
+    if (type === "profile") return restoreApplicationProfile();
+    throw new RangeError(`Unknown developer control: ${type}${value ? `:${value}` : ""}`);
+  }
+
+  async function dispatchControl(type, value) {
+    if (!diagnosticsActive) {
+      recordAction("control", `${type}:${value || ""}`, "ignored", "diagnostics-inactive");
+      return null;
+    }
+
+    const operation = Promise.resolve().then(() => executeControl(type, value));
+    pendingDiagnosticDispatches.add(operation);
+    try {
+      return await operation;
+    } finally {
+      pendingDiagnosticDispatches.delete(operation);
+    }
+  }
+
+  async function settleDiagnosticDispatches() {
+    while (pendingDiagnosticDispatches.size) {
+      await Promise.allSettled([...pendingDiagnosticDispatches]);
+    }
+    return true;
+  }
+''',
+)
+
+replace_once(
+    panel,
+    '''    if (wasActive) {
+      await restoreApplicationProfile({ quiet: true, reason: "diagnostics-disabled" });
+    } else {
+      overrideActive = false;
+    }
+''',
+    '''    if (wasActive) {
+      await settleDiagnosticDispatches();
+      await restoreApplicationProfile({ quiet: true, reason: "diagnostics-disabled" });
+    } else {
+      overrideActive = false;
+    }
+''',
+)
+
+replace_once(
+    panel,
+    '      eventSubscriptionCount: diagnosticUnsubscribers.length,\n      environmentPreview:',
+    '      eventSubscriptionCount: diagnosticUnsubscribers.length,\n      pendingDispatchCount: pendingDiagnosticDispatches.size,\n      environmentPreview:',
+)
+
+test = Path("tests/dev-panel-controls.test.js")
+replace_once(
+    test,
+    'global.NCNIntegratedDepartments = { ready: async () => { throw new Error("Live services should avoid stale readiness waits."); } };',
+    'let departmentReadyHandler = async () => { throw new Error("Live services should avoid stale readiness waits."); };\nglobal.NCNIntegratedDepartments = { ready: () => departmentReadyHandler() };',
+)
+
+replace_once(
+    test,
+    '''  assert.equal(motionListeners.size, 0, "diagnostic movement listeners must be released");
+
+  console.log("Developer panel lifecycle harness passed.");
+''',
+    '''  assert.equal(motionListeners.size, 0, "diagnostic movement listeners must be released");
+
+  diagnosticsOn = true;
+  await global.NCNDevPanel.setDiagnosticsActive(true);
+  const restoreCountBeforeRace = profileRestoreCount;
+  let releaseDepartments;
+  departmentReadyHandler = () => new Promise(resolve => { releaseDepartments = resolve; });
+  services.delete("weather");
+  services.delete("chamber-motion");
+
+  const delayedWeather = global.NCNDevPanel.dispatchControl("weather", "heavy");
+  const delayedMotion = global.NCNDevPanel.dispatchControl("motion", "large");
+  await Promise.resolve();
+  assert.equal(global.NCNDevPanel.snapshot().pendingDispatchCount, 2,
+    "delayed laboratory actions must be visible as pending dispatches");
+
+  diagnosticsOn = false;
+  const delayedDisable = global.NCNDevPanel.setDiagnosticsActive(false);
+  await Promise.resolve();
+  assert.equal(profileRestoreCount, restoreCountBeforeRace,
+    "diagnostics-off must not restore ahead of pending laboratory actions");
+
+  services.set("weather", weather);
+  services.set("chamber-motion", motion);
+  releaseDepartments();
+  await Promise.all([delayedWeather, delayedMotion, delayedDisable]);
+
+  const raceCleaned = global.NCNDevPanel.snapshot();
+  assert.equal(profileRestoreCount, restoreCountBeforeRace + 1,
+    "diagnostics-off must perform one final canonical restore after pending actions settle");
+  assert.equal(raceCleaned.pendingDispatchCount, 0, "all delayed laboratory dispatches must be drained");
+  assert.equal(raceCleaned.weather.targetPreset, "mist",
+    "a delayed Weather request must not overwrite the final RedWire profile");
+  assert.equal(raceCleaned.weather.targetIntensity, 0.46,
+    "a delayed Weather request must not retain laboratory intensity");
+  assert.equal(raceCleaned.chamberMotion.activeSequenceCount, 0,
+    "a delayed motion request must be cancelled by the final profile restore");
+  assert.equal(raceCleaned.overrideActive, false,
+    "the delayed-action round trip must leave no active developer override");
+  assert.equal(documentElement.dataset.devEnvironmentPreview, undefined,
+    "the delayed-action round trip must leave no preview lift");
+
+  console.log("Developer panel lifecycle and delayed-dispatch cleanup harness passed.");
+''',
+)
