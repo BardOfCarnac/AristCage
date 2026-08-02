@@ -43,6 +43,21 @@
     --cols: 2 !important;
   }
 
+  #dripfeed-root .dripfeed-filter-rail .filter-chips {
+    gap: 4px;
+  }
+
+  #dripfeed-root .dripfeed-filter-rail .filter-chip {
+    font-size: clamp(.44rem, 2vw, .54rem);
+    letter-spacing: .045em;
+  }
+
+  #dripfeed-root .filter-transmit {
+    min-width: 102px;
+    padding-inline: 9px;
+    font-size: .61rem;
+  }
+
   #dripfeed-root .listing-tile {
     --headline-lines: 3;
     --body-lines: 2;
