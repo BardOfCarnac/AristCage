@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  apply-diagnostics-race-fix:
+  restore-normal-workflows:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'agent/weather-dev-panel-overhaul'
     runs-on: ubuntu-latest
     steps:
@@ -19,19 +19,25 @@ jobs:
           ref: agent/weather-dev-panel-overhaul
           fetch-depth: 0
 
-      - name: Apply source and regression-test patch
-        run: python3 tools/apply-diagnostics-dispatch-race-fix.py
+      - name: Restore production workflow definitions and remove helpers
+        run: |
+          git checkout 261e6f1f56898ac59a42e6e17f66d23887f25ac7 -- \
+            .github/workflows/dev-panel-check.yml \
+            .github/workflows/integration-host-check.yml
+          git rm -f \
+            .github/workflows/agent-diagnostics-dispatch-race-fix.yml \
+            tools/apply-diagnostics-dispatch-race-fix.py
 
-      - name: Verify deterministic delayed-readiness cleanup
+      - name: Verify retained source fix
         run: |
           node --check js/dev-panel-controls.js
           node --check tests/dev-panel-controls.test.js
           node tests/dev-panel-controls.test.js
 
-      - name: Commit tested fix
+      - name: Commit clean final tree
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add js/dev-panel-controls.js tests/dev-panel-controls.test.js
-          git commit -m "Fix diagnostics dispatch shutdown race"
+          git add .github/workflows/dev-panel-check.yml .github/workflows/integration-host-check.yml
+          git commit -m "Clean up diagnostics race fix tooling"
           git push origin HEAD:agent/weather-dev-panel-overhaul
