@@ -8,7 +8,7 @@
 (function (DF) {
   function categoryButtons() {
     return Object.entries(DF.model.CATEGORIES)
-      .map(([key, value]) => `<button class="filter-chip" data-category="${key}">${value.mark} ${value.label}</button>`)
+      .map(([key, value]) => `<button class="filter-chip" data-category="${key}">${value.label}</button>`)
       .join('');
   }
 
@@ -16,10 +16,9 @@
     return `<div class="dripfeed-app">
       <nav class="dripfeed-filter-rail" aria-label="Classified categories">
         <div class="filter-chips">
-          <button class="filter-chip active" data-category="all">ALL SIGNALS</button>
+          <button class="filter-chip active" data-category="all">ALL</button>
           ${categoryButtons()}
         </div>
-        <button class="button primary filter-transmit" data-action="open-submit">+ TRANSMIT</button>
       </nav>
 
       <section class="dripfeed-utility-rail">
@@ -29,8 +28,9 @@
           <span id="clock">--:--:--</span>
           <span id="api-mode">IMAGE NETWORK DEMO</span>
         </div>
-        <label class="search-box">⌕ <input id="feed-search" type="search" placeholder="Search classified transmissions…"></label>
+        <label class="search-box">⌕ <input id="feed-search" type="search" placeholder="Search listings…"></label>
         <div class="display-note"><strong id="result-count">0</strong> TRANSMISSIONS</div>
+        <button class="button primary filter-transmit" data-action="open-submit">+ TRANSMIT</button>
         <button class="button reset-local" data-action="reset">RESET LOCAL</button>
       </section>
 
