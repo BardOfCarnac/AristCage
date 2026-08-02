@@ -32,6 +32,7 @@ async function setRange(page, name, value) {
 async function diagnosticsSnapshot(page) {
   return page.evaluate(() => ({
     rootClass: document.documentElement.classList.contains("diagnostics-on"),
+    panelHidden: document.documentElement.classList.contains("diagnostics-panel-hidden"),
     preview: document.documentElement.dataset.devEnvironmentPreview || null,
     hiddenLayers: document.documentElement.dataset.debugWeatherHiddenLayers || null,
     application: window.NCNApplications?.current?.() || null,
@@ -129,7 +130,7 @@ async function verifyPanelGeometry(page, viewportName) {
   assert.ok(geometry.panel.scrollWidth <= geometry.panel.clientWidth + 2, `${viewportName}: diagnostics panel must not overflow horizontally`);
   assert.ok(
     geometry.panel.right <= geometry.toggle.left || geometry.panel.bottom <= geometry.toggle.top || geometry.panel.left >= geometry.toggle.right,
-    `${viewportName}: the diagnostics panel must not cover the Dev-off control`
+    `${viewportName}: the diagnostics panel must not cover the Dev hide/show control`
   );
   assert.ok(geometry.buttons.length > 12, `${viewportName}: mounted laboratory should expose its real controls`);
   const undersized = geometry.buttons.filter(button => button.height < 30);
@@ -188,8 +189,38 @@ async function verifyWeatherControls(page, viewportName) {
   assert.equal(report.controls.quality, "high", `${viewportName}: report should include quality override`);
 }
 
-async function verifyDisabledCleanup(page, viewportName, application, baseline) {
+async function verifyPanelHidePreservesWeather(page, viewportName) {
+  const before = await diagnosticsSnapshot(page);
   await page.locator(".diagnostics-toggle").click();
+  await page.waitForFunction(() => (
+    document.documentElement.classList.contains("diagnostics-on")
+    && document.documentElement.classList.contains("diagnostics-panel-hidden")
+    && getComputedStyle(document.querySelector(".diagnostics-panel")).display === "none"
+    && document.querySelector(".diagnostics-toggle")?.textContent === "Dev show"
+  ), null, { timeout: 10_000 });
+
+  const hidden = await diagnosticsSnapshot(page);
+  assert.equal(hidden.rootClass, true, `${viewportName}: hiding the panel must keep diagnostics active`);
+  assert.equal(hidden.panelHidden, true, `${viewportName}: the panel should enter preview-hidden state`);
+  assert.equal(hidden.panel.diagnosticsActive, true, `${viewportName}: hidden panel must not end the laboratory session`);
+  assert.equal(hidden.panel.telemetryActive, true, `${viewportName}: hidden panel must retain telemetry and service bindings`);
+  assert.equal(hidden.preview, before.preview, `${viewportName}: hiding the panel must preserve the environment preview lift`);
+  assert.equal(hidden.weather.enabled, before.weather.enabled, `${viewportName}: hiding the panel must preserve Weather enabled state`);
+  assert.equal(hidden.weather.targetPreset, before.weather.targetPreset, `${viewportName}: hiding the panel must preserve the selected Weather preset`);
+  assert.equal(hidden.weather.targetIntensity, before.weather.targetIntensity, `${viewportName}: hiding the panel must preserve Weather intensity`);
+  assert.equal(hidden.weather.qualityOverride, before.weather.qualityOverride, `${viewportName}: hiding the panel must preserve Weather quality`);
+  assert.equal(hidden.weather.seed, before.weather.seed, `${viewportName}: hiding the panel must preserve the deterministic seed`);
+
+  await page.locator(".diagnostics-toggle").click();
+  await page.waitForFunction(() => (
+    !document.documentElement.classList.contains("diagnostics-panel-hidden")
+    && getComputedStyle(document.querySelector(".diagnostics-panel")).display !== "none"
+    && document.querySelector(".diagnostics-toggle")?.textContent === "Dev hide"
+  ), null, { timeout: 10_000 });
+}
+
+async function verifyDisabledCleanup(page, viewportName, application, baseline) {
+  await page.locator("[data-debug-disable-diagnostics]").click();
   await waitForDiagnostics(page, false);
 
   await page.waitForFunction(({ expectedApplication, expectedBaseline }) => {
@@ -254,6 +285,7 @@ async function runViewport(viewportName, viewport) {
     assert.equal(dripfeedBaseline.qualityOverride, "auto", `${viewportName}/dripfeed: canonical profile should own automatic Weather quality`);
     await page.locator('[data-debug-weather="mist"]').click();
     await page.waitForFunction(() => document.documentElement.dataset.devEnvironmentPreview === "true", null, { timeout: 10_000 });
+    await verifyPanelHidePreservesWeather(page, viewportName);
     await page.locator('[data-debug-weather-layer="rear"]').click();
     await verifyDisabledCleanup(page, viewportName, "dripfeed", dripfeedBaseline);
 
@@ -300,7 +332,7 @@ async function runViewport(viewportName, viewport) {
 try {
   await runViewport("desktop", { width: 1440, height: 900 });
   await runViewport("mobile", { width: 390, height: 844 });
-  console.log("PASS: Weather laboratory interaction, complete state cleanup and RedWire/Dripfeed usability verified on desktop and mobile");
+  console.log("PASS: Weather laboratory hide/show persistence, explicit cleanup and RedWire/Dripfeed usability verified on desktop and mobile");
 } finally {
   await browser.close();
 }

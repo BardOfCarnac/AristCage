@@ -191,6 +191,9 @@ function renderCounts() {
   for (const forbidden of ['requestAnimationFrame', 'setInterval', 'Math.random', 'querySelector', 'window.NCNEffects', 'dispatchEvent']) {
     assert.equal(source.includes(forbidden), false, `forbidden token: ${forbidden}`);
   }
+  assert.equal(source.includes('bank.x = -bounds.halfWidth - bank.width'), false,
+    'mist recycling must not move every expired bank into an off-screen corner');
+  assert.ok(source.includes('recycleMistBank'), 'Weather must own an explicit mist-bank recycling path');
 
   const weather = global.NCNWeatherDepartment.createWeather(context);
   const beforeChildren = Object.values(layers).reduce((sum, layer) => sum + layer.children.length, 0);
@@ -223,6 +226,15 @@ function renderCounts() {
   });
   const renders = renderCounts();
   assert.ok(renders.radial > 0, 'approved mist banks must draw radial puffs');
+
+  runtime.step(64, 2400);
+  const sustainedMist = weather.snapshot();
+  assert.ok(sustainedMist.diagnostics.mistField.recycled > 0,
+    'a long-running mist field must recycle banks rather than rely on its initial population');
+  assert.ok(sustainedMist.diagnostics.mistField.visibleBanks >= Math.floor(sustainedMist.particles.mist * 0.70),
+    'recycled mist must keep most banks intersecting the visible chamber');
+  assert.ok(sustainedMist.diagnostics.mistField.minimumVisibleBanks >= Math.floor(sustainedMist.particles.mist * 0.55),
+    'mist coverage must not progressively drain during sustained runtime');
 
   weather.applyProfile({ enabled: true, preset: 'heavy-mist', intensity: 0.92, seed: 2045 });
   runtime.handle.enable();

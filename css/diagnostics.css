@@ -14,6 +14,10 @@ html.diagnostics-on .diagnostics-toggle {
   display: block;
 }
 
+html.diagnostics-on.diagnostics-panel-hidden .diagnostics-panel {
+  display: none;
+}
+
 .diagnostics-toggle {
   position: fixed;
   right: 8px;
@@ -47,12 +51,29 @@ html.diagnostics-on .diagnostics-toggle {
 
 .diagnostics-title {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 8px;
   color: var(--white);
   font-weight: 600;
   letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.diagnostics-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.diagnostics-title-actions button {
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 80, 50, .48);
+  background: rgba(255, 50, 25, .06);
+  color: rgba(255, 205, 150, .82);
+  font: 600 .48rem/1 var(--font-main);
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
 
@@ -191,15 +212,15 @@ html.diagnostics-on .diagnostics-toggle {
 .diagnostics-axis-label.z { right: 2px; top: 11px; color: #ff7b68; }
 
 /* Temporary layer identification. */
-html.diagnostics-on .card-field { outline: 1px dashed #ff8b3d !important; }
-html.diagnostics-on .frame { outline: 1px dashed #67f0ff !important; }
-html.diagnostics-on .priority { outline: 1px dashed #ff304f !important; }
-html.diagnostics-on .meta { outline: 1px dashed #80ff73 !important; }
-html.diagnostics-on .headline { outline: 1px dashed #5aa7ff !important; }
-html.diagnostics-on .tags { outline: 1px dashed #df71ff !important; }
-html.diagnostics-on .body { outline: 1px dashed #ffe45e !important; }
-html.diagnostics-on .rail { outline: 1px dashed #ffffff !important; }
-html.diagnostics-on .chamber { outline: 1px dashed #8a6cff !important; }
+html.diagnostics-on:not(.diagnostics-panel-hidden) .card-field { outline: 1px dashed #ff8b3d !important; }
+html.diagnostics-on:not(.diagnostics-panel-hidden) .frame { outline: 1px dashed #67f0ff !important; }
+html.diagnostics-on:not(.diagnostics-panel-hidden) .priority { outline: 1px dashed #ff304f !important; }
+html.diagnostics-on:not(.diagnostics-panel-hidden) .meta { outline: 1px dashed #80ff73 !important; }
+html.diagnostics-on:not(.diagnostics-panel-hidden) .headline { outline: 1px dashed #5aa7ff !important; }
+html.diagnostics-on:not(.diagnostics-panel-hidden) .tags { outline: 1px dashed #df71ff !important; }
+html.diagnostics-on:not(.diagnostics-panel-hidden) .body { outline: 1px dashed #ffe45e !important; }
+html.diagnostics-on:not(.diagnostics-panel-hidden) .rail { outline: 1px dashed #ffffff !important; }
+html.diagnostics-on:not(.diagnostics-panel-hidden) .chamber { outline: 1px dashed #8a6cff !important; }
 
 @media (max-width: 600px) {
   .diagnostics-panel {

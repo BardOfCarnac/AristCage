@@ -30,6 +30,7 @@ let diagnosticsCameraFocal;
 let diagnosticsCameraAperture;
 let diagnosticsOpticalLayers;
 let diagnosticsLiveListenersBound = false;
+let diagnosticsPanelHidden = false;
 let diagnosticsTransition = Promise.resolve();
 let diagnosticMarkTapCount = 0;
 let diagnosticMarkTapTimer;
@@ -114,7 +115,13 @@ function ensureDiagnosticsInterface() {
   panel.className = "diagnostics-panel";
   panel.setAttribute("aria-label", "Projection diagnostics");
   panel.innerHTML = `
-    <div class="diagnostics-title"><span>Projection Diagnostics</span><span>DEV</span></div>
+    <div class="diagnostics-title">
+      <span>Projection Diagnostics</span>
+      <span class="diagnostics-title-actions">
+        <span>DEV</span>
+        <button type="button" data-debug-disable-diagnostics>Exit &amp; restore</button>
+      </span>
+    </div>
     <section class="diagnostics-section diagnostics-application-section">
       <div class="diagnostics-heading">Terminal application · temporary launcher bypass</div>
       <div class="diagnostics-app-switch" role="group" aria-label="Terminal application">
@@ -165,12 +172,18 @@ function ensureDiagnosticsInterface() {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "diagnostics-toggle";
-  toggle.addEventListener("click", () => { void toggleDiagnostics(); });
+  toggle.addEventListener("click", () => {
+    if (document.documentElement.classList.contains("diagnostics-on")) toggleDiagnosticsPanel();
+    else void setDiagnosticsEnabled(true);
+  });
 
   panel.querySelectorAll("[data-debug-app]").forEach(button => {
     button.addEventListener("click", () => {
       void window.NCNApplications?.switchTo?.(button.dataset.debugApp);
     });
+  });
+  panel.querySelector("[data-debug-disable-diagnostics]")?.addEventListener("click", () => {
+    void setDiagnosticsEnabled(false);
   });
 
   document.body.append(panel, toggle);
@@ -185,6 +198,19 @@ function ensureDiagnosticsInterface() {
   diagnosticsCameraAperture = panel.querySelector("[data-debug-camera-aperture]");
   diagnosticsOpticalLayers = panel.querySelector("[data-debug-optical-layers]");
   updateApplicationDiagnostics();
+}
+
+function setDiagnosticsPanelHidden(hidden) {
+  const active = document.documentElement.classList.contains("diagnostics-on");
+  diagnosticsPanelHidden = active && Boolean(hidden);
+  document.documentElement.classList.toggle("diagnostics-panel-hidden", diagnosticsPanelHidden);
+  diagnosticsPanel?.setAttribute("aria-hidden", String(diagnosticsPanelHidden));
+  if (diagnosticsToggle) diagnosticsToggle.textContent = diagnosticsPanelHidden ? "Dev show" : active ? "Dev hide" : "Dev off";
+  return diagnosticsPanelHidden;
+}
+
+function toggleDiagnosticsPanel() {
+  return setDiagnosticsPanelHidden(!diagnosticsPanelHidden);
 }
 
 function findDiagnosticEntry() {
@@ -263,7 +289,7 @@ async function commitDiagnosticsEnabled(enabled) {
   if (enabled) {
     ensureDiagnosticsInterface();
     document.documentElement.classList.add("diagnostics-on");
-    diagnosticsToggle.textContent = "Dev on";
+    setDiagnosticsPanelHidden(false);
     window.localStorage.setItem(NCN_DIAGNOSTICS_KEY, "1");
     bindDiagnosticsLiveListeners();
     updateDiagnosticsLiveValues();
@@ -273,7 +299,7 @@ async function commitDiagnosticsEnabled(enabled) {
 
   await Promise.resolve(window.NCNDevPanel?.setDiagnosticsActive?.(false));
   document.documentElement.classList.remove("diagnostics-on");
-  if (diagnosticsToggle) diagnosticsToggle.textContent = "Dev off";
+  setDiagnosticsPanelHidden(false);
   window.localStorage.setItem(NCN_DIAGNOSTICS_KEY, "0");
   unbindDiagnosticsLiveListeners();
   return false;
