@@ -130,6 +130,7 @@ const effects = {
 };
 const context = {
   owner: 'weather-node-test',
+  testing: true,
   runtime,
   layers: { weather: layers },
   settings,
@@ -194,10 +195,76 @@ function renderCounts() {
   assert.equal(source.includes('bank.x = -bounds.halfWidth - bank.width'), false,
     'mist recycling must not move every expired bank into an off-screen corner');
   assert.ok(source.includes('recycleMistBank'), 'Weather must own an explicit mist-bank recycling path');
+  assert.equal(source.includes('initial = false'), false, 'mist reset must not retain an unused initial-mode parameter');
+  assert.equal(source.includes('else bank.x = clamp'), false, 'depth-only recycling must not clamp the untouched X axis');
+  assert.equal(source.includes('else bank.z = clamp'), false, 'X-only recycling must not clamp the untouched Z axis');
 
   const weather = global.NCNWeatherDepartment.createWeather(context);
   const beforeChildren = Object.values(layers).reduce((sum, layer) => sum + layer.children.length, 0);
   await weather.init();
+
+  const recycleBounds = { halfWidth: 4.2, halfHeight: 2.55, near: 2.5, far: 10.5 };
+  const recycleProbe = (previous, rerolled, crossedX, crossedZ) => weather.testMistRecycleAxes({
+    bounds: recycleBounds,
+    previous,
+    rerolled,
+    crossedX,
+    crossedZ
+  });
+
+  const positiveX = recycleProbe(
+    { x: 5.95, z: 7.15, width: 1.2, depth: 0.8 },
+    { width: 0.72, depth: 0.55 },
+    true,
+    false
+  );
+  assert.equal(positiveX.z, 7.15, 'positive X-only recycling must preserve depth exactly');
+  assert.ok(positiveX.x < 0 && positiveX.x >= -recycleBounds.halfWidth,
+    'positive X crossing must re-enter through the negative chamber side');
+
+  const negativeX = recycleProbe(
+    { x: -5.95, z: 6.35, width: 1.2, depth: 0.8 },
+    { width: 0.74, depth: 0.57 },
+    true,
+    false
+  );
+  assert.equal(negativeX.z, 6.35, 'negative X-only recycling must preserve depth exactly');
+  assert.ok(negativeX.x > 0 && negativeX.x <= recycleBounds.halfWidth,
+    'negative X crossing must re-enter through the positive chamber side');
+
+  const nearZ = recycleProbe(
+    { x: 5.55, z: 2.54, width: 1.0, depth: 0.75 },
+    { width: 0.62, depth: 0.42 },
+    false,
+    true
+  );
+  assert.equal(nearZ.x, 5.55, 'near Z-only recycling must preserve lateral position exactly');
+  assert.ok(nearZ.z < recycleBounds.far && nearZ.z > 9.5,
+    'near crossing must re-enter through the far chamber boundary');
+  assert.ok(Math.abs(nearZ.x) <= recycleBounds.halfWidth + nearZ.width * 1.4,
+    'rerolled width must be widened enough to keep the preserved X coordinate valid');
+
+  const farZ = recycleProbe(
+    { x: -5.5, z: 10.75, width: 1.0, depth: 0.8 },
+    { width: 0.64, depth: 0.46 },
+    false,
+    true
+  );
+  assert.equal(farZ.x, -5.5, 'far Z-only recycling must preserve lateral position exactly');
+  assert.ok(farZ.z > recycleBounds.near && farZ.z < 3.2,
+    'far crossing must re-enter through the near chamber boundary');
+  assert.ok(Math.abs(farZ.x) <= recycleBounds.halfWidth + farZ.width * 1.4,
+    'far-wrap reroll must retain a width compatible with the preserved X coordinate');
+
+  const simultaneous = recycleProbe(
+    { x: 6.1, z: 2.52, width: 1.1, depth: 0.72 },
+    { width: 0.7, depth: 0.5 },
+    true,
+    true
+  );
+  assert.ok(simultaneous.x < 0, 'simultaneous crossing must wrap X independently');
+  assert.ok(simultaneous.z > 9.5, 'simultaneous crossing must wrap Z independently');
+
   let snapshot = weather.snapshot();
   assert.equal(snapshot.resources.canvases, 4);
   assert.equal(snapshot.resources.visibleCanvases, 0);

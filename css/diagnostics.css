@@ -50,11 +50,18 @@ html.diagnostics-on.diagnostics-panel-hidden .diagnostics-panel {
 }
 
 .diagnostics-title {
+  position: sticky;
+  top: -10px;
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
+  margin: -10px -10px 8px;
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 70, 40, .28);
+  background: rgba(2, 2, 4, .985);
+  box-shadow: 0 8px 14px rgba(2, 2, 4, .76);
   color: var(--white);
   font-weight: 600;
   letter-spacing: .16em;

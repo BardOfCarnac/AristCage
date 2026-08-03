@@ -172,10 +172,7 @@ function ensureDiagnosticsInterface() {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "diagnostics-toggle";
-  toggle.addEventListener("click", () => {
-    if (document.documentElement.classList.contains("diagnostics-on")) toggleDiagnosticsPanel();
-    else void setDiagnosticsEnabled(true);
-  });
+  toggle.addEventListener("click", () => { void toggleDiagnostics(); });
 
   panel.querySelectorAll("[data-debug-app]").forEach(button => {
     button.addEventListener("click", () => {
@@ -311,7 +308,10 @@ function setDiagnosticsEnabled(enabled) {
 }
 
 function toggleDiagnostics() {
-  return setDiagnosticsEnabled(!document.documentElement.classList.contains("diagnostics-on"));
+  if (document.documentElement.classList.contains("diagnostics-on")) {
+    return Promise.resolve(toggleDiagnosticsPanel());
+  }
+  return setDiagnosticsEnabled(true);
 }
 
 function bindDiagnosticsActivationTriggers() {
