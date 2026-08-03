@@ -59,16 +59,17 @@
   --optical-item-scale: 0.93 !important;
 }
 
-/* The reading core stays nearly black, then dissolves to complete transparency
-   at the actual card sides. Corners fall beyond the ellipse and inherit the
-   final transparent stop, so no off-element fade or blur is involved. */
+/* The article backing is an alpha-only surface. `closest-side` makes the
+   100% stop land on the real card sides; the corners therefore finish fully
+   transparent instead of leaving the fade outside the rendered plate. */
 .optical-mode .optical-semantic-item[data-optical-role="plate"] .optical-plate-surface {
   background: radial-gradient(
-    ellipse 50% 50% at 50% 50%,
+    ellipse closest-side at 50% 50%,
     rgba(0, 0, 0, .96) 0%,
-    rgba(0, 0, 0, .96) 44%,
-    rgba(0, 0, 0, .78) 60%,
-    rgba(0, 0, 0, .32) 82%,
+    rgba(0, 0, 0, .96) 48%,
+    rgba(0, 0, 0, .78) 66%,
+    rgba(0, 0, 0, .40) 82%,
+    rgba(0, 0, 0, .10) 95%,
     rgba(0, 0, 0, 0) 100%
   );
   box-shadow: none;
