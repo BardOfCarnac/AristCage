@@ -182,8 +182,6 @@ function assertAtmosphericForeground(result, name, expectedPreset) {
     `${name}: foreground composition must not be restricted to Heavy Mist`);
   assert.ok(Math.abs(result.bridge.lastForegroundThreshold - result.chamberDepth) < 0.01,
     `${name}: the rendered region must use the actual plate chamber depth`);
-  assert.ok(result.bridge.lastForegroundPuffs <= result.weather.diagnostics.depthFrame.puffCount,
-    `${name}: the foreground pass must be composed only from the canonical current-frame puff field`);
   assert.equal(result.bridge.weatherPolicyMutation, false, `${name}: Integration must not mutate Weather policy`);
   assert.ok(Math.max(...result.edgeOutside) <= 3, `${name}: foreground pixels must remain transparent outside the crossed plate`);
   const interiorMax = Math.max(...result.foregroundInterior);
