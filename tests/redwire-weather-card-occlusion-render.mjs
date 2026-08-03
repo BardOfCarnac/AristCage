@@ -4,6 +4,7 @@ import { chromium } from "playwright";
 
 const baseUrl = process.env.NCN_TEST_URL || "http://127.0.0.1:4173/";
 const artifactRoot = "artifacts/redwire-weather-card-occlusion";
+const SMOKE_FRONT_WIND = Object.freeze({ x: 0, y: 0, z: -0.72 });
 const browser = await chromium.launch({ headless: true });
 fs.mkdirSync(artifactRoot, { recursive: true });
 
@@ -263,10 +264,19 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
       `${name}: ordinary mist must retain the accepted baseline flow`);
     await page.screenshot({ path: `${artifactRoot}/${name}-mist.png`, fullPage: true });
 
-    await applyWeather(page, "smoke", 1, "smoke-article-obscuration-proof");
+    await applyWeather(page, "smoke", 1, "smoke-article-obscuration-proof", SMOKE_FRONT_WIND);
+    await page.waitForFunction(expectedZ => {
+      const weather = window.NCNIntegration.getService("weather")?.snapshot?.();
+      return weather?.wind?.z === expectedZ
+        && weather?.diagnostics?.effectiveDepthFlow?.mist < -0.8;
+    }, SMOKE_FRONT_WIND.z, { timeout: 15_000 });
     await waitForVisiblePlateCrossing(page);
     const smoke = await visualSnapshot(page);
     assertAtmosphericForeground(smoke, `${name} smoke`, "smoke");
+    assert.equal(smoke.weather.wind.z, SMOKE_FRONT_WIND.z,
+      `${name}: the bad-terminal smoke proof must retain its declared forward draft`);
+    assert.ok(smoke.weather.diagnostics.effectiveDepthFlow.mist < -0.8,
+      `${name}: the smoke bank must be driven through the article plane`);
     await page.screenshot({ path: `${artifactRoot}/${name}-smoke.png`, fullPage: true });
 
     await page.evaluate(async () => {
@@ -298,7 +308,7 @@ async function runViewport(name, viewport, reducedMotion = "no-preference") {
       window.NCNApplications.current() === "redwire"
       && window.NCNRedWireWeatherCardOcclusion?.snapshot?.().active === true
     ), null, { timeout: 15_000 });
-    await applyWeather(page, "smoke", 1, "foreground-return-proof");
+    await applyWeather(page, "smoke", 1, "foreground-return-proof", SMOKE_FRONT_WIND);
     await page.waitForFunction(previousGeneration => (
       window.NCNRedWireWeatherCardOcclusion?.snapshot?.().foregroundGeneration > previousGeneration
     ), firstGeneration, { timeout: 15_000 });
