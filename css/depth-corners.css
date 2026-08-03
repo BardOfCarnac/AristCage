@@ -83,6 +83,6 @@
   border-color: currentColor;
 }
 
-html.diagnostics-on .corners {
+html.diagnostics-on:not(.diagnostics-panel-hidden) .corners {
   outline: 1px dashed #ff9b4a !important;
 }

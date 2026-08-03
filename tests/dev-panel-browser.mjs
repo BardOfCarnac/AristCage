@@ -32,6 +32,7 @@ async function setRange(page, name, value) {
 async function diagnosticsSnapshot(page) {
   return page.evaluate(() => ({
     rootClass: document.documentElement.classList.contains("diagnostics-on"),
+    panelHidden: document.documentElement.classList.contains("diagnostics-panel-hidden"),
     preview: document.documentElement.dataset.devEnvironmentPreview || null,
     hiddenLayers: document.documentElement.dataset.debugWeatherHiddenLayers || null,
     application: window.NCNApplications?.current?.() || null,
@@ -129,7 +130,7 @@ async function verifyPanelGeometry(page, viewportName) {
   assert.ok(geometry.panel.scrollWidth <= geometry.panel.clientWidth + 2, `${viewportName}: diagnostics panel must not overflow horizontally`);
   assert.ok(
     geometry.panel.right <= geometry.toggle.left || geometry.panel.bottom <= geometry.toggle.top || geometry.panel.left >= geometry.toggle.right,
-    `${viewportName}: the diagnostics panel must not cover the Dev-off control`
+    `${viewportName}: the diagnostics panel must not cover the Dev hide/show control`
   );
   assert.ok(geometry.buttons.length > 12, `${viewportName}: mounted laboratory should expose its real controls`);
   const undersized = geometry.buttons.filter(button => button.height < 30);
@@ -188,8 +189,74 @@ async function verifyWeatherControls(page, viewportName) {
   assert.equal(report.controls.quality, "high", `${viewportName}: report should include quality override`);
 }
 
+function assertWeatherPreviewPreserved(actual, expected, label) {
+  assert.equal(actual.preview, expected.preview, `${label}: environment preview lift must survive`);
+  assert.equal(actual.weather.enabled, expected.weather.enabled, `${label}: Weather enabled state must survive`);
+  assert.equal(actual.weather.targetPreset, expected.weather.targetPreset, `${label}: Weather preset must survive`);
+  assert.equal(actual.weather.targetIntensity, expected.weather.targetIntensity, `${label}: Weather intensity must survive`);
+  assert.equal(actual.weather.qualityOverride, expected.weather.qualityOverride, `${label}: Weather quality must survive`);
+  assert.equal(actual.weather.seed, expected.weather.seed, `${label}: Weather seed must survive`);
+}
+
+async function waitForPanelPresentation(page, hidden) {
+  await page.waitForFunction(expectedHidden => {
+    const root = document.documentElement;
+    const panel = document.querySelector(".diagnostics-panel");
+    const toggle = document.querySelector(".diagnostics-toggle");
+    return root.classList.contains("diagnostics-on")
+      && root.classList.contains("diagnostics-panel-hidden") === expectedHidden
+      && (getComputedStyle(panel).display === "none") === expectedHidden
+      && toggle?.textContent === (expectedHidden ? "Dev show" : "Dev hide");
+  }, hidden, { timeout: 10_000 });
+}
+
+async function verifyPresentationRoute(page, viewportName, routeName, trigger) {
+  const before = await diagnosticsSnapshot(page);
+  await trigger();
+  await waitForPanelPresentation(page, true);
+
+  const hidden = await diagnosticsSnapshot(page);
+  assert.equal(hidden.rootClass, true, `${viewportName}/${routeName}: presentation toggle must keep diagnostics active`);
+  assert.equal(hidden.panelHidden, true, `${viewportName}/${routeName}: panel should hide without exiting`);
+  assert.equal(hidden.panel.diagnosticsActive, true, `${viewportName}/${routeName}: laboratory session must remain active`);
+  assert.equal(hidden.panel.telemetryActive, true, `${viewportName}/${routeName}: telemetry must remain active`);
+  assertWeatherPreviewPreserved(hidden, before, `${viewportName}/${routeName}/hidden`);
+
+  await trigger();
+  await waitForPanelPresentation(page, false);
+  const shown = await diagnosticsSnapshot(page);
+  assert.equal(shown.panelHidden, false, `${viewportName}/${routeName}: second gesture must reveal the panel`);
+  assertWeatherPreviewPreserved(shown, before, `${viewportName}/${routeName}/shown`);
+}
+
+async function tripleTapRailMark(page) {
+  const mark = page.locator(".rail-mark");
+  for (let index = 0; index < 3; index += 1) await mark.click();
+}
+
+async function verifyPanelHidePreservesWeather(page, viewportName) {
+  await verifyPresentationRoute(page, viewportName, "floating-control", () => page.locator(".diagnostics-toggle").click());
+}
+
+async function verifyKeyboardAndMarkPreserveWeather(page, viewportName) {
+  await verifyPresentationRoute(page, viewportName, "keyboard", () => page.keyboard.press("Control+Shift+D"));
+  await verifyPresentationRoute(page, viewportName, "triple-mark", () => tripleTapRailMark(page));
+}
+
 async function verifyDisabledCleanup(page, viewportName, application, baseline) {
-  await page.locator(".diagnostics-toggle").click();
+  await page.locator(".diagnostics-panel").evaluate(panel => { panel.scrollTop = panel.scrollHeight; });
+  await page.waitForFunction(() => {
+    const panel = document.querySelector(".diagnostics-panel");
+    const title = document.querySelector(".diagnostics-title");
+    const exit = document.querySelector("[data-debug-disable-diagnostics]");
+    const panelRect = panel.getBoundingClientRect();
+    const exitRect = exit.getBoundingClientRect();
+    return getComputedStyle(title).position === "sticky"
+      && exit.getClientRects().length > 0
+      && exitRect.top >= panelRect.top - 1
+      && exitRect.bottom <= panelRect.bottom + 1;
+  }, null, { timeout: 10_000 });
+  await page.locator("[data-debug-disable-diagnostics]").click();
   await waitForDiagnostics(page, false);
 
   await page.waitForFunction(({ expectedApplication, expectedBaseline }) => {
@@ -248,12 +315,14 @@ async function runViewport(viewportName, viewport) {
     await page.locator(".diagnostics-panel").evaluate(panel => { panel.scrollTop = 0; });
 
     await verifyWeatherControls(page, viewportName);
+    await verifyKeyboardAndMarkPreserveWeather(page, viewportName);
     await switchApplication(page, "dripfeed");
     await page.waitForSelector("#dripfeed-root .listing-tile", { state: "visible", timeout: 15_000 });
     const dripfeedBaseline = await weatherBaseline(page);
     assert.equal(dripfeedBaseline.qualityOverride, "auto", `${viewportName}/dripfeed: canonical profile should own automatic Weather quality`);
     await page.locator('[data-debug-weather="mist"]').click();
     await page.waitForFunction(() => document.documentElement.dataset.devEnvironmentPreview === "true", null, { timeout: 10_000 });
+    await verifyPanelHidePreservesWeather(page, viewportName);
     await page.locator('[data-debug-weather-layer="rear"]').click();
     await verifyDisabledCleanup(page, viewportName, "dripfeed", dripfeedBaseline);
 
@@ -300,7 +369,7 @@ async function runViewport(viewportName, viewport) {
 try {
   await runViewport("desktop", { width: 1440, height: 900 });
   await runViewport("mobile", { width: 390, height: 844 });
-  console.log("PASS: Weather laboratory interaction, complete state cleanup and RedWire/Dripfeed usability verified on desktop and mobile");
+  console.log("PASS: All diagnostics presentation routes preserve Weather, sticky explicit cleanup works, and RedWire/Dripfeed remain usable on desktop and mobile");
 } finally {
   await browser.close();
 }

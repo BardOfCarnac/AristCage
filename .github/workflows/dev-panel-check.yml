@@ -8,8 +8,10 @@ on:
       - "js/dev-panel-controls.js"
       - "js/integration-service-gate.js"
       - "css/dev-panel-controls.css"
+      - "css/depth-corners.css"
       - "tests/dev-panel-controls.test.js"
       - "tests/dev-panel-browser.mjs"
+      - "tests/dev-panel-corner-outline-browser.mjs"
       - "tests/integration-service-gate.test.js"
       - ".github/workflows/dev-panel-check.yml"
   workflow_dispatch:
@@ -30,6 +32,7 @@ jobs:
           node --check js/integration-service-gate.js
           node --check tests/dev-panel-controls.test.js
           node --check tests/dev-panel-browser.mjs
+          node --check tests/dev-panel-corner-outline-browser.mjs
           node --check tests/integration-service-gate.test.js
 
       - name: Run service capability gate harness
@@ -47,6 +50,7 @@ jobs:
           const script = fs.readFileSync('js/dev-panel-controls.js', 'utf8');
           const gate = fs.readFileSync('js/integration-service-gate.js', 'utf8');
           const css = fs.readFileSync('css/dev-panel-controls.css', 'utf8');
+          const cornersCss = fs.readFileSync('css/depth-corners.css', 'utf8');
 
           for (const source of [
             'css/dev-panel-controls.css',
@@ -113,6 +117,9 @@ jobs:
           if (!css.includes('data-dev-environment-preview')) {
             throw new Error('Developer Weather and movement previews are not lifted above Dripfeed.');
           }
+          if (!cornersCss.includes('html.diagnostics-on:not(.diagnostics-panel-hidden) .corners')) {
+            throw new Error('Corner diagnostics must disappear whenever the diagnostics panel presentation is hidden.');
+          }
           console.log('Shared developer panel controls are lifecycle-gated and wired correctly.');
           NODE
 
@@ -147,6 +154,7 @@ jobs:
             sleep 1
           done
           node tests/dev-panel-browser.mjs 2>&1 | tee artifacts/dev-panel-browser/test-output.log
+          node tests/dev-panel-corner-outline-browser.mjs 2>&1 | tee -a artifacts/dev-panel-browser/test-output.log
 
       - name: Print browser diagnostics
         if: always()
