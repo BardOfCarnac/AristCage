@@ -1,9 +1,13 @@
 /*==================================================
   REDWIRE WEATHER CARD OCCLUSION
 
-  Integration-owned completed-frame compositor. Rear Weather is removed beneath
-  rendered Optical plates. During heavy mist, only the leading edge of genuinely
-  near Weather puffs is replayed above those plates.
+  Integration-owned completed-frame compositor. Weather behind Optical plates
+  is removed from the department canvases, then the exact current-frame puffs
+  nearer than each plate's real chamber depth are replayed above the article.
+
+  This intentionally permits mist and smoke to obstruct RedWire articles. Poor
+  terminal visibility is presentation, not a UI error; permanent shell controls
+  remain outside the article-region compositor.
 ==================================================*/
 (() => {
   "use strict";
@@ -14,9 +18,7 @@
   ].join(" ");
   const WEATHER_CANVAS_SELECTOR = "canvas.ncn-department-weather-canvas";
   const FOREGROUND_CLASS = "ncn-redwire-weather-foreground";
-  const HEAVY_MIST_PRESET = "heavy-mist";
-  const HEAVY_FRONT_DEPTH = 5.45;
-  const LEADING_DEPTH_WINDOW = 0.18;
+  const DEFAULT_PLATE_DEPTH = 5.45;
   const FOREGROUND_Z_INDEX = 24;
   const EDGE_FEATHER = 6;
 
@@ -34,7 +36,8 @@
   let lastCanvasCount = 0;
   let lastForegroundPuffs = 0;
   let lastForegroundRegions = 0;
-  let lastForegroundThreshold = HEAVY_FRONT_DEPTH;
+  let lastForegroundThreshold = DEFAULT_PLATE_DEPTH;
+  let lastForegroundDepthRange = null;
   let foregroundGeneration = 0;
 
   function activeApplication() {
@@ -48,35 +51,45 @@
     catch (error) { console.error(error); return null; }
   }
 
-  function isHeavyMist(snapshot = weatherSnapshot()) {
-    if (!snapshot?.enabled) return false;
-    const selectedPreset = snapshot.targetPreset || snapshot.preset;
-    return selectedPreset === HEAVY_MIST_PRESET;
+  function visibleRect(node) {
+    if (!node) return null;
+    const style = getComputedStyle(node);
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return null;
+    const rect = node.getBoundingClientRect?.();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    return Object.freeze({
+      left: rect.left,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height
+    });
   }
 
-  function visiblePlateRects() {
+  function plateDepth(surface) {
+    const plane = surface.closest?.(".optical-plane")
+      || surface.closest?.("[data-chamber-depth]")
+      || null;
+    const depth = Number(plane?.dataset?.chamberDepth);
+    return Number.isFinite(depth) ? depth : DEFAULT_PLATE_DEPTH;
+  }
+
+  function visiblePlates() {
     if (activeApplication() !== "redwire") return [];
 
     return [...document.querySelectorAll(PLATE_SELECTOR)]
-      .filter(surface => {
-        const item = surface.closest?.(".optical-semantic-item");
-        if (item?.classList?.contains("optical-absent")) return false;
-        const style = getComputedStyle(surface);
-        if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
-        const rect = surface.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      })
       .map(surface => {
-        const rect = surface.getBoundingClientRect();
+        const item = surface.closest?.(".optical-semantic-item");
+        if (item?.classList?.contains("optical-absent")) return null;
+        const rect = visibleRect(surface);
+        if (!rect) return null;
         return Object.freeze({
-          left: rect.left,
-          top: rect.top,
-          right: rect.right,
-          bottom: rect.bottom,
-          width: rect.width,
-          height: rect.height
+          ...rect,
+          chamberZ: plateDepth(surface)
         });
       })
+      .filter(Boolean)
       .sort((a, b) => a.top - b.top || a.left - b.left);
   }
 
@@ -85,7 +98,14 @@
       .filter(canvas => !canvas.hidden && getComputedStyle(canvas).visibility !== "hidden");
   }
 
-  function eraseWeatherUnderPlates(plates = visiblePlateRects(), canvases = visibleWeatherCanvases()) {
+  function plateRect(plate) {
+    if (!plate) return null;
+    const rect = plate.rect || plate;
+    if (![rect.left, rect.top, rect.right, rect.bottom].every(Number.isFinite)) return null;
+    return rect;
+  }
+
+  function eraseWeatherUnderPlates(plates = visiblePlates(), canvases = visibleWeatherCanvases()) {
     lastPlateCount = plates.length;
     lastCanvasCount = canvases.length;
     if (!plates.length || !canvases.length) return 0;
@@ -100,7 +120,9 @@
       context.globalCompositeOperation = "destination-out";
       context.fillStyle = "rgba(0,0,0,1)";
 
-      plates.forEach(rect => {
+      plates.forEach(plate => {
+        const rect = plateRect(plate);
+        if (!rect) return;
         const left = Math.max(rect.left, canvasRect.left);
         const top = Math.max(rect.top, canvasRect.top);
         const right = Math.min(rect.right, canvasRect.right);
@@ -188,24 +210,33 @@
     if (foregroundCanvas && hide) foregroundCanvas.hidden = true;
     lastForegroundPuffs = 0;
     lastForegroundRegions = 0;
+    lastForegroundDepthRange = null;
   }
 
-  function leadingForegroundThreshold(depthFrame) {
-    const nearest = Number(depthFrame?.depthRange?.nearest);
-    if (!Number.isFinite(nearest)) return HEAVY_FRONT_DEPTH;
-    return Math.min(HEAVY_FRONT_DEPTH, nearest + LEADING_DEPTH_WINDOW);
-  }
+  function foregroundRegions(plates) {
+    const regions = plates.map(plate => {
+      const rect = plateRect(plate);
+      const nearerThan = Number(plate?.chamberZ);
+      return Object.freeze({
+        nearerThan: Number.isFinite(nearerThan) ? nearerThan : DEFAULT_PLATE_DEPTH,
+        polygons: Object.freeze([Object.freeze([
+          Object.freeze({ x: rect.left, y: rect.top }),
+          Object.freeze({ x: rect.right, y: rect.top }),
+          Object.freeze({ x: rect.right, y: rect.bottom }),
+          Object.freeze({ x: rect.left, y: rect.bottom })
+        ])])
+      });
+    });
 
-  function foregroundRegions(plates, nearerThan = HEAVY_FRONT_DEPTH) {
-    return plates.map(rect => Object.freeze({
-      nearerThan,
-      polygons: Object.freeze([Object.freeze([
-        Object.freeze({ x: rect.left, y: rect.top }),
-        Object.freeze({ x: rect.right, y: rect.top }),
-        Object.freeze({ x: rect.right, y: rect.bottom }),
-        Object.freeze({ x: rect.left, y: rect.bottom })
-      ])])
-    }));
+    const depths = regions.map(region => region.nearerThan);
+    if (depths.length) {
+      lastForegroundThreshold = Math.max(...depths);
+      lastForegroundDepthRange = Object.freeze({
+        nearestSurface: Math.min(...depths),
+        farthestSurface: Math.max(...depths)
+      });
+    }
+    return regions;
   }
 
   function drawFeatherMask(plates, viewport) {
@@ -214,7 +245,9 @@
     maskContext.save?.();
     maskContext.filter = `blur(${EDGE_FEATHER}px)`;
     maskContext.fillStyle = "rgba(255,255,255,1)";
-    plates.forEach(rect => {
+    plates.forEach(plate => {
+      const rect = plateRect(plate);
+      if (!rect) return;
       const inset = EDGE_FEATHER * 0.65;
       const left = rect.left + inset;
       const top = rect.top + inset;
@@ -242,19 +275,18 @@
     return true;
   }
 
-  function renderHeavyMistForeground(payload, plates, snapshot) {
+  function renderWeatherForeground(payload, plates, snapshot) {
     const depthFrame = payload?.depthFrame
       || weatherService?.getDepthFrame?.(payload?.token ?? payload?.runtimeToken)
       || null;
-    if (!plates.length || !isHeavyMist(snapshot) || typeof depthFrame?.renderForeground !== "function") {
+    if (!plates.length || !snapshot?.enabled || typeof depthFrame?.renderForeground !== "function") {
       clearForeground();
       return 0;
     }
 
     const viewport = foregroundViewport();
     if (!viewport || !foregroundContext) return 0;
-    const threshold = leadingForegroundThreshold(depthFrame);
-    const regions = foregroundRegions(plates, threshold);
+    const regions = foregroundRegions(plates);
     foregroundContext.clearRect?.(0, 0, viewport.width, viewport.height);
     let rendered = 0;
     try {
@@ -264,13 +296,12 @@
         includeAttenuation: false
       })) || 0;
     } catch (error) {
-      console.error("[NCN Integration] Heavy-mist foreground render failed", error);
+      console.error("[NCN Integration] Weather foreground render failed", error);
       clearForeground();
       return 0;
     }
 
     if (rendered > 0) applyFeatherMask(plates, viewport);
-    lastForegroundThreshold = threshold;
     lastForegroundPuffs = rendered;
     lastForegroundRegions = regions.length;
     foregroundCanvas.hidden = rendered <= 0;
@@ -284,11 +315,11 @@
       return 0;
     }
 
-    const plates = visiblePlateRects();
+    const plates = visiblePlates();
     const canvases = visibleWeatherCanvases();
     const snapshot = weatherSnapshot();
     const erased = eraseWeatherUnderPlates(plates, canvases);
-    const foreground = renderHeavyMistForeground(payload, plates, snapshot);
+    const foreground = renderWeatherForeground(payload, plates, snapshot);
     renderedFrames += 1;
     return erased + foreground;
   }
@@ -355,7 +386,10 @@
       lastForegroundPuffs,
       lastForegroundRegions,
       lastForegroundThreshold,
-      foregroundDepth: HEAVY_FRONT_DEPTH,
+      lastForegroundDepthRange,
+      foregroundDepth: DEFAULT_PLATE_DEPTH,
+      foregroundDepthMode: "optical-plate",
+      foregroundPresetPolicy: "all-enabled-atmosphere",
       foregroundZIndex: FOREGROUND_Z_INDEX,
       foregroundGeneration,
       foregroundConnected: Boolean(foregroundCanvas?.isConnected),
