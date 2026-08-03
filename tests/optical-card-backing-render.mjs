@@ -96,7 +96,7 @@ function decodePng(buffer) {
 }
 
 function sampleCard(image, rect) {
-  const inset = 2;
+  const inset = 1;
   const left = rect.x;
   const top = rect.y;
   const right = left + rect.width - 1;
