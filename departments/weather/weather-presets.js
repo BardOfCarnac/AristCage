@@ -56,7 +56,10 @@ window.NCNWeatherPresets = (() => {
       moisture: 0.28,
       turbulence: 0.34,
       drift: 0.12,
-      depthFlow: -0.060
+      depthFlow: -0.060,
+      verticalFill: 0.68,
+      bankScale: 1.22,
+      bankMultiplier: 1.35
     }),
     "light-rain": preset({
       mist: 0.18,
