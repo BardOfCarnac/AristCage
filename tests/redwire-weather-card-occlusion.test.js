@@ -8,10 +8,12 @@ const source = fs.readFileSync(path.resolve(__dirname, "..", "js", "redwire-weat
 assert.equal(source.includes("requestAnimationFrame"), false, "Card composition must not create a private frame loop.");
 assert.equal(source.includes("setInterval"), false, "Card composition must not create an interval.");
 assert.equal(source.includes("setWind"), false, "Integration must not own Weather wind policy.");
+assert.equal(source.includes("HEAVY_MIST_PRESET"), false, "Foreground composition must not be restricted to Heavy Mist.");
 assert.ok(source.includes("subscribeAfterRender"), "The bridge must consume Weather's completed frame publication.");
-assert.ok(source.includes("renderForeground"), "Heavy mist must use Weather's exact-depth foreground renderer.");
+assert.ok(source.includes("renderForeground"), "Atmospheric Weather must use Weather's exact-depth foreground renderer.");
 assert.ok(source.includes("destination-out"), "Rear Weather must be subtracted beneath Optical plates.");
 assert.ok(source.includes("destination-in"), "The foreground pass must be softly constrained to plate regions.");
+assert.ok(source.includes("optical-plate"), "The foreground threshold must come from the real Optical plate depth.");
 
 const listeners = new Map();
 const subscriptions = [];
@@ -21,14 +23,19 @@ const maskCalls = [];
 const foregroundOptions = [];
 const createdCanvases = [];
 let application = "redwire";
-let preset = "heavy-mist";
+let preset = "mist";
+let weatherEnabled = true;
 
 const plateRect = Object.freeze({ left: 24, top: 110, right: 364, bottom: 290, width: 340, height: 180 });
 const canvasRect = Object.freeze({ left: 0, top: 0, right: 390, bottom: 844, width: 390, height: 844 });
-
+const plane = { dataset: { chamberDepth: "5.50" } };
 const plateItem = { classList: { contains: () => false } };
 const plate = {
-  closest: () => plateItem,
+  closest(selector) {
+    if (selector === ".optical-semantic-item") return plateItem;
+    if (selector === ".optical-plane" || selector === "[data-chamber-depth]") return plane;
+    return null;
+  },
   getBoundingClientRect: () => plateRect,
   styleState: { display: "block", visibility: "visible", opacity: "1" }
 };
@@ -89,7 +96,7 @@ function makeCanvas() {
 
 const depthFrame = {
   renderForeground(context, options) {
-    foregroundOptions.push(options);
+    foregroundOptions.push({ preset, options });
     context.fillRect(plateRect.left, plateRect.top, 40, 30);
     return 2;
   }
@@ -98,7 +105,7 @@ const depthFrame = {
 const weather = {
   snapshot() {
     return {
-      enabled: true,
+      enabled: weatherEnabled,
       preset,
       targetPreset: preset,
       wind: { x: 0, y: 0, z: 0 }
@@ -172,11 +179,12 @@ vm.runInContext(source, context, { filename: "redwire-weather-card-occlusion.js"
     height: 180
   }, "Rear Weather must be removed from the exact visible plate rectangle.");
 
-  assert.equal(foregroundOptions.length, 1, "Heavy mist must execute one exact-depth foreground pass.");
-  assert.equal(foregroundOptions[0].regions.length, 1);
-  assert.equal(foregroundOptions[0].regions[0].nearerThan, 5.45);
+  assert.equal(foregroundOptions.length, 1, "Ordinary mist must execute an exact-depth foreground pass.");
+  assert.equal(foregroundOptions[0].preset, "mist");
+  assert.equal(foregroundOptions[0].options.regions.length, 1);
+  assert.equal(foregroundOptions[0].options.regions[0].nearerThan, 5.5);
   assert.deepEqual(
-    JSON.parse(JSON.stringify(foregroundOptions[0].regions[0].polygons[0])),
+    JSON.parse(JSON.stringify(foregroundOptions[0].options.regions[0].polygons[0])),
     [
       { x: 24, y: 110 },
       { x: 364, y: 110 },
@@ -185,7 +193,7 @@ vm.runInContext(source, context, { filename: "redwire-weather-card-occlusion.js"
     ],
     "The foreground renderer must receive the real plate polygon."
   );
-  assert.equal(foregroundOptions[0].includeAttenuation, false);
+  assert.equal(foregroundOptions[0].options.includeAttenuation, false);
 
   const foregroundCanvas = createdCanvases[0];
   assert.ok(Number(foregroundCanvas.style.zIndex) > 20, "The direct-body foreground layer must sit above the Optical viewer.");
@@ -193,13 +201,19 @@ vm.runInContext(source, context, { filename: "redwire-weather-card-occlusion.js"
   assert.equal(foregroundCanvas.hidden, false);
   assert.ok(
     foregroundCalls.some(call => call.type === "drawImage" && call.operation === "destination-in"),
-    "The replayed mist must receive the feathered exact-region mask."
+    "The replayed atmosphere must receive the feathered exact-region mask."
   );
 
-  preset = "mist";
+  preset = "smoke";
   subscriptions[0].listener({ type: "render", depthFrame });
-  assert.equal(foregroundOptions.length, 1, "Ordinary mist must not receive the foreground pass.");
-  assert.equal(foregroundCanvas.hidden, true, "Ordinary mist must clear and hide the foreground layer.");
+  assert.equal(foregroundOptions.length, 2, "Smoke must use the same exact-depth foreground pass.");
+  assert.equal(foregroundOptions[1].preset, "smoke");
+  assert.equal(foregroundCanvas.hidden, false);
+
+  weatherEnabled = false;
+  subscriptions[0].listener({ type: "render", depthFrame });
+  assert.equal(foregroundOptions.length, 2, "Disabled Weather must not render a foreground pass.");
+  assert.equal(foregroundCanvas.hidden, true, "Disabled Weather must clear and hide the foreground layer.");
 
   const firstGeneration = window.NCNRedWireWeatherCardOcclusion.snapshot().foregroundGeneration;
   application = "dripfeed";
@@ -209,7 +223,8 @@ vm.runInContext(source, context, { filename: "redwire-weather-card-occlusion.js"
   assert.equal(window.NCNRedWireWeatherCardOcclusion.snapshot().weatherPolicyMutation, false);
 
   application = "redwire";
-  preset = "heavy-mist";
+  preset = "mist";
+  weatherEnabled = true;
   listeners.get("ncn:application-environment-phase")?.({ detail: { phase: "active", next: "redwire" } });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(subscriptions.length, 2, "Returning to RedWire must create a fresh subscription.");
@@ -217,9 +232,13 @@ vm.runInContext(source, context, { filename: "redwire-weather-card-occlusion.js"
   const renewed = window.NCNRedWireWeatherCardOcclusion.snapshot();
   assert.ok(renewed.foregroundGeneration > firstGeneration, "Returning to RedWire must create a fresh foreground compositor.");
   assert.equal(renewed.lastForegroundPuffs, 2);
+  assert.equal(renewed.lastForegroundRegions, 1);
+  assert.equal(renewed.lastForegroundThreshold, 5.5);
+  assert.equal(renewed.foregroundDepthMode, "optical-plate");
+  assert.equal(renewed.foregroundPresetPolicy, "all-enabled-atmosphere");
   assert.equal(renewed.active, true);
 
-  console.log("RedWire rear Weather occlusion and exact-depth heavy-mist foreground composition satisfy lifecycle and layering contracts.");
+  console.log("RedWire rear Weather occlusion and exact-depth atmospheric foreground composition satisfy lifecycle and layering contracts.");
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
