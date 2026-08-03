@@ -160,10 +160,12 @@ try {
     </html>`);
 
   const rectangles = {
-    compact: await page.locator("#compact").boundingBox(),
-    expanded: await page.locator("#expanded").boundingBox()
+    compact: await page.locator("#compact .optical-plate-surface").boundingBox(),
+    expanded: await page.locator("#expanded .optical-plate-surface").boundingBox()
   };
   assert.ok(rectangles.compact && rectangles.expanded, "Both mounted card backings must render.");
+  assert.ok(rectangles.compact.width < 360 && rectangles.expanded.width < 520,
+    "Proof must sample the transformed Optical plate rather than the unscaled host card.");
 
   const screenshotPath = path.join(artifactRoot, "mounted-perimeter.png");
   const screenshot = await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -179,7 +181,7 @@ try {
     path.join(artifactRoot, "mounted-perimeter.json"),
     JSON.stringify({ backdrop, rectangles, samples }, null, 2)
   );
-  console.log("Mounted compact and expanded Optical backings retain black centres and reveal the backdrop at every side and corner.");
+  console.log("Mounted compact and expanded Optical backings retain black centres and reveal the backdrop at every real plate side and corner.");
 } finally {
   await browser.close();
 }
