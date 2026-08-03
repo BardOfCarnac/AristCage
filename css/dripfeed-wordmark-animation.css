@@ -2,13 +2,15 @@
   DRIPFEED ANIMATED HEADER WORDMARK
 ==================================================*/
 
+html[data-ncn-app="dripfeed"] .rail {
+  padding: 5px clamp(10px, 2vw, 18px) 6px;
+}
+
 html[data-ncn-app="dripfeed"] .rail-title {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas:
-    "word"
-    "tag";
-  align-items: start;
-  gap: 2px;
+  grid-template-columns: minmax(0, auto) minmax(8rem, 1fr);
+  grid-template-areas: "word tag";
+  align-items: center;
+  gap: clamp(8px, 2vw, 18px);
 }
 
 html[data-ncn-app="dripfeed"] .rail-title strong {
@@ -19,13 +21,15 @@ html[data-ncn-app="dripfeed"] .rail-title strong {
 html[data-ncn-app="dripfeed"] .rail-title > span {
   grid-area: tag;
   display: block !important;
+  align-self: center;
   max-width: none;
   margin: 0;
   color: rgba(244, 234, 226, .66);
-  font-size: clamp(.56rem, 1.45vw, .76rem);
-  line-height: 1.2;
+  font-size: clamp(.48rem, 1vw, .62rem);
+  line-height: 1.15;
   letter-spacing: .18em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 html[data-ncn-app="dripfeed"] .rail-title::after {
@@ -34,12 +38,12 @@ html[data-ncn-app="dripfeed"] .rail-title::after {
 
 html[data-ncn-app="dripfeed"] .dripfeed-wordmark-host {
   display: block;
-  width: min(100%, clamp(24rem, 54vw, 48rem));
+  width: min(48vw, clamp(12rem, 27vw, 24rem));
   max-width: 100%;
-  min-height: clamp(3.5rem, 8vw, 6.7rem);
+  min-height: clamp(1.75rem, 4vw, 3.35rem);
   color: #f4eee8;
   font-family: "Saira", "Arial Black", system-ui, sans-serif;
-  font-size: clamp(2.2rem, 6.4vw, 4.45rem);
+  font-size: clamp(1.1rem, 3.2vw, 2.25rem);
   font-weight: 900;
   line-height: 1;
 }
@@ -57,22 +61,33 @@ html[data-ncn-app="dripfeed"] .dripfeed-wordmark-svg {
 }
 
 @media (max-width: 740px), (hover: none) and (pointer: coarse) {
+  html[data-ncn-app="dripfeed"] .rail {
+    padding: 5px 9px 6px;
+  }
+
   html[data-ncn-app="dripfeed"] .rail-title {
-    gap: 1px;
+    grid-template-columns: minmax(0, auto) minmax(7rem, 1fr);
+    grid-template-areas: "word tag";
+    gap: 8px;
   }
 
   html[data-ncn-app="dripfeed"] .dripfeed-wordmark-host {
-    width: min(100%, 31rem);
-    min-height: clamp(3.25rem, 13vw, 5.8rem);
+    width: min(48vw, 15.5rem);
+    min-height: clamp(1.65rem, 6.5vw, 2.9rem);
   }
 
   html[data-ncn-app="dripfeed"] .rail-title > span {
-    font-size: clamp(.54rem, 2.35vw, .7rem);
+    font-size: clamp(.46rem, 1.8vw, .58rem);
+    letter-spacing: .14em;
   }
 }
 
 @media (max-width: 390px) {
   html[data-ncn-app="dripfeed"] .dripfeed-wordmark-host {
-    width: 100%;
+    width: min(47vw, 11.5rem);
+  }
+
+  html[data-ncn-app="dripfeed"] .rail-title > span {
+    white-space: normal;
   }
 }
