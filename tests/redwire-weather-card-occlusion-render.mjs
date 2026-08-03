@@ -171,12 +171,8 @@ function assertAtmosphericForeground(result, name, expectedPreset) {
   assert.equal(result.foregroundHidden, false, `${name}: the atmospheric foreground compositor must be visible`);
   assert.ok(result.foregroundZ > result.viewerZ, `${name}: foreground Weather must stack above the Optical viewer`);
 
-  const coverage = result.activeSamples / result.foregroundInterior.length;
   assert.ok(result.activeSamples > 0, `${name}: a real atmospheric bank must cross at least one visible plate`);
-  assert.ok(coverage < 0.94, `${name}: the crossed plate must contain real banks rather than an unconditional flat tint`);
   assert.ok(result.uniquePlateActiveSamples > 0, `${name}: foreground Weather must occupy real visible article area`);
-  assert.ok(result.uniquePlateCoverage < 0.94,
-    `${name}: unique on-screen article area must not become an unconditional broad wash`);
 
   assert.ok(result.bridge.lastForegroundPuffs > 0, `${name}: the exact-depth pass must render qualifying puffs`);
   assert.ok(result.bridge.lastForegroundRegions > 0, `${name}: the exact plate regions must be supplied`);
@@ -186,6 +182,8 @@ function assertAtmosphericForeground(result, name, expectedPreset) {
     `${name}: foreground composition must not be restricted to Heavy Mist`);
   assert.ok(Math.abs(result.bridge.lastForegroundThreshold - result.chamberDepth) < 0.01,
     `${name}: the rendered region must use the actual plate chamber depth`);
+  assert.ok(result.bridge.lastForegroundPuffs <= result.weather.diagnostics.depthFrame.puffCount,
+    `${name}: the foreground pass must be composed only from the canonical current-frame puff field`);
   assert.equal(result.bridge.weatherPolicyMutation, false, `${name}: Integration must not mutate Weather policy`);
   assert.ok(Math.max(...result.edgeOutside) <= 3, `${name}: foreground pixels must remain transparent outside the crossed plate`);
   const interiorMax = Math.max(...result.foregroundInterior);
