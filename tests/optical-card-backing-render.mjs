@@ -6,6 +6,7 @@ import { chromium } from "playwright";
 
 const root = path.resolve(import.meta.dirname, "..");
 const artifactRoot = path.join(root, "artifacts", "optical-card-backing");
+const projection = fs.readFileSync(path.join(root, "css", "optical-projection.css"), "utf8");
 const profile = fs.readFileSync(path.join(root, "css", "optical-three-plane-profile.css"), "utf8");
 const backdrop = Object.freeze([22, 96, 174]);
 
@@ -141,8 +142,8 @@ try {
         .sample-card { position: relative; }
         .sample-card.compact { width: 360px; height: 140px; }
         .sample-card.expanded { width: 520px; height: 280px; }
-        .optical-semantic-item,
-        .optical-plate-surface { position: absolute; inset: 0; }
+        .sample-card > .optical-semantic-item { left: 0; top: 0; width: 100%; height: 100%; }
+        ${projection}
         ${profile}
       </style></head>
       <body>
