@@ -24,20 +24,21 @@ async function waitForVisiblePlateCrossing(page) {
       return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && Number(style.opacity) !== 0;
     });
 
+    const bridge = window.NCNRedWireWeatherCardOcclusion?.snapshot?.();
+    if (!bridge || bridge.lastForegroundPuffs <= 0) return false;
+
     for (const node of plates) {
       const rect = node.getBoundingClientRect();
-      for (const fx of [0.1, 0.25, 0.4, 0.55, 0.7, 0.85]) {
-        for (const fy of [0.12, 0.3, 0.5, 0.7, 0.88]) {
-          const pageX = rect.left + rect.width * fx;
-          const pageY = rect.top + rect.height * fy;
-          if (pageX < canvasRect.left || pageX > canvasRect.right
-            || pageY < canvasRect.top || pageY > canvasRect.bottom) continue;
-          const x = Math.max(0, Math.min(canvas.width - 1,
-            Math.floor((pageX - canvasRect.left) * canvas.width / canvasRect.width)));
-          const y = Math.max(0, Math.min(canvas.height - 1,
-            Math.floor((pageY - canvasRect.top) * canvas.height / canvasRect.height)));
-          if (context.getImageData(x, y, 1, 1).data[3] > 8) return true;
-        }
+      const scaleX = canvas.width / canvasRect.width;
+      const scaleY = canvas.height / canvasRect.height;
+      const left = Math.max(0, Math.floor((rect.left - canvasRect.left) * scaleX));
+      const top = Math.max(0, Math.floor((rect.top - canvasRect.top) * scaleY));
+      const right = Math.min(canvas.width, Math.ceil((rect.right - canvasRect.left) * scaleX));
+      const bottom = Math.min(canvas.height, Math.ceil((rect.bottom - canvasRect.top) * scaleY));
+      if (right <= left || bottom <= top) continue;
+      const pixels = context.getImageData(left, top, right - left, bottom - top).data;
+      for (let index = 3; index < pixels.length; index += 4) {
+        if (pixels[index] > 8) return true;
       }
     }
     return false;
@@ -81,6 +82,30 @@ async function visualSnapshot(page) {
       return points;
     }
 
+    function alphaStatsInPageRect(canvas, pageRect, threshold = 8) {
+      if (!canvas || canvas.hidden) return { max: 0, active: 0, total: 0 };
+      const canvasRect = canvas.getBoundingClientRect();
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context || canvasRect.width <= 0 || canvasRect.height <= 0) return { max: 0, active: 0, total: 0 };
+      const scaleX = canvas.width / canvasRect.width;
+      const scaleY = canvas.height / canvasRect.height;
+      const inset = 2;
+      const left = Math.max(0, Math.floor((pageRect.left - canvasRect.left + inset) * scaleX));
+      const top = Math.max(0, Math.floor((pageRect.top - canvasRect.top + inset) * scaleY));
+      const right = Math.min(canvas.width, Math.ceil((pageRect.right - canvasRect.left - inset) * scaleX));
+      const bottom = Math.min(canvas.height, Math.ceil((pageRect.bottom - canvasRect.top - inset) * scaleY));
+      if (right <= left || bottom <= top) return { max: 0, active: 0, total: 0 };
+      const pixels = context.getImageData(left, top, right - left, bottom - top).data;
+      let max = 0;
+      let active = 0;
+      for (let index = 3; index < pixels.length; index += 4) {
+        const alpha = pixels[index];
+        if (alpha > max) max = alpha;
+        if (alpha > threshold) active += 1;
+      }
+      return { max, active, total: pixels.length / 4 };
+    }
+
     function samplePlate(node) {
       const plate = node.getBoundingClientRect();
       const interiorPoints = interiorPointsFor(plate);
@@ -89,6 +114,7 @@ async function visualSnapshot(page) {
         ...baseCanvases.map(canvas => alphaAtPage(canvas, point.x, point.y))
       ));
       const foregroundInterior = interiorPoints.map(point => alphaAtPage(foreground, point.x, point.y));
+      const foregroundStats = alphaStatsInPageRect(foreground, plate);
 
       const edgeInside = [];
       const edgeOutside = [];
@@ -125,32 +151,26 @@ async function visualSnapshot(page) {
         foregroundInterior,
         edgeInside,
         edgeOutside,
-        maxForegroundAlpha: Math.max(0, ...foregroundInterior),
-        activeSamples: foregroundInterior.filter(alpha => alpha > 8).length
+        maxForegroundAlpha: foregroundStats.max,
+        activeSamples: foregroundStats.active,
+        foregroundSampleCount: foregroundStats.total
       };
     }
 
     const plates = plateNodes.map(samplePlate);
     const selected = [...plates].sort((a, b) => b.maxForegroundAlpha - a.maxForegroundAlpha)[0];
-    const uniquePoints = new Map();
-    plateNodes.forEach(node => {
-      interiorPointsFor(node.getBoundingClientRect()).forEach(point => {
-        const key = `${Math.round(point.x)}:${Math.round(point.y)}`;
-        if (!uniquePoints.has(key)) uniquePoints.set(key, point);
-      });
-    });
-    const uniqueForeground = [...uniquePoints.values()]
-      .map(point => alphaAtPage(foreground, point.x, point.y));
+    const foregroundSampleCount = plates.reduce((sum, item) => sum + item.foregroundSampleCount, 0);
+    const foregroundActiveSamples = plates.reduce((sum, item) => sum + item.activeSamples, 0);
 
     return {
       application: window.NCNApplications?.current?.() || null,
       ...selected,
       visiblePlateCount: plates.length,
       crossedPlateCount: plates.filter(item => item.maxForegroundAlpha > 8).length,
-      uniquePlateSampleCount: uniqueForeground.length,
-      uniquePlateActiveSamples: uniqueForeground.filter(alpha => alpha > 8).length,
-      uniquePlateCoverage: uniqueForeground.length
-        ? uniqueForeground.filter(alpha => alpha > 8).length / uniqueForeground.length
+      uniquePlateSampleCount: foregroundSampleCount,
+      uniquePlateActiveSamples: foregroundActiveSamples,
+      uniquePlateCoverage: foregroundSampleCount
+        ? foregroundActiveSamples / foregroundSampleCount
         : 0,
       baseCanvasCount: baseCanvases.length,
       foregroundPresent: Boolean(foreground),
