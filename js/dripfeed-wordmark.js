@@ -1,15 +1,26 @@
 /*==================================================
   DRIPFEED ANIMATED WORDMARK
 
-  Mounts the approved continuous rainbow diffusion treatment into the shared
-  terminal header. Geometry is read from the existing SVG wordmark asset so the
-  animation and static fallback always use the same traced lettering.
+  Mounts the approved colour-diffusion treatment into the shared terminal
+  header. Geometry is read from the existing SVG asset so the animation and
+  static fallback always use the same traced lettering.
 ==================================================*/
 
 window.DripfeedWordmark = (() => {
   const GEOMETRY_URL = 'assets/dripfeed-wordmark.svg';
-  const COLOURS = ['#8e5cff', '#ff4d5a', '#ff8a2a', '#ffe45d', '#59e86c', '#45b8ff'];
-  const DURATION = 6200;
+  const COLOURS = [
+    '#A3203E', // deep red
+    '#E13A45', // strong red
+    '#FF465F', // bright red
+    '#E93D87', // raspberry
+    '#DC43C6', // magenta
+    '#7E43E6', // rich purple
+    '#9655E8', // violet
+    '#6E58E8', // ultraviolet
+    '#9E72EE', // weighted lavender
+    '#F05AC0'  // fuchsia
+  ];
+  const DURATION = 6800;
   let active = null;
   let geometryPromise = null;
   let instanceCounter = 0;
@@ -43,17 +54,40 @@ window.DripfeedWordmark = (() => {
     ];
   }
 
+  function cubicBezier1D(value, firstControl, secondControl) {
+    const inverse = 1 - value;
+    return (
+      3 * inverse * inverse * value * firstControl
+      + 3 * inverse * value * value * secondControl
+      + value * value * value
+    );
+  }
+
   function spreadCurve(value) {
     const u = clamp(value);
+    const curved = cubicBezier1D(u, .58, .84);
+    return curved * .84 + smooth(u) * .16;
+  }
 
-    // The spread reaches the neighbouring letters promptly, then eases early
-    // enough to hang around the p rather than dividing the word at the F.
-    if (u <= .26) {
-      return .40 * (1 - Math.pow(1 - (u / .26), 2));
+  function shuffle(values) {
+    const result = values.slice();
+    for (let index = result.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
     }
+    return result;
+  }
 
-    const tail = (u - .26) / .74;
-    return .40 + .60 * smooth(tail);
+  function seedWindow() {
+    return shuffle(COLOURS).slice(0, 4);
+  }
+
+  function nextRandomColour(window) {
+    const recent = window.slice(-2);
+    let options = COLOURS.filter(colour => !recent.includes(colour));
+    if (!options.length) options = COLOURS.filter(colour => colour !== window.at(-1));
+    if (!options.length) options = COLOURS.slice();
+    return options[Math.floor(Math.random() * options.length)];
   }
 
   function geometry() {
@@ -85,19 +119,19 @@ window.DripfeedWordmark = (() => {
         <path id="${id('dot')}" d="${paths.dot}" fill-rule="evenodd"></path>
 
         <radialGradient id="${id('base-gradient')}" gradientUnits="userSpaceOnUse" cx="462" cy="148" r="1080" gradientTransform="matrix(1.62 0 0 1 -286 18)">
-          <stop data-base-stop="0" offset="0%" stop-color="#ff4d5a"></stop>
-          <stop data-base-stop="1" offset="14%" stop-color="#ff4d5a"></stop>
-          <stop data-base-stop="2" offset="34%" stop-color="#d85679"></stop>
-          <stop data-base-stop="3" offset="66%" stop-color="#b75a98"></stop>
-          <stop data-base-stop="4" offset="100%" stop-color="#8e5cff"></stop>
+          <stop data-base-stop="0" offset="0%" stop-color="#E13A45"></stop>
+          <stop data-base-stop="1" offset="14%" stop-color="#E13A45"></stop>
+          <stop data-base-stop="2" offset="34%" stop-color="#C83869"></stop>
+          <stop data-base-stop="3" offset="66%" stop-color="#A23D91"></stop>
+          <stop data-base-stop="4" offset="100%" stop-color="#7E43E6"></stop>
         </radialGradient>
 
         <radialGradient id="${id('target-gradient')}" gradientUnits="userSpaceOnUse" cx="462" cy="148" r="1080" gradientTransform="matrix(1.62 0 0 1 -286 18)">
-          <stop data-target-stop="0" offset="0%" stop-color="#ff8a2a"></stop>
-          <stop data-target-stop="1" offset="14%" stop-color="#ff8a2a"></stop>
-          <stop data-target-stop="2" offset="34%" stop-color="#ff7650"></stop>
-          <stop data-target-stop="3" offset="66%" stop-color="#ff5b5d"></stop>
-          <stop data-target-stop="4" offset="100%" stop-color="#ff4d5a"></stop>
+          <stop data-target-stop="0" offset="0%" stop-color="#E93D87"></stop>
+          <stop data-target-stop="1" offset="14%" stop-color="#E93D87"></stop>
+          <stop data-target-stop="2" offset="34%" stop-color="#DC43C6"></stop>
+          <stop data-target-stop="3" offset="66%" stop-color="#9655E8"></stop>
+          <stop data-target-stop="4" offset="100%" stop-color="#6E58E8"></stop>
         </radialGradient>
 
         <radialGradient id="${id('reveal-gradient')}" cx="50%" cy="50%" r="50%">
@@ -124,17 +158,11 @@ window.DripfeedWordmark = (() => {
             <circle data-reveal="4" cx="462" cy="176" r="0" fill="url(#${id('reveal-gradient')})" opacity=".32"></circle>
           </g>
         </mask>
-
-        <filter id="${id('glow')}" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="8"></feGaussianBlur>
-        </filter>
       </defs>
 
       <use href="#${id('body')}" fill="url(#${id('base-gradient')})"></use>
-      <use href="#${id('body')}" fill="url(#${id('base-gradient')})" opacity=".22" filter="url(#${id('glow')})"></use>
       <use data-target-word href="#${id('body')}" fill="url(#${id('target-gradient')})" mask="url(#${id('reveal-mask')})"></use>
-      <use data-dot-fill href="#${id('dot')}" fill="#ff8a2a"></use>
-      <use data-dot-glow href="#${id('dot')}" fill="#ff8a2a" opacity=".28" filter="url(#${id('glow')})"></use>
+      <use data-dot-fill href="#${id('dot')}" fill="#FF465F"></use>
     </svg>`;
   }
 
@@ -173,26 +201,21 @@ window.DripfeedWordmark = (() => {
     const reveals = [...svg.querySelectorAll('[data-reveal]')];
     const targetWord = svg.querySelector('[data-target-word]');
     const dotFill = svg.querySelector('[data-dot-fill]');
-    const dotGlow = svg.querySelector('[data-dot-glow]');
 
-    let index = 0;
+    let colourWindow = seedWindow();
     let elapsed = 0;
     let last = performance.now();
     let frameId = 0;
     let stopped = false;
 
     function render() {
-      const oldColour = COLOURS[index % COLOURS.length];
-      const currentColour = COLOURS[(index + 1) % COLOURS.length];
-      const incomingColour = COLOURS[(index + 2) % COLOURS.length];
-      const futureColour = COLOURS[(index + 3) % COLOURS.length];
+      const [oldColour, currentColour, incomingColour, futureColour] = colourWindow;
       const progress = elapsed / DURATION;
-
       const start = baseField(oldColour, currentColour);
       const target = baseField(currentColour, incomingColour);
       const spread = spreadCurve(clamp(progress / .78));
       const radius = 1210 * spread;
-      const drift = 10 * spread;
+      const drift = 6 * spread;
       const radii = [.82, .72, .68, .76, .96];
       const baseY = [132, 144, 144, 158, 176];
       const driftScale = [.10, .45, .42, .85, 1.20];
@@ -212,9 +235,12 @@ window.DripfeedWordmark = (() => {
       targetWord.setAttribute('opacity', (1 - fade).toFixed(3));
 
       const dotShift = smooth(clamp((progress - .64) / .20));
-      const dotColour = mix(incomingColour, futureColour, dotShift);
-      dotFill.setAttribute('fill', dotColour);
-      dotGlow.setAttribute('fill', dotColour);
+      dotFill.setAttribute('fill', mix(incomingColour, futureColour, dotShift));
+    }
+
+    function advanceColour() {
+      colourWindow.shift();
+      colourWindow.push(nextRandomColour(colourWindow));
     }
 
     function frame(now) {
@@ -224,7 +250,7 @@ window.DripfeedWordmark = (() => {
       elapsed += delta;
       while (elapsed >= DURATION) {
         elapsed -= DURATION;
-        index = (index + 1) % COLOURS.length;
+        advanceColour();
       }
       render();
       frameId = requestAnimationFrame(frame);

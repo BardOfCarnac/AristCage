@@ -3,6 +3,8 @@
 
   The activation gestures are always available, but the diagnostics UI and
   live viewport listeners are created only while diagnostics are enabled.
+  The laboratory drains any in-flight control dispatches before this module
+  removes diagnostics mode, so canonical profile restoration remains final.
 ==================================================*/
 
 const NCN_DIAGNOSTICS_KEY = "ncn-diagnostics";
@@ -28,6 +30,8 @@ let diagnosticsCameraFocal;
 let diagnosticsCameraAperture;
 let diagnosticsOpticalLayers;
 let diagnosticsLiveListenersBound = false;
+let diagnosticsPanelHidden = false;
+let diagnosticsTransition = Promise.resolve();
 let diagnosticMarkTapCount = 0;
 let diagnosticMarkTapTimer;
 
@@ -111,7 +115,13 @@ function ensureDiagnosticsInterface() {
   panel.className = "diagnostics-panel";
   panel.setAttribute("aria-label", "Projection diagnostics");
   panel.innerHTML = `
-    <div class="diagnostics-title"><span>Projection Diagnostics</span><span>DEV</span></div>
+    <div class="diagnostics-title">
+      <span>Projection Diagnostics</span>
+      <span class="diagnostics-title-actions">
+        <span>DEV</span>
+        <button type="button" data-debug-disable-diagnostics>Exit &amp; restore</button>
+      </span>
+    </div>
     <section class="diagnostics-section diagnostics-application-section">
       <div class="diagnostics-heading">Terminal application · temporary launcher bypass</div>
       <div class="diagnostics-app-switch" role="group" aria-label="Terminal application">
@@ -162,15 +172,17 @@ function ensureDiagnosticsInterface() {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "diagnostics-toggle";
-  toggle.addEventListener("click", toggleDiagnostics);
+  toggle.addEventListener("click", () => { void toggleDiagnostics(); });
 
   panel.querySelectorAll("[data-debug-app]").forEach(button => {
     button.addEventListener("click", () => {
       void window.NCNApplications?.switchTo?.(button.dataset.debugApp);
     });
   });
+  panel.querySelector("[data-debug-disable-diagnostics]")?.addEventListener("click", () => {
+    void setDiagnosticsEnabled(false);
+  });
 
-  window.addEventListener("ncn:application-change", updateApplicationDiagnostics);
   document.body.append(panel, toggle);
   diagnosticsPanel = panel;
   diagnosticsToggle = toggle;
@@ -183,6 +195,19 @@ function ensureDiagnosticsInterface() {
   diagnosticsCameraAperture = panel.querySelector("[data-debug-camera-aperture]");
   diagnosticsOpticalLayers = panel.querySelector("[data-debug-optical-layers]");
   updateApplicationDiagnostics();
+}
+
+function setDiagnosticsPanelHidden(hidden) {
+  const active = document.documentElement.classList.contains("diagnostics-on");
+  diagnosticsPanelHidden = active && Boolean(hidden);
+  document.documentElement.classList.toggle("diagnostics-panel-hidden", diagnosticsPanelHidden);
+  diagnosticsPanel?.setAttribute("aria-hidden", String(diagnosticsPanelHidden));
+  if (diagnosticsToggle) diagnosticsToggle.textContent = diagnosticsPanelHidden ? "Dev show" : active ? "Dev hide" : "Dev off";
+  return diagnosticsPanelHidden;
+}
+
+function toggleDiagnosticsPanel() {
+  return setDiagnosticsPanelHidden(!diagnosticsPanelHidden);
 }
 
 function findDiagnosticEntry() {
@@ -244,6 +269,7 @@ function bindDiagnosticsLiveListeners() {
   window.addEventListener("scroll", updateDiagnosticsLiveValues, { passive: true });
   window.addEventListener("resize", updateDiagnosticsLiveValues);
   window.addEventListener("ncn:chamber-camera-change", updateDiagnosticsLiveValues);
+  window.addEventListener("ncn:application-change", updateApplicationDiagnostics);
   diagnosticsLiveListenersBound = true;
 }
 
@@ -252,35 +278,47 @@ function unbindDiagnosticsLiveListeners() {
   window.removeEventListener("scroll", updateDiagnosticsLiveValues);
   window.removeEventListener("resize", updateDiagnosticsLiveValues);
   window.removeEventListener("ncn:chamber-camera-change", updateDiagnosticsLiveValues);
+  window.removeEventListener("ncn:application-change", updateApplicationDiagnostics);
   diagnosticsLiveListenersBound = false;
 }
 
-function setDiagnosticsEnabled(enabled) {
+async function commitDiagnosticsEnabled(enabled) {
   if (enabled) {
     ensureDiagnosticsInterface();
     document.documentElement.classList.add("diagnostics-on");
-    diagnosticsToggle.textContent = "Dev on";
+    setDiagnosticsPanelHidden(false);
     window.localStorage.setItem(NCN_DIAGNOSTICS_KEY, "1");
     bindDiagnosticsLiveListeners();
     updateDiagnosticsLiveValues();
-    return;
+    await Promise.resolve(window.NCNDevPanel?.setDiagnosticsActive?.(true));
+    return true;
   }
 
+  await Promise.resolve(window.NCNDevPanel?.setDiagnosticsActive?.(false));
   document.documentElement.classList.remove("diagnostics-on");
-  if (diagnosticsToggle) diagnosticsToggle.textContent = "Dev off";
+  setDiagnosticsPanelHidden(false);
   window.localStorage.setItem(NCN_DIAGNOSTICS_KEY, "0");
   unbindDiagnosticsLiveListeners();
+  return false;
+}
+
+function setDiagnosticsEnabled(enabled) {
+  diagnosticsTransition = diagnosticsTransition.then(() => commitDiagnosticsEnabled(Boolean(enabled)));
+  return diagnosticsTransition;
 }
 
 function toggleDiagnostics() {
-  setDiagnosticsEnabled(!document.documentElement.classList.contains("diagnostics-on"));
+  if (document.documentElement.classList.contains("diagnostics-on")) {
+    return Promise.resolve(toggleDiagnosticsPanel());
+  }
+  return setDiagnosticsEnabled(true);
 }
 
 function bindDiagnosticsActivationTriggers() {
   document.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "d") {
       event.preventDefault();
-      toggleDiagnostics();
+      void toggleDiagnostics();
     }
   });
 
@@ -290,7 +328,7 @@ function bindDiagnosticsActivationTriggers() {
 
     if (diagnosticMarkTapCount >= 3) {
       diagnosticMarkTapCount = 0;
-      toggleDiagnostics();
+      void toggleDiagnostics();
       return;
     }
 
@@ -303,5 +341,5 @@ function bindDiagnosticsActivationTriggers() {
 bindDiagnosticsActivationTriggers();
 
 if (diagnosticsEnabledFromEnvironment()) {
-  setDiagnosticsEnabled(true);
+  void setDiagnosticsEnabled(true);
 }

@@ -10,7 +10,11 @@
 
   const TARGET_ACTIVE = 3;
   const MAX_ACTIVE = 4;
-  const RETRY_DELAY = 1400;
+  const FILL_DELAY_RANGE = Object.freeze([650, 1650]);
+  const REFILL_DELAY_RANGE = Object.freeze([850, 2400]);
+  const QUIET_BREAK_RANGE = Object.freeze([3200, 6200]);
+  const QUIET_BREAK_CHANCE = 0.28;
+  const DURATION_JITTER = 0.14;
   const runtime = window.NCNViewerRuntime;
 
   let service = null;
@@ -23,6 +27,25 @@
   let lastFill = null;
   let lastOutcome = null;
   let serviceListeners = [];
+
+  function randomBetween(range) {
+    return range[0] + Math.random() * (range[1] - range[0]);
+  }
+
+  function nextFillDelay() {
+    return randomBetween(FILL_DELAY_RANGE);
+  }
+
+  function nextRefillDelay() {
+    return Math.random() < QUIET_BREAK_CHANCE
+      ? randomBetween(QUIET_BREAK_RANGE)
+      : randomBetween(REFILL_DELAY_RANGE);
+  }
+
+  function jitteredDuration(baseDuration) {
+    const variation = (Math.random() * 2 - 1) * DURATION_JITTER;
+    return Math.round(baseDuration * (1 + variation));
+  }
 
   function currentApplication() {
     return window.NCNApplications?.current?.()
@@ -68,7 +91,12 @@
     if (!service || service === attachedService) return;
     detachServiceListeners();
     attachedService = service;
-    const refill = event => wake(`sequence:${event.type}`);
+    const refill = event => {
+      const delay = event.type === "blockmove:complete"
+        ? nextRefillDelay()
+        : randomBetween(REFILL_DELAY_RANGE) * 0.5;
+      wake(`sequence:${event.type}`, delay);
+    };
     ["blockmove:complete", "blockmove:cancel", "blockmove:error"].forEach(type => {
       listenToService(type, refill);
     });
@@ -143,26 +171,28 @@
 
     let requested = 0;
     const panel = currentPanel();
-    for (let index = 0; index < missing; index += 1) {
+    if (missing > 0) {
+      const baseDuration = panel === "submit" ? 7600 : 6800;
       const movement = window.NCNChamberMotionController.requestMovement({
         allowConcurrent: true,
         clusterSize: panel === "submit" ? [3, 7] : [2, 6],
         intensity: panel === "submit" ? 0.72 : 0.64,
-        duration: panel === "submit" ? 7600 : 6800,
+        duration: jitteredDuration(baseDuration),
         seed: `panel-activity:${panel}:${requestCount + 1}`
-      }, `activity:${reason}:${index + 1}`);
-      if (!movement) continue;
-      requestCount += 1;
-      const requestId = requestCount;
-      requested += 1;
-      Promise.resolve(movement).then(value => {
-        lastOutcome = Object.freeze({ request: requestId, value, timestamp: performance.now() });
-      }).catch(error => {
-        lastOutcome = Object.freeze({ request: requestId, error: String(error?.message || error), timestamp: performance.now() });
-      });
+      }, `activity:${reason}:1`);
+      if (movement) {
+        requestCount += 1;
+        const requestId = requestCount;
+        requested = 1;
+        Promise.resolve(movement).then(value => {
+          lastOutcome = Object.freeze({ request: requestId, value, timestamp: performance.now() });
+        }).catch(error => {
+          lastOutcome = Object.freeze({ request: requestId, error: String(error?.message || error), timestamp: performance.now() });
+        });
+      }
     }
 
-    nextAttemptAt = clock + RETRY_DELAY;
+    nextAttemptAt = clock + nextFillDelay();
     updateActivityMarker(snapshot, requested ? "requesting" : "panel-active");
     lastFill = Object.freeze({ reason, target, inFlight, missing, requested, timestamp: clock });
     return requested > 0;
@@ -198,16 +228,19 @@
     return runtimeHandle;
   }
 
-  function wake(reason = "host") {
+  function wake(reason = "host", delay = 0) {
     wakeCount += 1;
-    lastWake = Object.freeze({ reason, timestamp: performance.now() });
+    const clock = performance.now();
+    const wait = Math.max(0, Number(delay) || 0);
+    if (wait > 0) nextAttemptAt = Math.max(nextAttemptAt, clock + wait);
+    else nextAttemptAt = 0;
+    lastWake = Object.freeze({ reason, delay: wait, nextAttemptAt, timestamp: clock });
     const handle = ensureRuntimeTask();
     if (!handle || !panelActivityRequested()) {
       handle?.disable?.();
       updateActivityMarker(service?.snapshot?.() || null);
       return false;
     }
-    nextAttemptAt = 0;
     const task = handle.snapshot?.();
     if (task?.enabled) handle.wake?.(`chamber-motion:${reason}`);
     else handle.enable?.(`chamber-motion:${reason}`);
@@ -268,6 +301,7 @@
       maxActive: MAX_ACTIVE,
       wakeCount,
       requestCount,
+      nextAttemptAt,
       lastWake,
       lastFill,
       lastOutcome,

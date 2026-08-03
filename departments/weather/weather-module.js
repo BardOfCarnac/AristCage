@@ -135,7 +135,10 @@ window.NCNWeatherDepartment = (() => {
       fpsUpdates: 0,
       depthFrameSerial: 0,
       heavyMistPrimePending: false,
-      heavyMistPrimeCount: 0
+      heavyMistPrimeCount: 0,
+      mistRecycleCount: 0,
+      mistVisibleBanks: 0,
+      mistMinimumVisibleBanks: null
     };
 
     let random = seededRandom(state.seed);
@@ -362,7 +365,7 @@ window.NCNWeatherDepartment = (() => {
       return (Number(state.config.depthFlow) || 0) + state.wind.z;
     }
 
-    function resetMistBank(bank, bounds, initial = false) {
+    function resetMistBank(bank, bounds) {
       bank.x = randomBetween(-bounds.halfWidth * 1.25, bounds.halfWidth * 1.25);
       bank.z = randomBetween(bounds.near + 0.2, bounds.far - 0.25);
       bank.width = randomBetween(0.62, 1.58);
@@ -377,21 +380,13 @@ window.NCNWeatherDepartment = (() => {
       bank.puffs = Math.round(randomBetween(3, 5));
       bank.bias = randomBetween(-0.4, 0.4);
       bank.age = 0;
-      if (!initial) {
-        const depthFlow = effectiveMistDepthFlow();
-        const drift = APPROVED_MIST.drift + state.wind.x;
-        if (depthFlow < -0.02) bank.z = bounds.far - randomBetween(0, 0.6);
-        else if (depthFlow > 0.02) bank.z = bounds.near + randomBetween(0.15, 0.65);
-        if (drift > 0.02) bank.x = -bounds.halfWidth - bank.width;
-        else if (drift < -0.02) bank.x = bounds.halfWidth + bank.width;
-      }
     }
 
     function makePool(type, count, bounds = null) {
       const pool = particles[type];
       while (pool.length < count) {
         const particle = { active: false, type, slot: pool.length };
-        if (type === "mist" && bounds) resetMistBank(particle, bounds, true);
+        if (type === "mist" && bounds) resetMistBank(particle, bounds);
         pool.push(particle);
       }
       pool.slice(count).forEach(item => { item.active = false; });
@@ -475,9 +470,12 @@ window.NCNWeatherDepartment = (() => {
 
     function deactivateAll(resetSequence = false) {
       TYPES.forEach(type => particles[type].forEach(particle => { particle.active = false; particle.age = 0; }));
+      state.mistVisibleBanks = 0;
+      state.mistMinimumVisibleBanks = null;
       if (resetSequence) {
         state.spawnSerial = 0;
         state.elapsedMs = 0;
+        state.mistRecycleCount = 0;
         random = seededRandom(state.seed);
       }
     }
@@ -523,6 +521,66 @@ window.NCNWeatherDepartment = (() => {
       }
     }
 
+    function mistBankVisible(bank, bounds) {
+      if (!bank.active) return false;
+      const halfVisibleWidth = bank.width * 0.58;
+      const halfVisibleDepth = bank.depth * 0.30;
+      return bank.x + halfVisibleWidth >= -bounds.halfWidth
+        && bank.x - halfVisibleWidth <= bounds.halfWidth
+        && bank.z + halfVisibleDepth >= bounds.near
+        && bank.z - halfVisibleDepth <= bounds.far;
+    }
+
+    function updateMistCoverage(bounds, target) {
+      const visible = particles.mist.reduce((count, bank) => count + (mistBankVisible(bank, bounds) ? 1 : 0), 0);
+      state.mistVisibleBanks = visible;
+      if (target > 0) {
+        state.mistMinimumVisibleBanks = state.mistMinimumVisibleBanks === null
+          ? visible
+          : Math.min(state.mistMinimumVisibleBanks, visible);
+      } else state.mistMinimumVisibleBanks = null;
+      return visible;
+    }
+
+    function mistRecycleFrame(bank, bounds) {
+      return Object.freeze({
+        xLimit: bounds.halfWidth + bank.width * 1.4,
+        nearLimit: bounds.near + 0.08,
+        farLimit: bounds.far + 0.2
+      });
+    }
+
+    function resolveMistRecycleAxes(previous, rerolled, bounds, crossedX, crossedZ) {
+      const previousFrame = mistRecycleFrame(previous, bounds);
+      const next = { ...rerolled };
+
+      if (crossedX) {
+        next.x = previous.x > previousFrame.xLimit
+          ? -bounds.halfWidth + next.width * 0.18
+          : bounds.halfWidth - next.width * 0.18;
+      } else {
+        next.x = previous.x;
+        const requiredWidth = Math.max(0, (Math.abs(previous.x) - bounds.halfWidth) / 1.4);
+        const safeWidth = Math.min(previous.width, requiredWidth + 0.005);
+        next.width = Math.max(next.width, safeWidth);
+      }
+
+      if (crossedZ) {
+        next.z = previous.z < previousFrame.nearLimit
+          ? bounds.far - next.depth * 0.18
+          : bounds.near + 0.12 + next.depth * 0.18;
+      } else next.z = previous.z;
+
+      return next;
+    }
+
+    function recycleMistBank(bank, bounds, crossedX, crossedZ) {
+      const previous = { x: bank.x, z: bank.z, width: bank.width, depth: bank.depth };
+      resetMistBank(bank, bounds);
+      Object.assign(bank, resolveMistRecycleAxes(previous, bank, bounds, crossedX, crossedZ));
+      state.mistRecycleCount += 1;
+    }
+
     function updateMistBank(bank, deltaSeconds, bounds, settings) {
       if (!bank.active) return;
       bank.age += deltaSeconds;
@@ -532,17 +590,17 @@ window.NCNWeatherDepartment = (() => {
       const depthSpeed = settings.depthFlow * 0.28;
       bank.x += (sideSpeed * bank.speed + wave * 0.035 * settings.turbulence + bank.bias * 0.006) * deltaSeconds;
       bank.z += (depthSpeed * bank.speed + wave2 * 0.025 * settings.turbulence) * deltaSeconds;
-      const xLimit = bounds.halfWidth + bank.width * 1.4;
-      if (bank.x > xLimit || bank.x < -xLimit || bank.z < bounds.near + 0.08 || bank.z > bounds.far + 0.2) {
-        resetMistBank(bank, bounds, false);
-      }
+      const frame = mistRecycleFrame(bank, bounds);
+      const crossedX = bank.x > frame.xLimit || bank.x < -frame.xLimit;
+      const crossedZ = bank.z < frame.nearLimit || bank.z > frame.farLimit;
+      if (crossedX || crossedZ) recycleMistBank(bank, bounds, crossedX, crossedZ);
     }
 
     function primeHeavyMistBank(bounds) {
       if (!state.heavyMistPrimePending || state.targetPreset !== HEAVY_MIST_PRESET) return 0;
       const bank = particles.mist.find(item => item.active);
       if (!bank) return 0;
-      resetMistBank(bank, bounds, true);
+      resetMistBank(bank, bounds);
       bank.x = 0;
       bank.z = clamp(HEAVY_MIST_FOREGROUND_DEPTH - 0.22, bounds.near + 0.18, bounds.far - 0.25);
       bank.width = 1.72;
@@ -1058,6 +1116,7 @@ window.NCNWeatherDepartment = (() => {
       TYPES.forEach(type => deactivateSurplus(type, counts[type]));
       primeHeavyMistBank(scene.bounds);
       particles.mist.forEach(bank => updateMistBank(bank, deltaSeconds, scene.bounds, settings));
+      updateMistCoverage(scene.bounds, counts.mist);
       ["dust", "rain"].forEach(type => particles[type].forEach(particle => updateParticle(particle, deltaSeconds, scene.bounds)));
       render(intensity, scene, settings, frame);
       const active = TYPES.reduce((sum, type) => sum + activeCount(type), 0);
@@ -1198,7 +1257,7 @@ window.NCNWeatherDepartment = (() => {
       state.spawnSerial = 0;
       state.elapsedMs = 0;
       const bounds = { halfWidth: 4.2, halfHeight: 2.55, near: 2.5, far: 10.5 };
-      particles.mist.forEach(bank => resetMistBank(bank, bounds, true));
+      particles.mist.forEach(bank => resetMistBank(bank, bounds));
       state.heavyMistPrimePending = state.targetPreset === HEAVY_MIST_PRESET;
       deactivateAll(false);
       runtimeHandle?.wake?.("weather:seed");
@@ -1343,6 +1402,11 @@ window.NCNWeatherDepartment = (() => {
           generalHaze: false,
           frontEnergy: false,
           approvedMist: APPROVED_MIST,
+          mistField: Object.freeze({
+            recycled: state.mistRecycleCount,
+            visibleBanks: state.mistVisibleBanks,
+            minimumVisibleBanks: state.mistMinimumVisibleBanks
+          }),
           effectiveDepthFlow: Object.freeze({
             configured: Number(state.config.depthFlow) || 0,
             wind: state.wind.z,
@@ -1369,6 +1433,35 @@ window.NCNWeatherDepartment = (() => {
       });
     }
 
+    function testMistRecycleAxes(sample = {}) {
+      if (context.testing !== true) throw new Error("Weather recycle probes are test-only.");
+      const bounds = {
+        halfWidth: Number(sample.bounds?.halfWidth) || 4.2,
+        halfHeight: Number(sample.bounds?.halfHeight) || 2.55,
+        near: Number(sample.bounds?.near) || 2.5,
+        far: Number(sample.bounds?.far) || 10.5
+      };
+      const previous = {
+        x: Number(sample.previous?.x) || 0,
+        z: Number(sample.previous?.z) || bounds.near,
+        width: Math.max(0.01, Number(sample.previous?.width) || 1),
+        depth: Math.max(0.01, Number(sample.previous?.depth) || 0.7)
+      };
+      const rerolled = {
+        x: 0,
+        z: 0,
+        width: Math.max(0.01, Number(sample.rerolled?.width) || 0.62),
+        depth: Math.max(0.01, Number(sample.rerolled?.depth) || 0.38)
+      };
+      return Object.freeze(resolveMistRecycleAxes(
+        previous,
+        rerolled,
+        bounds,
+        Boolean(sample.crossedX),
+        Boolean(sample.crossedZ)
+      ));
+    }
+
     return Object.freeze({
       init,
       applyProfile,
@@ -1393,6 +1486,7 @@ window.NCNWeatherDepartment = (() => {
         staleHandles: "invalid-after-disable-suspend-reset-destroy",
         subscriberLifecycle: "cleared-on-disable-suspend-reset-destroy"
       }),
+      ...(context.testing === true ? { testMistRecycleAxes } : {}),
       requestAtmosphericEffect: requestEffect
     });
   }

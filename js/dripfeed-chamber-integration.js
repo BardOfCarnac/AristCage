@@ -16,7 +16,7 @@ window.NCNDripfeedChamber = (() => {
   const CONTROL_GAP = 4;
   const OCCLUSION_GAP = 8;
   const MIN_APERTURE_HEIGHT = 250;
-  const LIVE_PLANE_GAP_CELLS = 0.02;
+  const LIVE_PLANE_GAP_CELLS = 0.005;
   const LATENT_PLANE_GAP_CELLS = 0.26;
 
   let active = false;
