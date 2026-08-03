@@ -15,6 +15,12 @@ const presets = context.window.NCNWeatherPresets;
 assert.ok(presets, "Weather presets must publish.");
 assert.equal(presets.mist.depthFlow, -0.018, "Ordinary mist must retain its accepted data baseline.");
 assert.equal(presets["heavy-mist"].depthFlow, -0.72, "Heavy mist must declare its forward flow as preset data.");
+assert.ok(presets.smoke.verticalFill >= 0.6,
+  "Smoke must rise through the chamber rather than remain trapped as floor fog.");
+assert.ok(presets.smoke.bankScale > 1,
+  "Smoke banks must have enough breadth to cross article planes naturally.");
+assert.ok(presets.smoke.bankMultiplier > 1,
+  "Smoke must sustain a materially occupied chamber field.");
 
 for (const forbidden of [
   "Object.defineProperty",
@@ -69,4 +75,4 @@ assert.ok(compositorSource.includes("destination-out"),
 assert.ok(compositorSource.includes("destination-in"),
   "Foreground replay must remain feathered to the approved crossing regions.");
 
-console.log("Heavy mist is implemented canonically in Weather, presets remain data-only, and Integration only composites genuine depth-frame puffs.");
+console.log("Heavy mist and raised smoke are implemented canonically in Weather, presets remain data-only, and Integration only composites genuine depth-frame puffs.");
