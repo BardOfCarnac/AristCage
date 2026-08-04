@@ -10,6 +10,7 @@ on:
       - "tests/integration-visual-roundtrip.mjs"
       - "tests/optical-card-backing-contract.test.js"
       - "tests/optical-card-backing-render.mjs"
+      - "tests/optical-weather-card-occlusion.mjs"
       - ".github/workflows/integration-visual-roundtrip.yml"
   workflow_dispatch:
 
@@ -31,6 +32,7 @@ jobs:
           node --check tests/integration-visual-roundtrip.mjs
           node --check tests/optical-card-backing-contract.test.js
           node --check tests/optical-card-backing-render.mjs
+          node --check tests/optical-weather-card-occlusion.mjs
 
       - name: Install browser runner
         run: |
@@ -54,6 +56,7 @@ jobs:
           done
           node tests/optical-card-backing-contract.test.js 2>&1 | tee artifacts/optical-card-backing/contract-output.log
           node tests/optical-card-backing-render.mjs 2>&1 | tee artifacts/optical-card-backing/render-output.log
+          node tests/optical-weather-card-occlusion.mjs 2>&1 | tee artifacts/optical-card-backing/weather-occlusion-output.log
           node tests/integration-visual-roundtrip.mjs 2>&1 | tee artifacts/integration-roundtrip/test-output.log
 
       - name: Print visual diagnostics
@@ -65,6 +68,7 @@ jobs:
           test ! -f artifacts/integration-roundtrip/test-output.log || cat artifacts/integration-roundtrip/test-output.log
           test ! -f artifacts/optical-card-backing/contract-output.log || cat artifacts/optical-card-backing/contract-output.log
           test ! -f artifacts/optical-card-backing/render-output.log || cat artifacts/optical-card-backing/render-output.log
+          test ! -f artifacts/optical-card-backing/weather-occlusion-output.log || cat artifacts/optical-card-backing/weather-occlusion-output.log
           for failure in artifacts/integration-roundtrip/*-failure.txt; do
             test ! -e "$failure" || { echo "--- $failure"; cat "$failure"; }
           done
