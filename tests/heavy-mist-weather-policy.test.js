@@ -60,13 +60,22 @@ assert.equal(compositorSource.includes("setWind"), false,
   "The Integration compositor must never mutate Weather simulation policy.");
 assert.equal(compositorSource.includes("renderHeavyMistSurge"), false,
   "The compositor must not generate a synthetic card-local surge.");
-assert.equal(compositorSource.includes("createRadialGradient"), false,
-  "The compositor must replay Weather puffs rather than drawing its own atmosphere.");
+
+const alphaEraseStart = compositorSource.indexOf("function erasePlateWithAlphaFade");
+const alphaEraseEnd = compositorSource.indexOf("function eraseWeatherUnderPlates", alphaEraseStart);
+const alphaEraseBlock = compositorSource.slice(alphaEraseStart, alphaEraseEnd);
+assert.ok(alphaEraseStart >= 0 && alphaEraseBlock.includes("createRadialGradient"),
+  "The compositor may use a radial gradient only to shape destination-out plate occlusion.");
+const foregroundStart = compositorSource.indexOf("function renderHeavyMistForeground");
+const foregroundEnd = compositorSource.indexOf("function onWeatherFrame", foregroundStart);
+const foregroundBlock = compositorSource.slice(foregroundStart, foregroundEnd);
+assert.equal(foregroundBlock.includes("createRadialGradient"), false,
+  "Foreground atmosphere must still be replayed from genuine Weather puffs, never synthesised by Integration.");
 assert.ok(compositorSource.includes("depthFrame.renderForeground"),
   "The compositor must consume Weather's exact-depth puff publication.");
 assert.ok(compositorSource.includes("destination-out"),
-  "Rear Weather must remain erased beneath Optical plates.");
+  "Rear Weather must remain alpha-occluded beneath Optical plates.");
 assert.ok(compositorSource.includes("destination-in"),
   "Foreground replay must remain feathered to the approved crossing regions.");
 
-console.log("Heavy mist is implemented canonically in Weather, presets remain data-only, and Integration only composites genuine depth-frame puffs.");
+console.log("Heavy mist remains canonical Weather data; Integration only shapes rear occlusion and replays genuine depth-frame puffs.");
