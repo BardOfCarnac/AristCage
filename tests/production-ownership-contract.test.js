@@ -11,6 +11,7 @@ const chamberCss = read("css/layered-chamber.css");
 const config = read("js/config.js");
 const data = read("js/data.js");
 const app = read("js/app.js");
+const applicationSwitcher = read("js/application-switcher.js");
 const actions = read("js/actions.js");
 const layout = read("js/layout.js");
 const projectionCss = read("css/projection.css");
@@ -34,6 +35,7 @@ assert.match(index, /js\/projection-engine\.js/, "The active Projection lifecycl
 assert.doesNotMatch(data, /NCN_PROJECTION_PROFILE/, "The archived per-part depth profile must be absent.");
 assert.doesNotMatch(config, /\bprojection\s*:\s*\{/, "The archived parallax travel configuration must be absent.");
 assert.doesNotMatch(app, /updateProjection/, "Application boot must not invoke the archived parallax renderer.");
+assert.doesNotMatch(applicationSwitcher, /updateProjection/, "Application switching must not invoke the archived parallax renderer.");
 assert.doesNotMatch(actions, /updateProjection/, "Interaction code must not install parallax scroll or resize updates.");
 assert.doesNotMatch(layout, /updateProjection/, "Projection transactions must not call the archived parallax renderer.");
 assert.doesNotMatch(projectionCss, /--projection-y/, "Production CSS must not retain the old scroll offset variable.");
