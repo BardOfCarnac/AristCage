@@ -47,29 +47,33 @@ html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dr
   z-index: 42;
   pointer-events: auto;
   box-sizing: border-box;
-  backdrop-filter: blur(5px);
 }
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-filter-rail {
   top: var(--drip-chamber-control-top, var(--ncn-rail-clearance, 64px));
-  min-height: 36px;
-  padding: 4px 0;
+  min-height: 28px;
+  padding: 0;
   border: 0;
-  background: linear-gradient(90deg, rgba(4, 2, 3, .82), rgba(4, 2, 3, .48) 76%, transparent);
+  background: transparent;
+  backdrop-filter: none;
 }
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-filter-rail .filter-chips {
-  padding-inline: 4px;
+  width: 100%;
+  padding-inline: 2px;
   flex-wrap: nowrap;
-  mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+  justify-content: space-between;
+  gap: clamp(5px, 1.25vw, 14px);
+  overflow: hidden;
+  mask-image: none;
 }
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .filter-transmit {
-  margin-right: 1px;
+  margin: 0;
 }
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-utility-rail {
-  top: var(--drip-chamber-utility-top, calc(var(--ncn-rail-clearance, 64px) + 42px));
+  top: var(--drip-chamber-utility-top, calc(var(--ncn-rail-clearance, 64px) + 34px));
   min-height: 38px;
   display: flex;
   flex-wrap: nowrap;
@@ -81,6 +85,7 @@ html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dr
   overscroll-behavior-inline: contain;
   scrollbar-width: none;
   border: 0;
+  backdrop-filter: blur(5px);
   background: linear-gradient(90deg, rgba(4, 2, 3, .76), rgba(4, 2, 3, .34) 80%, transparent);
 }
 
@@ -261,7 +266,6 @@ html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .ov
 }
 
 @media (max-width: 720px) {
-  html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-filter-rail,
   html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-utility-rail {
     backdrop-filter: blur(3px);
   }

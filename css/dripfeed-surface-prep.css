@@ -27,18 +27,25 @@
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 8px;
+  gap: 0;
   min-width: 0;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
   background: transparent;
 }
 
 #dripfeed-root .dripfeed-filter-rail .filter-chips {
   display: flex;
   flex: 1 1 auto;
-  flex-wrap: nowrap;
-  gap: 5px;
+  width: 100%;
   min-width: 0;
-  overflow-x: auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(5px, 1.25vw, 14px);
+  padding-inline: 2px;
+  overflow: hidden;
   overscroll-behavior-inline: contain;
   scrollbar-width: none;
 }
@@ -49,11 +56,38 @@
 
 #dripfeed-root .dripfeed-filter-rail .filter-chip {
   flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(244, 234, 226, .58);
+  font-family: "Arial Narrow", "Roboto Condensed", "Saira Condensed", sans-serif;
+  font-size: clamp(.48rem, 1.18vw, .6rem);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: .08em;
   white-space: nowrap;
+}
+
+#dripfeed-root .dripfeed-filter-rail .filter-chip:hover,
+#dripfeed-root .dripfeed-filter-rail .filter-chip.active {
+  border: 0;
+  background: transparent;
+  color: #ffe1dd;
+}
+
+#dripfeed-root .dripfeed-filter-rail .filter-chip.active {
+  box-shadow: inset 0 -1px rgba(240, 68, 57, .92);
 }
 
 #dripfeed-root .filter-transmit {
   flex: 0 0 auto;
+  min-width: 112px;
+}
+
+#dripfeed-root .repack-wall {
+  display: none !important;
 }
 
 #dripfeed-root .demo-stage {

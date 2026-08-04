@@ -3,6 +3,8 @@
 
   Dripfeed-owned packing and text-budget corrections. The chamber host may place
   this publication but does not change its square-cell packing or content fit.
+  The approved v29 wordmark and compact title rail remain owned by mainline
+  header/wordmark publications and are intentionally untouched here.
 ==================================================*/
 
 /* Compact one-row cells need a stricter local text budget at every viewport.
@@ -41,6 +43,21 @@
 @media (max-width: 430px) {
   html[data-ncn-app="dripfeed"] #dripfeed-root {
     --cols: 2 !important;
+  }
+
+  #dripfeed-root .dripfeed-filter-rail .filter-chips {
+    gap: 4px;
+  }
+
+  #dripfeed-root .dripfeed-filter-rail .filter-chip {
+    font-size: clamp(.44rem, 2vw, .54rem);
+    letter-spacing: .045em;
+  }
+
+  #dripfeed-root .filter-transmit {
+    min-width: 102px;
+    padding-inline: 9px;
+    font-size: .61rem;
   }
 
   #dripfeed-root .listing-tile {
