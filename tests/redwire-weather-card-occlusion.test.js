@@ -189,10 +189,10 @@ vm.runInContext(source, context, { filename: "redwire-weather-card-occlusion.js"
     { offset: 0, colour: "rgba(0,0,0,0.96)" },
     { offset: 0.48, colour: "rgba(0,0,0,0.96)" },
     { offset: 0.66, colour: "rgba(0,0,0,0.78)" },
-    { offset: 0.82, colour: "rgba(0,0,0,0.4)" },
-    { offset: 0.95, colour: "rgba(0,0,0,0.1)" },
-    { offset: 1, colour: "rgba(0,0,0,0)" }
-  ], "Rear Weather must share every Optical backing alpha stop.");
+    { offset: 0.82, colour: "rgba(0,0,0,0.58)" },
+    { offset: 0.95, colour: "rgba(0,0,0,0.4)" },
+    { offset: 1, colour: "rgba(0,0,0,0.35)" }
+  ], "Rear Weather must share every Optical backing alpha stop and retain a 65%-transparent edge.");
 
   const rearErase = baseDrawCalls.find(call => call.type === "fillRect");
   assert.equal(rearErase?.operation, "destination-out");
@@ -249,7 +249,7 @@ vm.runInContext(source, context, { filename: "redwire-weather-card-occlusion.js"
   assert.equal(renewed.lastForegroundPuffs, 2);
   assert.equal(renewed.active, true);
 
-  console.log("RedWire rear Weather follows the Optical alpha fade and exact-depth heavy-mist foreground composition satisfies lifecycle contracts.");
+  console.log("RedWire rear Weather follows the 65%-transparent Optical edge and exact-depth heavy-mist composition satisfies lifecycle contracts.");
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
