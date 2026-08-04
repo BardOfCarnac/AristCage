@@ -60,17 +60,17 @@
 }
 
 /* The article backing is an alpha-only surface. `closest-side` makes the
-   100% stop land on the real card sides; the corners therefore finish fully
-   transparent instead of leaving the fade outside the rendered plate. */
+   final stop land on the real card sides while retaining a translucent
+   35% black edge instead of disappearing completely into the chamber. */
 .optical-mode .optical-semantic-item[data-optical-role="plate"] .optical-plate-surface {
   background: radial-gradient(
     ellipse closest-side at 50% 50%,
     rgba(0, 0, 0, .96) 0%,
     rgba(0, 0, 0, .96) 48%,
     rgba(0, 0, 0, .78) 66%,
-    rgba(0, 0, 0, .40) 82%,
-    rgba(0, 0, 0, .10) 95%,
-    rgba(0, 0, 0, 0) 100%
+    rgba(0, 0, 0, .58) 82%,
+    rgba(0, 0, 0, .40) 95%,
+    rgba(0, 0, 0, .35) 100%
   );
   box-shadow: none;
   filter: none;
