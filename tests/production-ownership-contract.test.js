@@ -12,6 +12,7 @@ const config = read("js/config.js");
 const data = read("js/data.js");
 const app = read("js/app.js");
 const applicationSwitcher = read("js/application-switcher.js");
+const desktop = read("js/desktop.js");
 const actions = read("js/actions.js");
 const layout = read("js/layout.js");
 const projectionCss = read("css/projection.css");
@@ -23,6 +24,7 @@ const motionAdapter = read("js/chamber-motion-adapter.js");
 const motionPresentation = read("js/chamber-motion-presentation.js");
 const departmentInstaller = read("js/integration-departments.js");
 const probe = read("js/production-ownership-probe.js");
+const breakpointProof = read("tests/desktop-breakpoint-roundtrip.mjs");
 const inventory = read("docs/architecture/production-ownership-inventory.md");
 
 assert.equal(
@@ -36,10 +38,17 @@ assert.doesNotMatch(data, /NCN_PROJECTION_PROFILE/, "The archived per-part depth
 assert.doesNotMatch(config, /\bprojection\s*:\s*\{/, "The archived parallax travel configuration must be absent.");
 assert.doesNotMatch(app, /updateProjection/, "Application boot must not invoke the archived parallax renderer.");
 assert.doesNotMatch(applicationSwitcher, /updateProjection/, "Application switching must not invoke the archived parallax renderer.");
+assert.doesNotMatch(desktop, /updateProjection/, "Responsive desktop/mobile breakpoint changes must not invoke the archived parallax renderer.");
 assert.doesNotMatch(actions, /updateProjection/, "Interaction code must not install parallax scroll or resize updates.");
 assert.doesNotMatch(layout, /updateProjection/, "Projection transactions must not call the archived parallax renderer.");
 assert.doesNotMatch(projectionCss, /--projection-y/, "Production CSS must not retain the old scroll offset variable.");
 assert.doesNotMatch(projectionCss, /translateY\(var\(--projection-y/, "Production objects must not use the archived parallax transform.");
+assert.match(breakpointProof, /setViewportSize\(\{ width: 390, height: 844 \}\)/,
+  "Browser proof must cross below the 601px breakpoint.");
+assert.match(breakpointProof, /setViewportSize\(\{ width: 900, height: 760 \}\)/,
+  "Browser proof must return above the 601px breakpoint.");
+assert.match(breakpointProof, /assert\.deepEqual\(pageErrors, \[\]/,
+  "Browser proof must reject uncaught errors during the breakpoint round trip.");
 
 assert.match(chamber, /MODES\s*=\s*Object\.freeze\(\{\s*OFF:\s*"off",\s*BACKGROUND:\s*"background"\s*\}\)/,
   "The production chamber must expose only OFF and BACKGROUND modes.");
@@ -125,4 +134,4 @@ assert.match(inventory, /legacy environment adapter/,
   "The later cleanup stage for compatibility fallbacks must be named.");
 assert.match(inventory, /Heavy mist may create one mounted/, "Conditional compositor resources must be disclosed.");
 
-console.log("Production ownership contract passed: legacy viewers are archived, canonical and compatibility resources are separated, and the mounted ledger is enforceable.");
+console.log("Production ownership contract passed: legacy viewers are archived, responsive breakpoint paths are parallax-free, canonical and compatibility resources are separated, and the mounted ledger is enforceable.");
