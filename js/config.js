@@ -12,9 +12,6 @@ const NCN_CONFIG = {
     dismissDuration: 600,
     displacedResolveDelay: 180
   },
-  projection: {
-    travel: 58
-  },
   dripfeed: {
     // A single provider-neutral proxy can serve both routes by reading the
     // `provider` query/body field. Empty values keep deterministic mock
