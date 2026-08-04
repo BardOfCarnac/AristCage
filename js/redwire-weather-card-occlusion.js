@@ -19,6 +19,14 @@
   const LEADING_DEPTH_WINDOW = 0.18;
   const FOREGROUND_Z_INDEX = 24;
   const EDGE_FEATHER = 6;
+  const PLATE_ALPHA_STOPS = Object.freeze([
+    Object.freeze([0, 0.96]),
+    Object.freeze([0.48, 0.96]),
+    Object.freeze([0.66, 0.78]),
+    Object.freeze([0.82, 0.40]),
+    Object.freeze([0.95, 0.10]),
+    Object.freeze([1, 0])
+  ]);
 
   let releaseWeather = null;
   let weatherService = null;
@@ -85,6 +93,26 @@
       .filter(canvas => !canvas.hidden && getComputedStyle(canvas).visibility !== "hidden");
   }
 
+  function erasePlateWithAlphaFade(context, rect, canvasRect) {
+    const left = rect.left - canvasRect.left;
+    const top = rect.top - canvasRect.top;
+    const width = rect.width;
+    const height = rect.height;
+    if (width <= 0 || height <= 0 || typeof context.createRadialGradient !== "function") return false;
+
+    context.save?.();
+    context.translate?.(left + width / 2, top + height / 2);
+    context.scale?.(width, height);
+    const gradient = context.createRadialGradient(0, 0, 0, 0, 0, 0.5);
+    PLATE_ALPHA_STOPS.forEach(([offset, alpha]) => {
+      gradient.addColorStop(offset, `rgba(0,0,0,${alpha})`);
+    });
+    context.fillStyle = gradient;
+    context.fillRect?.(-0.5, -0.5, 1, 1);
+    context.restore?.();
+    return true;
+  }
+
   function eraseWeatherUnderPlates(plates = visiblePlateRects(), canvases = visibleWeatherCanvases()) {
     lastPlateCount = plates.length;
     lastCanvasCount = canvases.length;
@@ -98,7 +126,6 @@
 
       context.save?.();
       context.globalCompositeOperation = "destination-out";
-      context.fillStyle = "rgba(0,0,0,1)";
 
       plates.forEach(rect => {
         const left = Math.max(rect.left, canvasRect.left);
@@ -106,13 +133,7 @@
         const right = Math.min(rect.right, canvasRect.right);
         const bottom = Math.min(rect.bottom, canvasRect.bottom);
         if (right <= left || bottom <= top) return;
-        context.fillRect?.(
-          left - canvasRect.left,
-          top - canvasRect.top,
-          right - left,
-          bottom - top
-        );
-        erased += 1;
+        if (erasePlateWithAlphaFade(context, rect, canvasRect)) erased += 1;
       });
 
       context.restore?.();

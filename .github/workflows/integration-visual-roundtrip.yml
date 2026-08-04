@@ -8,6 +8,9 @@ on:
       - "js/**"
       - "departments/**"
       - "tests/integration-visual-roundtrip.mjs"
+      - "tests/optical-card-backing-contract.test.js"
+      - "tests/optical-card-backing-render.mjs"
+      - "tests/optical-weather-card-occlusion.mjs"
       - ".github/workflows/integration-visual-roundtrip.yml"
   workflow_dispatch:
 
@@ -25,19 +28,23 @@ jobs:
           node-version: 24
 
       - name: Check smoke-test syntax
-        run: node --check tests/integration-visual-roundtrip.mjs
+        run: |
+          node --check tests/integration-visual-roundtrip.mjs
+          node --check tests/optical-card-backing-contract.test.js
+          node --check tests/optical-card-backing-render.mjs
+          node --check tests/optical-weather-card-occlusion.mjs
 
       - name: Install browser runner
         run: |
           npm install --no-save --no-package-lock playwright@1.54.1 > /tmp/ncn-browser-install.log 2>&1
           npx playwright install --with-deps chromium >> /tmp/ncn-browser-install.log 2>&1
 
-      - name: Run desktop and mobile visual round trip
+      - name: Run Optical backing proof and visual round trip
         id: roundtrip
         continue-on-error: true
         run: |
-          set -o pipefail
-          mkdir -p artifacts/integration-roundtrip
+          set -euo pipefail
+          mkdir -p artifacts/integration-roundtrip artifacts/optical-card-backing
           python3 -m http.server 4173 > /tmp/ncn-integration-http.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
@@ -47,6 +54,9 @@ jobs:
             fi
             sleep 1
           done
+          node tests/optical-card-backing-contract.test.js 2>&1 | tee artifacts/optical-card-backing/contract-output.log
+          node tests/optical-card-backing-render.mjs 2>&1 | tee artifacts/optical-card-backing/render-output.log
+          node tests/optical-weather-card-occlusion.mjs 2>&1 | tee artifacts/optical-card-backing/weather-occlusion-output.log
           node tests/integration-visual-roundtrip.mjs 2>&1 | tee artifacts/integration-roundtrip/test-output.log
 
       - name: Print visual diagnostics
@@ -54,7 +64,11 @@ jobs:
         run: |
           echo "Round-trip outcome: ${{ steps.roundtrip.outcome }}"
           find artifacts/integration-roundtrip -maxdepth 1 -type f -print 2>/dev/null || true
+          find artifacts/optical-card-backing -maxdepth 1 -type f -print 2>/dev/null || true
           test ! -f artifacts/integration-roundtrip/test-output.log || cat artifacts/integration-roundtrip/test-output.log
+          test ! -f artifacts/optical-card-backing/contract-output.log || cat artifacts/optical-card-backing/contract-output.log
+          test ! -f artifacts/optical-card-backing/render-output.log || cat artifacts/optical-card-backing/render-output.log
+          test ! -f artifacts/optical-card-backing/weather-occlusion-output.log || cat artifacts/optical-card-backing/weather-occlusion-output.log
           for failure in artifacts/integration-roundtrip/*-failure.txt; do
             test ! -e "$failure" || { echo "--- $failure"; cat "$failure"; }
           done
@@ -68,6 +82,7 @@ jobs:
           name: integration-visual-roundtrip
           path: |
             artifacts/integration-roundtrip
+            artifacts/optical-card-backing
             /tmp/ncn-integration-http.log
             /tmp/ncn-browser-install.log
           if-no-files-found: warn

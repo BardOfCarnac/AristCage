@@ -12,6 +12,10 @@ assert.ok(source.includes("subscribeAfterRender"), "The bridge must consume Weat
 assert.ok(source.includes("renderForeground"), "Heavy mist must use Weather's exact-depth foreground renderer.");
 assert.ok(source.includes("destination-out"), "Rear Weather must be subtracted beneath Optical plates.");
 assert.ok(source.includes("destination-in"), "The foreground pass must be softly constrained to plate regions.");
+assert.ok(source.includes("PLATE_ALPHA_STOPS"), "Rear Weather occlusion must share the Optical backing alpha profile.");
+assert.ok(source.includes("createRadialGradient"), "Rear Weather occlusion must use an elliptical alpha mask.");
+assert.equal(source.includes('fillStyle = "rgba(0,0,0,1)"'), false,
+  "Rear Weather must not be removed with the former opaque rectangle.");
 
 const listeners = new Map();
 const subscriptions = [];
@@ -41,10 +45,21 @@ function makeContext(log) {
     save() { log.push({ type: "save" }); },
     restore() { log.push({ type: "restore" }); },
     setTransform(...args) { log.push({ type: "setTransform", args }); },
+    translate(...args) { log.push({ type: "translate", args }); },
+    scale(...args) { log.push({ type: "scale", args }); },
     clearRect(...args) { log.push({ type: "clearRect", args }); },
     beginPath() { log.push({ type: "beginPath" }); },
     roundRect(...args) { log.push({ type: "roundRect", args }); },
     fill() { log.push({ type: "fill", operation: this.globalCompositeOperation }); },
+    createRadialGradient(...args) {
+      const stops = [];
+      const gradient = {
+        stops,
+        addColorStop(offset, colour) { stops.push({ offset, colour }); }
+      };
+      log.push({ type: "createRadialGradient", args, gradient });
+      return gradient;
+    },
     fillRect(x, y, width, height) {
       log.push({
         type: "fillRect",
@@ -161,16 +176,31 @@ vm.runInContext(source, context, { filename: "redwire-weather-card-occlusion.js"
   assert.equal(subscriptions.length, 1, "The bridge should subscribe after accepted departments are ready.");
   subscriptions[0].listener({ type: "render", depthFrame });
 
+  const translation = baseDrawCalls.find(call => call.type === "translate");
+  assert.deepEqual(translation?.args, [194, 200],
+    "Rear Weather alpha geometry must be centred on the visible plate.");
+  const scaling = baseDrawCalls.find(call => call.type === "scale");
+  assert.deepEqual(scaling?.args, [340, 180],
+    "Rear Weather alpha geometry must use the real plate width and height.");
+  const rearGradient = baseDrawCalls.find(call => call.type === "createRadialGradient");
+  assert.deepEqual(rearGradient?.args, [0, 0, 0, 0, 0, 0.5],
+    "Rear Weather must use a normalised closest-side ellipse.");
+  assert.deepEqual(rearGradient?.gradient?.stops, [
+    { offset: 0, colour: "rgba(0,0,0,0.96)" },
+    { offset: 0.48, colour: "rgba(0,0,0,0.96)" },
+    { offset: 0.66, colour: "rgba(0,0,0,0.78)" },
+    { offset: 0.82, colour: "rgba(0,0,0,0.4)" },
+    { offset: 0.95, colour: "rgba(0,0,0,0.1)" },
+    { offset: 1, colour: "rgba(0,0,0,0)" }
+  ], "Rear Weather must share every Optical backing alpha stop.");
+
   const rearErase = baseDrawCalls.find(call => call.type === "fillRect");
-  assert.deepEqual(rearErase, {
-    type: "fillRect",
-    operation: "destination-out",
-    fillStyle: "rgba(0,0,0,1)",
-    x: 24,
-    y: 110,
-    width: 340,
-    height: 180
-  }, "Rear Weather must be removed from the exact visible plate rectangle.");
+  assert.equal(rearErase?.operation, "destination-out");
+  assert.deepEqual(
+    { x: rearErase?.x, y: rearErase?.y, width: rearErase?.width, height: rearErase?.height },
+    { x: -0.5, y: -0.5, width: 1, height: 1 },
+    "Rear Weather must be erased through the normalised ellipse rather than a plate-wide opaque rectangle."
+  );
 
   assert.equal(foregroundOptions.length, 1, "Heavy mist must execute one exact-depth foreground pass.");
   assert.equal(foregroundOptions[0].regions.length, 1);
@@ -219,7 +249,7 @@ vm.runInContext(source, context, { filename: "redwire-weather-card-occlusion.js"
   assert.equal(renewed.lastForegroundPuffs, 2);
   assert.equal(renewed.active, true);
 
-  console.log("RedWire rear Weather occlusion and exact-depth heavy-mist foreground composition satisfy lifecycle and layering contracts.");
+  console.log("RedWire rear Weather follows the Optical alpha fade and exact-depth heavy-mist foreground composition satisfies lifecycle contracts.");
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

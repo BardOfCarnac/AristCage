@@ -58,3 +58,27 @@
 .optical-mode .optical-semantic-item[data-optical-role="plate"] {
   --optical-item-scale: 0.93 !important;
 }
+
+/* The article backing is an alpha-only surface. `closest-side` makes the
+   100% stop land on the real card sides; the corners therefore finish fully
+   transparent instead of leaving the fade outside the rendered plate. */
+.optical-mode .optical-semantic-item[data-optical-role="plate"] .optical-plate-surface {
+  background: radial-gradient(
+    ellipse closest-side at 50% 50%,
+    rgba(0, 0, 0, .96) 0%,
+    rgba(0, 0, 0, .96) 48%,
+    rgba(0, 0, 0, .78) 66%,
+    rgba(0, 0, 0, .40) 82%,
+    rgba(0, 0, 0, .10) 95%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  box-shadow: none;
+  filter: none;
+}
+
+/* The red perimeter remains its own crisp one-pixel plane. The corner
+   brackets are separate two-pixel strokes, so they retain visual priority. */
+.optical-mode .optical-semantic-item[data-optical-role="frame"] .frame {
+  border: 1px solid rgba(255, 70, 40, .42);
+  box-shadow: none;
+}
