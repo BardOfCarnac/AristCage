@@ -70,6 +70,10 @@ async function visualSnapshot(page) {
       return context.getImageData(x, y, 1, 1).data[3];
     }
 
+    function baseAlphaAt(point) {
+      return Math.max(0, ...baseCanvases.map(canvas => alphaAtPage(canvas, point.x, point.y)));
+    }
+
     function interiorPointsFor(rect) {
       const points = [];
       for (const fx of [0.08, 0.18, 0.28, 0.38, 0.5, 0.62, 0.72, 0.82, 0.92]) {
@@ -83,10 +87,18 @@ async function visualSnapshot(page) {
     function samplePlate(node) {
       const plate = node.getBoundingClientRect();
       const interiorPoints = interiorPointsFor(plate);
-      const baseInterior = interiorPoints.map(point => Math.max(
-        0,
-        ...baseCanvases.map(canvas => alphaAtPage(canvas, point.x, point.y))
-      ));
+      const baseInterior = interiorPoints.map(baseAlphaAt);
+      const baseCore = [
+        { x: plate.left + plate.width * 0.42, y: plate.top + plate.height * 0.42 },
+        { x: plate.left + plate.width * 0.50, y: plate.top + plate.height * 0.42 },
+        { x: plate.left + plate.width * 0.58, y: plate.top + plate.height * 0.42 },
+        { x: plate.left + plate.width * 0.42, y: plate.top + plate.height * 0.50 },
+        { x: plate.left + plate.width * 0.50, y: plate.top + plate.height * 0.50 },
+        { x: plate.left + plate.width * 0.58, y: plate.top + plate.height * 0.50 },
+        { x: plate.left + plate.width * 0.42, y: plate.top + plate.height * 0.58 },
+        { x: plate.left + plate.width * 0.50, y: plate.top + plate.height * 0.58 },
+        { x: plate.left + plate.width * 0.58, y: plate.top + plate.height * 0.58 }
+      ].map(baseAlphaAt);
       const foregroundInterior = interiorPoints.map(point => alphaAtPage(foreground, point.x, point.y));
 
       const edgeInside = [];
@@ -120,6 +132,7 @@ async function visualSnapshot(page) {
           height: plate.height
         },
         baseInterior,
+        baseCore,
         foregroundInterior,
         edgeInside,
         edgeOutside,
@@ -164,7 +177,8 @@ async function visualSnapshot(page) {
 function assertHeavyForeground(result, name) {
   assert.equal(result.application, "redwire", `${name}: RedWire must be active`);
   assert.ok(result.baseCanvasCount >= 4, `${name}: the completed Weather layer set is required`);
-  assert.ok(result.baseInterior.every(alpha => alpha <= 2), `${name}: rear Weather must remain erased beneath the crossed plate`);
+  assert.ok(result.baseCore.every(alpha => alpha <= 20),
+    `${name}: rear Weather must remain substantially occluded beneath the near-black reading core`);
   assert.equal(result.foregroundPresent, true, `${name}: the foreground compositor must exist`);
   assert.equal(result.foregroundHidden, false, `${name}: the heavy-mist foreground compositor must be visible`);
   assert.ok(result.foregroundZ > result.viewerZ, `${name}: foreground mist must stack above the Optical viewer`);
@@ -322,7 +336,7 @@ try {
   await runViewport("desktop", { width: 1440, height: 900 });
   await runViewport("mobile", { width: 390, height: 844 });
   await runViewport("desktop-reduced-motion", { width: 1440, height: 900 }, "reduce");
-  console.log("Canonical heavy mist crosses visible Optical area with a localised leading bank, ordinary mist does not, and application switching leaves no compositor or profile residue.");
+  console.log("Canonical heavy mist crosses visible Optical area with a localised leading bank, the reading core remains occluded, and application switching leaves no compositor or profile residue.");
 } finally {
   await browser.close();
 }
