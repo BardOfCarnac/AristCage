@@ -10,11 +10,13 @@ on:
       - "js/app.js"
       - "js/config.js"
       - "js/data.js"
+      - "js/desktop.js"
       - "js/diagnostics.js"
       - "js/layered-chamber.js"
       - "js/layout.js"
       - "js/production-ownership-probe.js"
       - "docs/architecture/production-ownership-inventory.md"
+      - "tests/desktop-breakpoint-roundtrip.mjs"
       - "tests/production-ownership-contract.test.js"
       - "js/integration-browser-probe.js"
       - "js/integration-service-gate.js"
@@ -45,7 +47,9 @@ jobs:
           node --check js/production-ownership-probe.js
           node --check js/integration-frozen-publications.js
           node --check js/layered-chamber.js
+          node --check js/desktop.js
           node --check js/diagnostics.js
+          node --check tests/desktop-breakpoint-roundtrip.mjs
           node --check tests/production-ownership-contract.test.js
           node tests/production-ownership-contract.test.js
 
