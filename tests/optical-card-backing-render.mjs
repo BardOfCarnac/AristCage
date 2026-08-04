@@ -9,6 +9,8 @@ const artifactRoot = path.join(root, "artifacts", "optical-card-backing");
 const projection = fs.readFileSync(path.join(root, "css", "optical-projection.css"), "utf8");
 const profile = fs.readFileSync(path.join(root, "css", "optical-three-plane-profile.css"), "utf8");
 const backdrop = Object.freeze([22, 96, 174]);
+const edgeOpacity = 0.35;
+const expectedEdge = Object.freeze(backdrop.map(channel => Math.round(channel * (1 - edgeOpacity))));
 
 fs.mkdirSync(artifactRoot, { recursive: true });
 
@@ -126,8 +128,10 @@ function assertCard(name, samples) {
 
   for (const [point, colour] of Object.entries(samples)) {
     if (point === "centre") continue;
-    assert.ok(maximumDifference(colour, backdrop) <= 12,
-      `${name}: ${point} perimeter must reveal the backdrop, got ${colour.join(",")}.`);
+    assert.ok(maximumDifference(colour, expectedEdge) <= 16,
+      `${name}: ${point} must retain roughly 35% black at the perimeter, got ${colour.join(",")}.`);
+    assert.ok(maximumDifference(colour, backdrop) >= 30,
+      `${name}: ${point} must not become fully transparent.`);
   }
 }
 
@@ -180,9 +184,9 @@ try {
   assertCard("expanded card", samples.expanded);
   fs.writeFileSync(
     path.join(artifactRoot, "mounted-perimeter.json"),
-    JSON.stringify({ backdrop, rectangles, samples }, null, 2)
+    JSON.stringify({ backdrop, edgeOpacity, expectedEdge, rectangles, samples }, null, 2)
   );
-  console.log("Mounted compact and expanded Optical backings retain black centres and reveal the backdrop at every real plate side and corner.");
+  console.log("Mounted compact and expanded Optical backings retain black centres and finish at roughly 65% transparency.");
 } finally {
   await browser.close();
 }
