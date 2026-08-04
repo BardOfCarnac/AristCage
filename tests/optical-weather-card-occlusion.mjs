@@ -20,6 +20,8 @@ const jsStops = [...occlusion.matchAll(/Object\.freeze\(\[([0-9.]+), ([0-9.]+)\]
   .map(match => [Number(match[1]), Number(match[2])]);
 assert.deepEqual(jsStops, cssStops,
   "Weather occlusion must use the same six offsets and alpha values as the Optical backing.");
+assert.deepEqual(cssStops.at(-1), [1, 0.35],
+  "The card and Weather occlusion must finish at 35% opacity, or 65% transparency.");
 assert.doesNotMatch(occlusion, /fillStyle\s*=\s*["']rgba\(0,0,0,1\)["']/,
   "Weather occlusion must not restore the former opaque rectangular erase.");
 assert.match(occlusion, /createRadialGradient\(0, 0, 0, 0, 0, 0\.5\)/,
@@ -33,8 +35,8 @@ function assertWeatherSamples(name, samples) {
 
   for (const [point, alpha] of Object.entries(samples)) {
     if (point === "centre" || point === "shoulder") continue;
-    assert.ok(alpha >= 235,
-      `${name}: ${point} must preserve Weather beneath the transparent perimeter, got alpha ${alpha}.`);
+    assert.ok(alpha >= 145 && alpha <= 185,
+      `${name}: ${point} must retain Weather beneath a 65%-transparent perimeter, got alpha ${alpha}.`);
   }
 }
 
@@ -144,14 +146,14 @@ try {
   assert.equal(proof.snapshot.lastCanvasCount, 1);
 
   await page.screenshot({
-    path: path.join(artifactRoot, "weather-through-transparent-rim.png"),
+    path: path.join(artifactRoot, "weather-through-translucent-rim.png"),
     fullPage: true
   });
   fs.writeFileSync(
-    path.join(artifactRoot, "weather-through-transparent-rim.json"),
+    path.join(artifactRoot, "weather-through-translucent-rim.json"),
     JSON.stringify({ weatherColour, ...proof }, null, 2)
   );
-  console.log("Weather remains beneath every transparent card edge while the reading core retains matched alpha occlusion.");
+  console.log("Weather remains visible beneath every 65%-transparent card edge while the reading core retains matched alpha occlusion.");
 } finally {
   await browser.close();
 }
