@@ -16,8 +16,8 @@ window.NCNDripfeedChamber = (() => {
   const CONTROL_GAP = 2;
   const OCCLUSION_GAP = 12;
   const MIN_APERTURE_HEIGHT = 250;
-  const LIVE_PLANE_ADVANCE_CELLS = 1;
-  const LIVE_PLANE_MIN_GAP_CELLS = 0.04;
+  const APERTURE_ADVANCE_CELLS = 1;
+  const LIVE_PLANE_GAP_CELLS = 0.005;
   const LATENT_PLANE_GAP_CELLS = 0.26;
 
   let active = false;
@@ -155,15 +155,23 @@ window.NCNDripfeedChamber = (() => {
     chosen ||= fallback;
     if (!chosen) return null;
 
-    // Advance the live wall by one chamber cell while retaining the settled
-    // aperture as its clipping window. The cards therefore read one full depth
-    // plane nearer without moving the chamber edge or foreground controls.
-    const liveZ = Math.max(
-      near + cell * LIVE_PLANE_MIN_GAP_CELLS,
-      chosen.lineZ - cell * LIVE_PLANE_ADVANCE_CELLS
-    );
-    const latentZ = chosen.lineZ + cell * LATENT_PLANE_GAP_CELLS;
-    const readerZ = Math.max(near + cell * 0.04, liveZ - cell * 0.58);
+    // Keep the controls on the first fully fitting aperture, then move the
+    // chamber opening and its live wall forward by one grid cell. The wall
+    // remains immediately behind its occluding line, preserving the chamber
+    // contract while making the whole feed read one plane nearer.
+    const controlsAperture = chosen.aperture;
+    const fittedStep = chosen.step;
+    const advancedStep = Math.max(1, fittedStep - APERTURE_ADVANCE_CELLS);
+    if (advancedStep < fittedStep) {
+      const lineZ = near + cell * advancedStep;
+      const aperture = freezeRect(camera.apertureAt(lineZ));
+      if (aperture.width && aperture.height) chosen = { lineZ, aperture, step: advancedStep };
+    }
+    const apertureAdvanceCells = fittedStep - chosen.step;
+
+    const liveZ = chosen.lineZ + cell * LIVE_PLANE_GAP_CELLS;
+    const latentZ = liveZ + cell * LATENT_PLANE_GAP_CELLS;
+    const readerZ = Math.max(near + cell * 0.04, chosen.lineZ - cell * 0.58);
     const live = planeProjection(camera, liveZ, chosen.aperture);
     const latent = planeProjection(camera, latentZ, chosen.aperture);
     const reader = planeProjection(camera, readerZ, chosen.aperture);
@@ -181,8 +189,8 @@ window.NCNDripfeedChamber = (() => {
       wallGutter,
       leadingClearance,
       calibration: Object.freeze({
-        liveAdvanceCells: LIVE_PLANE_ADVANCE_CELLS,
-        liveMinGapCells: LIVE_PLANE_MIN_GAP_CELLS,
+        apertureAdvanceCells,
+        liveGapCells: LIVE_PLANE_GAP_CELLS,
         latentGapCells: LATENT_PLANE_GAP_CELLS
       }),
       controls: Object.freeze({
@@ -191,8 +199,8 @@ window.NCNDripfeedChamber = (() => {
         utilityTop,
         utilityHeight,
         bottom: controlsBottom,
-        left: chosen.aperture.left,
-        width: chosen.aperture.width
+        left: controlsAperture.left,
+        width: controlsAperture.width
       }),
       planes: Object.freeze({ live, latent, reader })
     });
