@@ -323,19 +323,6 @@
 }
 
 /*==================================================
-  PARALLAX
-==================================================*/
-
-.frame,
-.priority,
-.meta,
-.headline,
-.tags,
-.body {
-  transform: translateY(var(--projection-y, 0px));
-}
-
-/*==================================================
   REDUCED MOTION
 ==================================================*/
 
@@ -344,15 +331,6 @@
   .priority {
     animation: none !important;
     transition: none !important;
-  }
-
-  .frame,
-  .priority,
-  .meta,
-  .headline,
-  .tags,
-  .body {
-    transform: none !important;
   }
 
   .part,
