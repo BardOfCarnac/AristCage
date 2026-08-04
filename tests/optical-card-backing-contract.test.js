@@ -34,7 +34,9 @@ assert.match(
   "Article backing geometry must terminate on the actual card sides."
 );
 assert.match(plate, /rgba\(0, 0, 0, \.96\) 48%/, "Article backing must retain a stable near-black reading core.");
-assert.match(plate, /rgba\(0, 0, 0, 0\) 100%/, "Article backing must reach full transparency at the real perimeter.");
+assert.match(plate, /rgba\(0, 0, 0, \.40\) 95%/, "Article backing must approach the edge through a smooth translucent shoulder.");
+assert.match(plate, /rgba\(0, 0, 0, \.35\) 100%/, "Article backing must finish at 35% black, or 65% transparency.");
+assert.doesNotMatch(plate, /rgba\(0, 0, 0, 0\) 100%/, "Article backing must not disappear completely at the perimeter.");
 assert.doesNotMatch(plate, /radial-gradient\(\s*[0-9.]+%\s+[0-9.]+%/, "Oversized radial geometry must not move the fade beyond the card.");
 assert.match(plate, /box-shadow:\s*none/, "Article backing must not use a shadow blur.");
 assert.match(plate, /filter:\s*none/, "Article backing must not use a filter blur.");
@@ -61,4 +63,4 @@ const profileIndex = html.indexOf("css/optical-three-plane-profile.css");
 assert.ok(projectionIndex >= 0 && profileIndex > projectionIndex,
   "The three-plane profile must load after the base Optical projection styles.");
 
-console.log("Optical backing geometry reaches the real perimeter, with a 1px rim beneath four 2px corner brackets.");
+console.log("Optical backing ends at 65% transparency, with a 1px rim beneath four 2px corner brackets.");
