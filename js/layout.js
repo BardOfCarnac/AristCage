@@ -59,7 +59,6 @@ async function runProjectionTransaction({
     traceTransaction(name, "COMMIT");
     await commit();
     await waitForLayout();
-    updateProjection();
 
     const committedKeepObjects = readProjectionObjects(keep);
     showImmediately(committedKeepObjects);
