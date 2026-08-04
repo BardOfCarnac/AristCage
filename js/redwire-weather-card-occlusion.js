@@ -23,9 +23,9 @@
     Object.freeze([0, 0.96]),
     Object.freeze([0.48, 0.96]),
     Object.freeze([0.66, 0.78]),
-    Object.freeze([0.82, 0.40]),
-    Object.freeze([0.95, 0.10]),
-    Object.freeze([1, 0])
+    Object.freeze([0.82, 0.58]),
+    Object.freeze([0.95, 0.40]),
+    Object.freeze([1, 0.35])
   ]);
 
   let releaseWeather = null;
