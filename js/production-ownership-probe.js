@@ -58,6 +58,10 @@
     catch (error) { return { snapshotError: String(error?.message || error) }; }
   }
 
+  function canvasName(canvas) {
+    return canvas.id || canvas.className || "anonymous-canvas";
+  }
+
   Promise.resolve().then(async () => {
     try {
       await window.NCNIntegratedDepartments?.ready?.();
@@ -66,21 +70,37 @@
         && window.LayeredChamber?.getMode?.() === window.LayeredChamber?.MODES?.BACKGROUND
         && window.OpticalProjection?.isEnabled?.() === true
         && document.querySelectorAll(".ncn-department-weather-canvas").length === 4
+        && document.querySelectorAll(".ncn-chamber-motion-canvas").length === 3
         && document.querySelectorAll(".optical-plane").length === 10
+        && document.querySelector(".ncn-floor-mist")?.dataset.ncnLegacyWeatherRetired === "true"
+        && document.querySelector(".ncn-chamber-block")?.dataset.ncnLegacyChamberMotionRetired === "true"
       ));
 
-      const chamberCanvases = [...document.querySelectorAll(".layered-chamber-canvas")]
-        .map(canvas => canvas.id || canvas.className);
-      const weatherCanvases = [...document.querySelectorAll(".ncn-department-weather-canvas")]
-        .map(canvas => canvas.className);
-      const allCanvases = [...document.querySelectorAll("canvas")]
-        .map(canvas => canvas.id || canvas.className || "anonymous-canvas");
+      const chamberCanvasNodes = [...document.querySelectorAll(".layered-chamber-canvas")];
+      const weatherCanvasNodes = [...document.querySelectorAll(".ncn-department-weather-canvas")];
+      const motionCanvasNodes = [...document.querySelectorAll(".ncn-chamber-motion-canvas")];
+      const compatibilityWeatherCanvas = document.querySelector("canvas.ncn-floor-mist");
+      const compatibilityMotionBlock = document.querySelector(".ncn-chamber-block");
+      const allCanvasNodes = [...document.querySelectorAll("canvas")];
+
+      const chamberCanvases = chamberCanvasNodes.map(canvasName);
+      const weatherCanvases = weatherCanvasNodes.map(canvasName);
+      const movementCanvases = motionCanvasNodes.map(canvas => Object.freeze({
+        name: canvasName(canvas),
+        role: canvas.dataset.ncnChamberMotionCanvas || null,
+        hidden: canvas.hidden === true,
+        connected: canvas.isConnected
+      }));
+      const allCanvases = allCanvasNodes.map(canvasName);
       const chamberModes = Object.values(window.LayeredChamber?.MODES || {}).sort();
       const modules = moduleSnapshot();
       const weather = serviceSnapshot("weather");
       const motion = serviceSnapshot("chamber-motion");
       const effects = serviceSnapshot("effects");
       const compositor = window.NCNRedWireWeatherCardOcclusion?.snapshot?.() || null;
+      const compatibilityWeather = window.NCNWeatherRenderer?.snapshot?.() || null;
+      const compatibilityMotion = window.NCNChamberMotion?.snapshot?.() || null;
+      const movementRoles = movementCanvases.map(item => item.role).sort();
 
       const checks = Object.freeze({
         redwireActive: window.NCNApplications?.current?.() === "redwire",
@@ -99,7 +119,42 @@
         noPersistedLabMode: window.localStorage.getItem("ncn-layered-chamber") === null,
         chamberCanvasCount: chamberCanvases.length === 2,
         weatherCanvasCount: weatherCanvases.length === 4,
-        baselineCanvasCount: allCanvases.length === 6,
+        movementCanvasCount: movementCanvases.length === 3,
+        movementCanvasRoles: movementRoles.join("|") === "foreground-mist|production|wall-matched",
+        compatibilityWeatherCanvasDocumented: Boolean(
+          compatibilityWeatherCanvas
+          && compatibilityWeatherCanvas.isConnected
+          && compatibilityWeatherCanvas.hidden === true
+          && compatibilityWeatherCanvas.dataset.ncnLegacyWeatherRetired === "true"
+          && compatibilityWeatherCanvas.classList.contains("is-enabled") === false
+        ),
+        compatibilityWeatherDormant: Boolean(
+          compatibilityWeather
+          && compatibilityWeather.enabled === false
+          && Number(compatibilityWeather.targetMist) === 0
+        ),
+        compatibilityMotionBlockDocumented: Boolean(
+          compatibilityMotionBlock
+          && compatibilityMotionBlock.isConnected
+          && compatibilityMotionBlock.hidden === true
+          && compatibilityMotionBlock.dataset.ncnLegacyChamberMotionRetired === "true"
+          && compatibilityMotionBlock.classList.contains("is-moving") === false
+        ),
+        compatibilityMotionDormant: Boolean(
+          compatibilityMotion
+          && compatibilityMotion.enabled === false
+          && compatibilityMotion.active === false
+        ),
+        connectedCanvasBaseline: allCanvases.length === 10,
+        canonicalCanvasBaseline: (
+          chamberCanvases.length + weatherCanvases.length + movementCanvases.length
+        ) === 9,
+        noUnexpectedCanvas: allCanvasNodes.every(canvas => (
+          chamberCanvasNodes.includes(canvas)
+          || weatherCanvasNodes.includes(canvas)
+          || motionCanvasNodes.includes(canvas)
+          || canvas === compatibilityWeatherCanvas
+        )),
         noRangefinderSurface: !document.querySelector(
           "#heuristic-rangefinder-plane, .heuristic-rangefinder-hit-surface"
         ),
@@ -110,6 +165,8 @@
         ),
         weatherOwnsFourCanvases: Number(weather?.resources?.canvases) === 4,
         weatherOwnsRuntimeTask: weather?.resources?.runtimeTask === true,
+        movementAdapterConnected: motion?.adapter?.canvasConnected === true,
+        movementAdapterIdle: motion?.adapter?.canvasVisible === false,
         acceptedModulesReady: ["effects", "weather", "chamber-motion"].every(name => {
           const record = modules.find(item => item.name === name);
           return record && ["ready", "suspended"].includes(record.state);
@@ -128,8 +185,28 @@
         application: window.NCNApplications?.current?.() || null,
         environment: window.NCNEnvironment?.current?.() || null,
         resources: {
-          chamberCanvases,
-          weatherCanvases,
+          canonical: {
+            chamberCanvases,
+            weatherCanvases,
+            movementCanvases,
+            connectedCanvasCount: 9
+          },
+          compatibility: {
+            weather: {
+              canvas: compatibilityWeatherCanvas ? canvasName(compatibilityWeatherCanvas) : null,
+              connected: compatibilityWeatherCanvas?.isConnected === true,
+              hidden: compatibilityWeatherCanvas?.hidden === true,
+              retired: compatibilityWeatherCanvas?.dataset.ncnLegacyWeatherRetired === "true",
+              snapshot: compatibilityWeather
+            },
+            chamberMotion: {
+              blockConnected: compatibilityMotionBlock?.isConnected === true,
+              blockHidden: compatibilityMotionBlock?.hidden === true,
+              retired: compatibilityMotionBlock?.dataset.ncnLegacyChamberMotionRetired === "true",
+              snapshot: compatibilityMotion
+            }
+          },
+          connectedCanvasCount: allCanvases.length,
           allCanvases,
           opticalPlanes: document.querySelectorAll(".optical-plane").length,
           compositor
@@ -145,7 +222,12 @@
           chamberLab: "archive/chamber-lab-final-2026-08-04",
           parallaxViewer: "archive/pre-optics-parallax-final-2026-08-04",
           sourceCommit: "c46b80e00502d6368a68709e934bdbff49825978"
-        }
+        },
+        nextCleanup: Object.freeze({
+          stage: "legacy environment adapter",
+          issue: 113,
+          targets: Object.freeze(["NCNWeatherRenderer", "NCNChamberMotion"])
+        })
       };
 
       publish(violations.length ? "error" : "ready", detail);
