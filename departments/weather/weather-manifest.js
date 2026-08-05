@@ -39,5 +39,5 @@ window.NCNWeatherDepartmentManifest = Object.freeze({
   replaces: "weather",
   reducedMotion: true,
   deterministicTesting: true,
-  notes: "Departmental publication only. It exposes exact puff-depth frame views and a synchronous after-render subscription, but receives no article-reading state and does not inspect Optical/article internals."
+  notes: "Departmental publication only. It exposes exact puff-depth frame views and a synchronous after-render subscription, but does not inspect or consume Optical/article state."
 });
