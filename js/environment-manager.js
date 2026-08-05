@@ -22,7 +22,6 @@ window.NCNEnvironment = (() => {
         wind: 0,
         quality: "auto",
         seed: 2045,
-        readingAttenuation: 0.48,
         controlAttenuation: 0.68
       }),
       effects: Object.freeze({ ambient: true, interaction: true }),
@@ -261,7 +260,6 @@ window.NCNEnvironment = (() => {
         wind: 0,
         quality: "auto",
         seed: 2045,
-        readingAttenuation: 0.48,
         controlAttenuation: 0.68,
         preset: desired.enabled ? "clear" : "mist"
       };
