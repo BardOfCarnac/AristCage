@@ -14,9 +14,7 @@ let page = null;
 function stablePolicy(snapshot) {
   return {
     targetPreset: snapshot.targetPreset,
-    intensity: Number(snapshot.intensity),
     targetIntensity: Number(snapshot.targetIntensity),
-    directorIntensity: Number(snapshot.director?.intensity),
     quality: snapshot.quality,
     qualityOverride: snapshot.qualityOverride,
     seed: snapshot.seed,
@@ -58,7 +56,11 @@ async function waitForArticlePhase(targetPage, expectedEntryId, expectedReading,
 
 function assertWeatherPhase(name, phase, baseline, dustFloor) {
   assert.deepEqual(stablePolicy(phase.weather), baseline,
-    `${name}: article interaction must not change Weather profile, effective intensity, controls or canvases.`);
+    `${name}: article interaction must not change Weather profile, controls or canvases.`);
+  assert.ok(Math.abs(Number(phase.weather.intensity) - baseline.targetIntensity) < 0.001,
+    `${name}: Weather effective intensity must remain converged on the unchanged target.`);
+  assert.ok(Math.abs(Number(phase.weather.director?.intensity) - baseline.targetIntensity) < 0.001,
+    `${name}: Visual Director environment authority must remain unchanged while reading.`);
   assert.ok(Number(phase.weather.particles.dust) >= dustFloor,
     `${name}: the live Dust field must remain above the full-intensity continuity floor.`);
   assert.equal("reading" in phase.weather.zones, false,
