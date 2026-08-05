@@ -51,10 +51,10 @@ html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dr
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-filter-rail {
   top: var(--drip-chamber-control-top, var(--ncn-rail-clearance, 64px));
-  min-height: 28px;
+  min-height: 32px;
   padding: 0;
   border: 0;
-  background: transparent;
+  background: rgba(4, 3, 3, .92);
   backdrop-filter: none;
 }
 
@@ -62,10 +62,23 @@ html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dr
   width: 100%;
   padding-inline: 2px;
   flex-wrap: nowrap;
-  justify-content: space-between;
-  gap: clamp(5px, 1.25vw, 14px);
-  overflow: hidden;
+  justify-content: flex-start;
+  gap: clamp(8px, 1.35vw, 14px);
+  overflow-x: auto;
+  overflow-y: hidden;
   mask-image: none;
+  scrollbar-width: none;
+}
+
+html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-filter-rail .filter-chips::-webkit-scrollbar {
+  display: none;
+}
+
+html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-filter-rail .filter-chip {
+  min-height: 32px;
+  font-size: clamp(.62rem, 1.45vw, .72rem);
+  font-weight: 450;
+  letter-spacing: .045em;
 }
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .filter-transmit {
@@ -74,19 +87,19 @@ html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .fi
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-utility-rail {
   top: var(--drip-chamber-utility-top, calc(var(--ncn-rail-clearance, 64px) + 34px));
-  min-height: 38px;
+  min-height: 42px;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
-  padding: 3px 0 4px;
+  gap: 8px;
+  padding: 2px 0 6px;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-inline: contain;
   scrollbar-width: none;
   border: 0;
-  backdrop-filter: blur(5px);
-  background: linear-gradient(90deg, rgba(4, 2, 3, .76), rgba(4, 2, 3, .34) 80%, transparent);
+  backdrop-filter: none;
+  background: linear-gradient(90deg, rgba(4, 2, 3, .96), rgba(4, 2, 3, .86) 82%, rgba(4, 2, 3, .72));
 }
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-utility-rail::-webkit-scrollbar,
@@ -99,14 +112,14 @@ html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dr
 }
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-utility-rail .search-box {
-  flex: 1 0 min(340px, 44vw);
+  flex: 1 1 min(340px, 44vw);
   min-width: 160px;
-  height: 34px;
-  background: rgba(6, 4, 5, .76);
+  height: 38px;
+  background: rgba(6, 4, 5, .88);
 }
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-utility-rail .search-box input {
-  height: 32px;
+  height: 36px;
 }
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-utility-rail .display-note,
@@ -116,7 +129,7 @@ html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dr
 }
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-utility-rail .button {
-  min-height: 34px;
+  min-height: 38px;
 }
 
 html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .demo-stage {
@@ -266,8 +279,20 @@ html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .ov
 }
 
 @media (max-width: 720px) {
+  html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-filter-rail .filter-chips {
+    gap: 5px;
+  }
+
+  html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-filter-rail .filter-chip {
+    font-size: clamp(.58rem, 2.25vw, .64rem);
+    letter-spacing: .025em;
+  }
+
   html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-utility-rail {
-    backdrop-filter: blur(3px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    overflow: hidden;
   }
 
   html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-utility-rail .display-note {
@@ -275,7 +300,13 @@ html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .ov
   }
 
   html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .dripfeed-utility-rail .search-box {
-    flex-basis: 58vw;
+    width: auto;
+    min-width: 0;
+    flex-basis: auto;
+  }
+
+  html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .filter-transmit {
+    min-width: 108px;
   }
 }
 

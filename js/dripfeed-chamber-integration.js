@@ -13,9 +13,10 @@ window.NCNDripfeedChamber = (() => {
   const OCCLUDER_ID = 'dripfeed-chamber-occluder';
   const MAX_GRID_STEPS = 14;
   const VIEWPORT_MARGIN = 8;
-  const CONTROL_GAP = 4;
-  const OCCLUSION_GAP = 8;
+  const CONTROL_GAP = 2;
+  const OCCLUSION_GAP = 12;
   const MIN_APERTURE_HEIGHT = 250;
+  const APERTURE_ADVANCE_CELLS = 1;
   const LIVE_PLANE_GAP_CELLS = 0.005;
   const LATENT_PLANE_GAP_CELLS = 0.26;
 
@@ -127,8 +128,8 @@ window.NCNDripfeedChamber = (() => {
     const viewportWidth = Math.max(1, finite(camera.width, window.innerWidth));
     const viewportHeight = Math.max(1, finite(camera.height, window.innerHeight));
     const railBottom = Math.max(0, finite(metrics.railBottom));
-    const filterHeight = Math.max(0, finite(metrics.filterHeight, 28));
-    const utilityHeight = Math.max(0, finite(metrics.utilityHeight, 38));
+    const filterHeight = Math.max(0, finite(metrics.filterHeight, 32));
+    const utilityHeight = Math.max(0, finite(metrics.utilityHeight, 42));
     const controlTop = railBottom + CONTROL_GAP;
     const utilityTop = controlTop + filterHeight + CONTROL_GAP;
     const controlsBottom = utilityTop + utilityHeight;
@@ -154,9 +155,20 @@ window.NCNDripfeedChamber = (() => {
     chosen ||= fallback;
     if (!chosen) return null;
 
-    // Keep the live wall immediately behind the occluding chamber line. This is
-    // the nearest truthful camera plane: it increases apparent proximity without
-    // applying an unreported CSS scale or allowing the cards to cross the grid.
+    // Keep the controls on the first fully fitting aperture, then move the
+    // chamber opening and its live wall forward by one grid cell. The wall
+    // remains immediately behind its occluding line, preserving the chamber
+    // contract while making the whole feed read one plane nearer.
+    const controlsAperture = chosen.aperture;
+    const fittedStep = chosen.step;
+    const advancedStep = Math.max(1, fittedStep - APERTURE_ADVANCE_CELLS);
+    if (advancedStep < fittedStep) {
+      const lineZ = near + cell * advancedStep;
+      const aperture = freezeRect(camera.apertureAt(lineZ));
+      if (aperture.width && aperture.height) chosen = { lineZ, aperture, step: advancedStep };
+    }
+    const apertureAdvanceCells = fittedStep - chosen.step;
+
     const liveZ = chosen.lineZ + cell * LIVE_PLANE_GAP_CELLS;
     const latentZ = liveZ + cell * LATENT_PLANE_GAP_CELLS;
     const readerZ = Math.max(near + cell * 0.04, chosen.lineZ - cell * 0.58);
@@ -177,6 +189,7 @@ window.NCNDripfeedChamber = (() => {
       wallGutter,
       leadingClearance,
       calibration: Object.freeze({
+        apertureAdvanceCells,
         liveGapCells: LIVE_PLANE_GAP_CELLS,
         latentGapCells: LATENT_PLANE_GAP_CELLS
       }),
@@ -186,8 +199,8 @@ window.NCNDripfeedChamber = (() => {
         utilityTop,
         utilityHeight,
         bottom: controlsBottom,
-        left: chosen.aperture.left,
-        width: chosen.aperture.width
+        left: controlsAperture.left,
+        width: controlsAperture.width
       }),
       planes: Object.freeze({ live, latent, reader })
     });
@@ -257,8 +270,8 @@ window.NCNDripfeedChamber = (() => {
 
     let next = computeGeometry(camera, {
       railBottom: currentRailBottom(),
-      filterHeight: measureHeight(filter, 28),
-      utilityHeight: measureHeight(utility, 38)
+      filterHeight: measureHeight(filter, 32),
+      utilityHeight: measureHeight(utility, 42)
     });
     if (!next) return false;
 
