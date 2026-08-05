@@ -1,28 +1,17 @@
 /*==================================================
-  PROJECTION DIAGNOSTICS
+  PRODUCTION DIAGNOSTICS
 
-  The activation gestures are always available, but the diagnostics UI and
-  live viewport listeners are created only while diagnostics are enabled.
-  The laboratory drains any in-flight control dispatches before this module
-  removes diagnostics mode, so canonical profile restoration remains final.
+  Activation gestures remain available, but the diagnostics interface and live
+  viewport listeners exist only while diagnostics are enabled. The archived
+  DOM-parallax profile is deliberately absent; current diagnostics report the
+  shared chamber camera and active Optical semantic planes.
 ==================================================*/
 
 const NCN_DIAGNOSTICS_KEY = "ncn-diagnostics";
-const NCN_DIAGNOSTIC_LAYERS = [
-  { name: "Header", depth: 1.25 },
-  { name: "Headline", profile: "headline" },
-  { name: "Meta", profile: "meta" },
-  { name: "Tags", profile: "tags" },
-  { name: "Body", profile: "body" },
-  { name: "Corners", profile: "corners" },
-  { name: "Priority", profile: "priority" },
-  { name: "Frame", profile: "frame" }
-];
 
 let diagnosticsPanel;
 let diagnosticsToggle;
 let diagnosticsLiveEntry;
-let diagnosticsLiveOffset;
 let diagnosticsLiveScroll;
 let diagnosticsCameraNear;
 let diagnosticsCameraCell;
@@ -51,22 +40,6 @@ function energySpectrumMarkup() {
   `).join("");
 }
 
-function diagnosticLayerMarkup(layer) {
-  const profile = layer.profile ? NCN_PROJECTION_PROFILE[layer.profile] : null;
-  const depth = profile?.depth ?? layer.depth;
-  const scaleX = profile?.structural
-    ? 0.965 + Math.min(depth, 1.1) * 0.035
-    : 1;
-
-  return `
-    <div class="diagnostics-layer">
-      <strong>${layer.name}</strong>
-      <span class="diagnostics-value">D ${Number(depth).toFixed(2)}</span>
-      <span class="diagnostics-value">X ${scaleX.toFixed(4)}</span>
-    </div>
-  `;
-}
-
 function opticalLayerDefinitions() {
   return window.OpticalProjection?.getPlaneDefinitions?.() || [];
 }
@@ -84,20 +57,24 @@ function opticalLayerMarkup(layer, camera) {
 }
 
 function cameraSnapshot() {
-  return window.LayeredChamber?.getCameraSnapshot?.()
-    || window.NCNChamberCamera?.snapshot?.()
+  return window.NCNChamberCamera?.snapshot?.()
+    || window.LayeredChamber?.getCameraSnapshot?.()
     || null;
 }
 
 function opticalLayerListMarkup(camera = cameraSnapshot()) {
   const layers = opticalLayerDefinitions();
-  if (!layers.length) return `<div class="diagnostics-value">No optical panes</div>`;
+  if (!layers.length) {
+    return `<div class="diagnostics-value">No optical panes</div>`;
+  }
   return layers.map(layer => opticalLayerMarkup(layer, camera)).join("");
 }
 
 function updateApplicationDiagnostics() {
   if (!diagnosticsPanel) return;
-  const current = window.NCNApplications?.current?.() || NCN_STATE.activeApp || "redwire";
+  const current = window.NCNApplications?.current?.()
+    || NCN_STATE.activeApp
+    || "redwire";
   diagnosticsPanel.querySelectorAll("[data-debug-app]").forEach(button => {
     const active = button.dataset.debugApp === current;
     button.classList.toggle("active", active);
@@ -107,16 +84,32 @@ function updateApplicationDiagnostics() {
   if (readout) readout.textContent = current.toUpperCase();
 }
 
+function updateRendererDiagnostics() {
+  if (!diagnosticsPanel) return;
+  const opticalEnabled = window.OpticalProjection?.isEnabled?.() === true;
+  const rangefinderEnabled = document.documentElement.classList.contains(
+    "heuristic-rangefinder-active"
+  );
+
+  diagnosticsPanel.querySelectorAll("[data-debug-renderer]").forEach(button => {
+    const active = button.dataset.debugRenderer === "optical"
+      ? opticalEnabled
+      : rangefinderEnabled;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+}
+
 function ensureDiagnosticsInterface() {
   if (diagnosticsPanel) return;
 
   const camera = cameraSnapshot();
   const panel = document.createElement("aside");
   panel.className = "diagnostics-panel";
-  panel.setAttribute("aria-label", "Projection diagnostics");
+  panel.setAttribute("aria-label", "Production diagnostics");
   panel.innerHTML = `
     <div class="diagnostics-title">
-      <span>Projection Diagnostics</span>
+      <span>Production Diagnostics</span>
       <span class="diagnostics-title-actions">
         <span>DEV</span>
         <button type="button" data-debug-disable-diagnostics>Exit &amp; restore</button>
@@ -130,13 +123,17 @@ function ensureDiagnosticsInterface() {
       </div>
       <div class="diagnostics-app-readout">Mounted: <strong data-debug-current-app>REDWIRE</strong></div>
     </section>
+    <section class="diagnostics-section diagnostics-renderer-section">
+      <div class="diagnostics-heading">Development-only renderer controls</div>
+      <div class="diagnostics-app-switch" role="group" aria-label="Renderer controls">
+        <button type="button" data-debug-renderer="optical" aria-pressed="false">Optical</button>
+        <button type="button" data-debug-renderer="rangefinder" aria-pressed="false">Rangefinder</button>
+      </div>
+      <div class="diagnostics-value">The archived Chamber Lab and DOM parallax viewer are not installed.</div>
+    </section>
     <section class="diagnostics-section">
       <div class="diagnostics-heading">Energy spectrum 0–10</div>
       <div class="diagnostics-spectrum">${energySpectrumMarkup()}</div>
-    </section>
-    <section class="diagnostics-section">
-      <div class="diagnostics-heading">DOM projection profile · D depth / X horizontal scale</div>
-      <div class="diagnostics-layer-list">${NCN_DIAGNOSTIC_LAYERS.map(diagnosticLayerMarkup).join("")}</div>
     </section>
     <section class="diagnostics-section">
       <div class="diagnostics-heading">Optical semantic panes · Z chamber depth / S camera scale</div>
@@ -155,7 +152,6 @@ function ensureDiagnosticsInterface() {
       <div class="diagnostics-heading">Live viewport values</div>
       <div class="diagnostics-live">
         <div><span>Entry</span><strong data-debug-entry>—</strong></div>
-        <div><span>Offset</span><strong data-debug-offset>0.000</strong></div>
         <div><span>Scroll Y</span><strong data-debug-scroll>0</strong></div>
       </div>
     </section>
@@ -179,6 +175,25 @@ function ensureDiagnosticsInterface() {
       void window.NCNApplications?.switchTo?.(button.dataset.debugApp);
     });
   });
+
+  panel.querySelector('[data-debug-renderer="optical"]')?.addEventListener("click", () => {
+    if (window.OpticalProjection?.isEnabled?.()) {
+      window.OpticalProjection.disable({ persist: false });
+    } else {
+      window.OpticalProjection?.enable?.({ persist: false });
+    }
+    updateRendererDiagnostics();
+  });
+
+  panel.querySelector('[data-debug-renderer="rangefinder"]')?.addEventListener("click", () => {
+    if (document.documentElement.classList.contains("heuristic-rangefinder-active")) {
+      window.HeuristicRangefinder?.disable?.();
+    } else {
+      window.HeuristicRangefinder?.enable?.();
+    }
+    updateRendererDiagnostics();
+  });
+
   panel.querySelector("[data-debug-disable-diagnostics]")?.addEventListener("click", () => {
     void setDiagnosticsEnabled(false);
   });
@@ -187,7 +202,6 @@ function ensureDiagnosticsInterface() {
   diagnosticsPanel = panel;
   diagnosticsToggle = toggle;
   diagnosticsLiveEntry = panel.querySelector("[data-debug-entry]");
-  diagnosticsLiveOffset = panel.querySelector("[data-debug-offset]");
   diagnosticsLiveScroll = panel.querySelector("[data-debug-scroll]");
   diagnosticsCameraNear = panel.querySelector("[data-debug-camera-near]");
   diagnosticsCameraCell = panel.querySelector("[data-debug-camera-cell]");
@@ -195,14 +209,24 @@ function ensureDiagnosticsInterface() {
   diagnosticsCameraAperture = panel.querySelector("[data-debug-camera-aperture]");
   diagnosticsOpticalLayers = panel.querySelector("[data-debug-optical-layers]");
   updateApplicationDiagnostics();
+  updateRendererDiagnostics();
 }
 
 function setDiagnosticsPanelHidden(hidden) {
   const active = document.documentElement.classList.contains("diagnostics-on");
   diagnosticsPanelHidden = active && Boolean(hidden);
-  document.documentElement.classList.toggle("diagnostics-panel-hidden", diagnosticsPanelHidden);
+  document.documentElement.classList.toggle(
+    "diagnostics-panel-hidden",
+    diagnosticsPanelHidden
+  );
   diagnosticsPanel?.setAttribute("aria-hidden", String(diagnosticsPanelHidden));
-  if (diagnosticsToggle) diagnosticsToggle.textContent = diagnosticsPanelHidden ? "Dev show" : active ? "Dev hide" : "Dev off";
+  if (diagnosticsToggle) {
+    diagnosticsToggle.textContent = diagnosticsPanelHidden
+      ? "Dev show"
+      : active
+        ? "Dev hide"
+        : "Dev off";
+  }
   return diagnosticsPanelHidden;
 }
 
@@ -215,7 +239,7 @@ function findDiagnosticEntry() {
   let closest = null;
   let closestDistance = Number.POSITIVE_INFINITY;
 
-  document.querySelectorAll(".entry:not(.panel)").forEach((entry) => {
+  document.querySelectorAll(".entry:not(.panel)").forEach(entry => {
     const rect = entry.getBoundingClientRect();
     const centre = rect.top + rect.height / 2;
     const distance = Math.abs(centre - viewportCentre);
@@ -232,7 +256,6 @@ function updateCameraDiagnostics() {
   if (!diagnosticsPanel) return;
 
   const camera = cameraSnapshot();
-
   if (!camera) {
     diagnosticsCameraNear.textContent = "—";
     diagnosticsCameraCell.textContent = "—";
@@ -250,18 +273,15 @@ function updateCameraDiagnostics() {
 }
 
 function updateDiagnosticsLiveValues() {
-  if (!document.documentElement.classList.contains("diagnostics-on") || !diagnosticsPanel) return;
+  if (!document.documentElement.classList.contains("diagnostics-on")
+    || !diagnosticsPanel) return;
 
   const entry = findDiagnosticEntry();
-  const rect = entry?.getBoundingClientRect();
-  const anchor = rect ? rect.top + 80 : window.innerHeight / 2;
-  const offset = (anchor - window.innerHeight / 2) / window.innerHeight;
-
   diagnosticsLiveEntry.textContent = entry?.dataset.entryId || "—";
-  diagnosticsLiveOffset.textContent = offset.toFixed(3);
   diagnosticsLiveScroll.textContent = Math.round(window.scrollY).toString();
   updateCameraDiagnostics();
   updateApplicationDiagnostics();
+  updateRendererDiagnostics();
 }
 
 function bindDiagnosticsLiveListeners() {
@@ -269,7 +289,7 @@ function bindDiagnosticsLiveListeners() {
   window.addEventListener("scroll", updateDiagnosticsLiveValues, { passive: true });
   window.addEventListener("resize", updateDiagnosticsLiveValues);
   window.addEventListener("ncn:chamber-camera-change", updateDiagnosticsLiveValues);
-  window.addEventListener("ncn:application-change", updateApplicationDiagnostics);
+  window.addEventListener("ncn:application-change", updateDiagnosticsLiveValues);
   diagnosticsLiveListenersBound = true;
 }
 
@@ -278,7 +298,7 @@ function unbindDiagnosticsLiveListeners() {
   window.removeEventListener("scroll", updateDiagnosticsLiveValues);
   window.removeEventListener("resize", updateDiagnosticsLiveValues);
   window.removeEventListener("ncn:chamber-camera-change", updateDiagnosticsLiveValues);
-  window.removeEventListener("ncn:application-change", updateApplicationDiagnostics);
+  window.removeEventListener("ncn:application-change", updateDiagnosticsLiveValues);
   diagnosticsLiveListenersBound = false;
 }
 
@@ -303,7 +323,9 @@ async function commitDiagnosticsEnabled(enabled) {
 }
 
 function setDiagnosticsEnabled(enabled) {
-  diagnosticsTransition = diagnosticsTransition.then(() => commitDiagnosticsEnabled(Boolean(enabled)));
+  diagnosticsTransition = diagnosticsTransition.then(() => (
+    commitDiagnosticsEnabled(Boolean(enabled))
+  ));
   return diagnosticsTransition;
 }
 
@@ -315,8 +337,10 @@ function toggleDiagnostics() {
 }
 
 function bindDiagnosticsActivationTriggers() {
-  document.addEventListener("keydown", (event) => {
-    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "d") {
+  document.addEventListener("keydown", event => {
+    if ((event.ctrlKey || event.metaKey)
+      && event.shiftKey
+      && event.key.toLowerCase() === "d") {
       event.preventDefault();
       void toggleDiagnostics();
     }

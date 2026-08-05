@@ -856,7 +856,7 @@
         thickness = plan.cellSize * n;
         anchorCentre = add(plan.sourceAnchor, scale(plan.sourceBasis.n, thickness * 0.5));
       } else if (t < timing.outwardEnd) {
-        const n = smoothstep((t - timing.extractEnd) / Math.max(0.000001, timing.outwardEnd - timing.extractEnd));
+        const n = easeOut((t - timing.extractEnd) / Math.max(0.000001, timing.outwardEnd - timing.extractEnd));
         phase = "travelling-out";
         basis = plan.sourceBasis;
         thickness = plan.cellSize;
@@ -868,7 +868,7 @@
         thickness = plan.cellSize;
         anchorCentre = plan.turnCentre;
       } else if (t < timing.inboundEnd) {
-        const n = smoothstep((t - timing.turnEnd) / Math.max(0.000001, timing.inboundEnd - timing.turnEnd));
+        const n = easeIn((t - timing.turnEnd) / Math.max(0.000001, timing.inboundEnd - timing.turnEnd));
         phase = "travelling-in";
         basis = plan.targetBasis;
         thickness = plan.cellSize;

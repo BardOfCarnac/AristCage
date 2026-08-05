@@ -143,14 +143,4 @@ document.addEventListener("click", event => {
   void toggleEntryLayout(entry);
 });
 
-/*==================================================
-  SCROLL / RESIZE
-==================================================*/
-
 syncPanelButtons();
-
-window.addEventListener("scroll", updateProjection, {
-  passive: true
-});
-
-window.addEventListener("resize", updateProjection);

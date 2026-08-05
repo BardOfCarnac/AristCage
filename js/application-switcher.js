@@ -102,7 +102,6 @@ window.NCNApplications = (() => {
 
     setMountVisibility('redwire');
     render();
-    updateProjection();
     activatePresence(true);
     requestRailMeasurement();
   }

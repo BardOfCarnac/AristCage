@@ -1,8 +1,16 @@
-/* Optional chamber subsystem with explicit lifecycle, modes, optical energy, and live feed projection. */
+/*==================================================
+  LAYERED CHAMBER · PRODUCTION SHELL
+
+  Owns the shared background chamber geometry and boot presentation. The former
+  interactive Chamber Lab is preserved on archive/chamber-lab-final-2026-08-04
+  and is deliberately absent from the production runtime.
+==================================================*/
 window.LayeredChamber = (() => {
-  const STORAGE_KEY = 'ncn-layered-chamber';
-  const ROOT_ID = 'layered-chamber-system';
-  const MODES = Object.freeze({ OFF: 'off', BACKGROUND: 'background', LAB: 'lab' });
+  "use strict";
+
+  const LEGACY_STORAGE_KEY = "ncn-layered-chamber";
+  const ROOT_ID = "layered-chamber-system";
+  const MODES = Object.freeze({ OFF: "off", BACKGROUND: "background" });
 
   const geometry = {
     cell: 0.5,
@@ -13,8 +21,7 @@ window.LayeredChamber = (() => {
     focal: 0.84,
     halfWidth: 3,
     halfHeight: 2.5,
-    wallShiftCells: 2,
-    articleDepthStep: 0.72
+    wallShiftCells: 2
   };
 
   const timing = {
@@ -27,7 +34,6 @@ window.LayeredChamber = (() => {
     returnDuration: 0.54,
     wallOpenDuration: 1.06,
     settleDuration: 0.46,
-    labDelay: 0.12,
     breathDuration: 2.8
   };
   timing.returnStart = timing.travelStart + timing.travelDuration + timing.infinityHold;
@@ -40,17 +46,6 @@ window.LayeredChamber = (() => {
     rearLockPulse: 0.26,
     wallLockPulse: 0.11,
     settleBreath: 0.012
-  };
-
-  const lab = {
-    scroll: 0,
-    targetScroll: 0,
-    maxScroll: 0,
-    dragging: false,
-    lastTouchY: 0,
-    diagnostics: false,
-    articlePitch: 1.16,
-    articleHeight: 0.86
   };
 
   const pageRoot = document.documentElement;
@@ -69,14 +64,11 @@ window.LayeredChamber = (() => {
   let injectedEnergy = 0;
   let injectedAt = 0;
   let injectedDuration = 0;
-  let feedObserver = null;
 
-  const toggle = () => document.querySelector('#layered-chamber-toggle');
   const clamp01 = value => Math.max(0, Math.min(1, value));
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const mix = (a, c, t) => a + (c - a) * t;
   const easeOut = t => 1 - Math.pow(1 - clamp01(t), 3);
-  const easeIn = t => Math.pow(clamp01(t), 3);
   const easeTravel = t => Math.pow(clamp01(t), 2.72);
   const easeReturn = t => 1 - Math.pow(1 - clamp01(t), 3.35);
   const easeInOut = t => {
@@ -95,54 +87,41 @@ window.LayeredChamber = (() => {
     const envelope = 1 - distance;
     return envelope * envelope * (3 - 2 * envelope);
   };
-  const snapCells = value => Math.max(geometry.cell, Math.round(value / geometry.cell) * geometry.cell);
+  const snapCells = value => Math.max(
+    geometry.cell,
+    Math.round(value / geometry.cell) * geometry.cell
+  );
 
   function isMode(value) {
     return Object.values(MODES).includes(value);
   }
 
   function makeCanvas(id) {
-    const canvas = document.createElement('canvas');
+    const canvas = document.createElement("canvas");
     canvas.id = id;
-    canvas.className = 'layered-chamber-canvas';
+    canvas.className = "layered-chamber-canvas";
     subsystemRoot.append(canvas);
     return canvas;
   }
 
   function createSubsystemRoot() {
-    const node = document.createElement('div');
+    const node = document.createElement("div");
     node.id = ROOT_ID;
-    node.className = 'layered-chamber-system';
-    node.setAttribute('aria-hidden', 'true');
+    node.className = "layered-chamber-system";
+    node.setAttribute("aria-hidden", "true");
     document.body.prepend(node);
     return node;
-  }
-
-  function observeFeed() {
-    const feed = document.querySelector('#feed');
-    if (!feed || feedObserver) return;
-    feedObserver = new MutationObserver(() => {
-      updateScrollRange();
-      requestDraw();
-    });
-    feedObserver.observe(feed, { childList: true, subtree: true, characterData: true, attributes: true });
   }
 
   function mount() {
     if (mounted) return;
     subsystemRoot = createSubsystemRoot();
-    bg = makeCanvas('layered-chamber-bg');
-    fg = makeCanvas('layered-chamber-fg');
-    b = bg.getContext('2d');
-    g = fg.getContext('2d');
-    addEventListener('resize', resize, { passive: true });
-    addEventListener('wheel', wheel, { passive: false });
-    addEventListener('touchstart', touchStart, { passive: true });
-    addEventListener('touchmove', touchMove, { passive: false });
-    addEventListener('touchend', touchEnd, { passive: true });
-    addEventListener('touchcancel', touchEnd, { passive: true });
+    bg = makeCanvas("layered-chamber-bg");
+    fg = makeCanvas("layered-chamber-fg");
+    b = bg.getContext("2d");
+    g = fg.getContext("2d");
+    addEventListener("resize", resize, { passive: true });
     mounted = true;
-    observeFeed();
     resize();
   }
 
@@ -150,18 +129,10 @@ window.LayeredChamber = (() => {
     if (!mounted) return;
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
-    removeEventListener('resize', resize);
-    removeEventListener('wheel', wheel);
-    removeEventListener('touchstart', touchStart);
-    removeEventListener('touchmove', touchMove);
-    removeEventListener('touchend', touchEnd);
-    removeEventListener('touchcancel', touchEnd);
-    feedObserver?.disconnect();
-    feedObserver = null;
+    removeEventListener("resize", resize);
     subsystemRoot?.remove();
     subsystemRoot = bg = fg = b = g = null;
     W = H = 0;
-    lab.dragging = false;
     mounted = false;
   }
 
@@ -190,25 +161,27 @@ window.LayeredChamber = (() => {
       canvas.height = Math.round(H * DPR);
       canvas.style.width = `${W}px`;
       canvas.style.height = `${H}px`;
-      canvas.getContext('2d').setTransform(DPR, 0, 0, DPR, 0, 0);
+      canvas.getContext("2d").setTransform(DPR, 0, 0, DPR, 0, 0);
     }
-    updateScrollRange();
     requestDraw();
   }
 
   function project(x, y, z) {
     const focal = focalLength();
-    return { x: W / 2 + x * focal / z, y: centreY() - y * focal / z };
+    return {
+      x: W / 2 + x * focal / z,
+      y: centreY() - y * focal / z
+    };
   }
 
   function palette(value, alpha) {
-    const stops = [[30,1,4],[88,3,9],[160,7,14],[238,20,18],[255,82,34]];
+    const stops = [[30, 1, 4], [88, 3, 9], [160, 7, 14], [238, 20, 18], [255, 82, 34]];
     const scaled = clamp01(value) * (stops.length - 1);
     const index = Math.min(stops.length - 2, Math.floor(scaled));
     const local = scaled - index;
     const a = stops[index];
     const c = stops[index + 1];
-    return `rgba(${Math.round(mix(a[0],c[0],local))},${Math.round(mix(a[1],c[1],local))},${Math.round(mix(a[2],c[2],local))},${clamp01(alpha)})`;
+    return `rgba(${Math.round(mix(a[0], c[0], local))},${Math.round(mix(a[1], c[1], local))},${Math.round(mix(a[2], c[2], local))},${clamp01(alpha)})`;
   }
 
   function bootEnergy(t) {
@@ -216,7 +189,10 @@ window.LayeredChamber = (() => {
     if (t < timing.ignitePeak) {
       const n = clamp01((t - timing.igniteStart) / (timing.ignitePeak - timing.igniteStart));
       const rise = mix(0.05, energy.bootPeak, easeOut(n));
-      const irregularity = (Math.sin(n * Math.PI * 5.5) * 0.035 + Math.sin(n * Math.PI * 11.5) * 0.012) * (1 - n);
+      const irregularity = (
+        Math.sin(n * Math.PI * 5.5) * 0.035
+        + Math.sin(n * Math.PI * 11.5) * 0.012
+      ) * (1 - n);
       return clamp01(rise + irregularity);
     }
     if (t < timing.igniteSettle) {
@@ -236,7 +212,9 @@ window.LayeredChamber = (() => {
       return 0;
     }
     const n = age / injectedDuration;
-    return injectedEnergy * Math.exp(-5.2 * n) * (0.82 + 0.18 * Math.cos(n * Math.PI * 7));
+    return injectedEnergy * Math.exp(-5.2 * n) * (
+      0.82 + 0.18 * Math.cos(n * Math.PI * 7)
+    );
   }
 
   function presentationState(now) {
@@ -251,31 +229,51 @@ window.LayeredChamber = (() => {
 
   function state(now) {
     const presentation = presentationState(now);
-    const { t, travel, returning, wallOpen } = presentation;
-    const rearLock = sharpPulse(t, timing.returnStart + timing.returnDuration, 0.22);
-    const wallLock = softPulse(t, timing.wallOpenStart + timing.wallOpenDuration, 0.38);
+    const { t } = presentation;
+    const rearLock = sharpPulse(
+      t,
+      timing.returnStart + timing.returnDuration,
+      0.22
+    );
+    const wallLock = softPulse(
+      t,
+      timing.wallOpenStart + timing.wallOpenDuration,
+      0.38
+    );
     const base = bootEnergy(t);
     const breathAge = t - timing.done;
     const breathActive = breathAge > 0 && breathAge < timing.breathDuration;
     const breathPhase = breathActive ? breathAge / timing.breathDuration : 0;
-    const breathEnvelope = breathActive ? Math.pow(Math.sin(breathPhase * Math.PI), 2) : 0;
+    const breathEnvelope = breathActive
+      ? Math.pow(Math.sin(breathPhase * Math.PI), 2)
+      : 0;
     const breath = breathActive
       ? Math.sin(breathPhase * Math.PI * 2) * breathEnvelope * energy.settleBreath
       : 0;
+
     return {
       ...presentation,
-      energy: clamp01(base + rearLock * energy.rearLockPulse + wallLock * energy.wallLockPulse + breath + injectedEnergyAt(now)),
-      lab: mode === MODES.LAB ? easeOut((t - timing.done - timing.labDelay) / 0.55) : 0,
+      energy: clamp01(
+        base
+        + rearLock * energy.rearLockPulse
+        + wallLock * energy.wallLockPulse
+        + breath
+        + injectedEnergyAt(now)
+      ),
       done: t >= timing.done + timing.breathDuration && injectedDuration === 0
     };
   }
 
-  function rearDepth(s) {
+  function rearDepth(presentation) {
     const initial = geometry.near + geometry.initialDepthCells * geometry.cell;
     const final = geometry.near + geometry.finalDepthCells * geometry.cell;
     const infinity = geometry.near + geometry.infinityDepthCells * geometry.cell;
-    if (s.returning > 0) return mix(infinity, final, s.returning);
-    if (s.travel > 0) return mix(initial, infinity, s.travel);
+    if (presentation.returning > 0) {
+      return mix(infinity, final, presentation.returning);
+    }
+    if (presentation.travel > 0) {
+      return mix(initial, infinity, presentation.travel);
+    }
     return initial;
   }
 
@@ -283,8 +281,9 @@ window.LayeredChamber = (() => {
     return geometry.halfWidth + geometry.wallShiftCells * geometry.cell;
   }
 
-  function visibleHalfWidth(s) {
-    return geometry.halfWidth + geometry.wallShiftCells * geometry.cell * s.wallOpen;
+  function visibleHalfWidth(presentation) {
+    return geometry.halfWidth
+      + geometry.wallShiftCells * geometry.cell * presentation.wallOpen;
   }
 
   function settledPresentationSnapshot() {
@@ -300,7 +299,9 @@ window.LayeredChamber = (() => {
   }
 
   function presentationSnapshot(now = performance.now()) {
-    if (mode === MODES.OFF || !mounted || !startedAt) return settledPresentationSnapshot();
+    if (mode === MODES.OFF || !mounted || !startedAt) {
+      return settledPresentationSnapshot();
+    }
     const presentation = presentationState(now);
     return Object.freeze({
       elapsed: presentation.t,
@@ -309,14 +310,22 @@ window.LayeredChamber = (() => {
       visibleHalfWidth: visibleHalfWidth(presentation),
       rearDepth: rearDepth(presentation),
       settled: presentation.t >= timing.done,
-      active: presentation.t < timing.done + timing.breathDuration || injectedDuration > 0
+      active: presentation.t < timing.done + timing.breathDuration
+        || injectedDuration > 0
     });
   }
 
   function apertureAt(z, halfWidth) {
     const tl = project(-halfWidth, geometry.halfHeight, z);
     const br = project(halfWidth, -geometry.halfHeight, z);
-    return { left: tl.x, top: tl.y, right: br.x, bottom: br.y, width: br.x - tl.x, height: br.y - tl.y };
+    return {
+      left: tl.x,
+      top: tl.y,
+      right: br.x,
+      bottom: br.y,
+      width: br.x - tl.x,
+      height: br.y - tl.y
+    };
   }
 
   function opticalProfile(z, energyLevel, alpha = 1) {
@@ -328,9 +337,20 @@ window.LayeredChamber = (() => {
     const depthOpacity = 1 + Math.sin(z * 3.17 + 1.2) * 0.008;
     return {
       resolve,
-      brightness: clamp01(energyLevel * (0.22 + contrast * 0.78) * depthBrightness),
-      opacity: clamp01(alpha * Math.pow(contrast, 1.28) * (0.22 + resolve * 0.78) * depthOpacity),
-      width: clamp(0.2 + 1.25 * Math.pow(contrast, 0.72), 0.2, 1.45)
+      brightness: clamp01(
+        energyLevel * (0.22 + contrast * 0.78) * depthBrightness
+      ),
+      opacity: clamp01(
+        alpha
+        * Math.pow(contrast, 1.28)
+        * (0.22 + resolve * 0.78)
+        * depthOpacity
+      ),
+      width: clamp(
+        0.2 + 1.25 * Math.pow(contrast, 0.72),
+        0.2,
+        1.45
+      )
     };
   }
 
@@ -346,21 +366,37 @@ window.LayeredChamber = (() => {
 
   function opticalLine(ctx, a, c, energyLevel, alpha, widthScale = 1) {
     const midpointZ = (a[2] + c[2]) * 0.5;
-    const p = opticalProfile(midpointZ, energyLevel, alpha);
-    if (p.opacity < 0.006) return;
+    const profile = opticalProfile(midpointZ, energyLevel, alpha);
+    if (profile.opacity < 0.006) return;
     const A = project(a[0], a[1], a[2]);
     const C = project(c[0], c[1], c[2]);
-    ctx.strokeStyle = palette(p.brightness, p.opacity);
-    ctx.lineWidth = p.width * widthScale;
+    ctx.strokeStyle = palette(profile.brightness, profile.opacity);
+    ctx.lineWidth = profile.width * widthScale;
     ctx.beginPath();
     ctx.moveTo(A.x, A.y);
     ctx.lineTo(C.x, C.y);
     ctx.stroke();
   }
 
-  function opticalDepthLine(ctx, x, y, nearZ, farZ, energyLevel, alpha, widthScale = 1) {
+  function opticalDepthLine(
+    ctx,
+    x,
+    y,
+    nearZ,
+    farZ,
+    energyLevel,
+    alpha,
+    widthScale = 1
+  ) {
     for (let z = nearZ; z < farZ - 0.0001; z += geometry.cell) {
-      opticalLine(ctx, [x, y, z], [x, y, Math.min(farZ, z + geometry.cell)], energyLevel, alpha, widthScale);
+      opticalLine(
+        ctx,
+        [x, y, z],
+        [x, y, Math.min(farZ, z + geometry.cell)],
+        energyLevel,
+        alpha,
+        widthScale
+      );
     }
   }
 
@@ -371,23 +407,48 @@ window.LayeredChamber = (() => {
     const yCells = Math.round((Y * 2) / cell);
     const profile = opticalProfile(z, systemEnergy, alpha);
     const stride = resolutionStride(z);
+
     if (Number.isFinite(stride)) {
       for (let ix = 0; ix <= xCells; ix += stride) {
         const x = -fullX + ix * cell;
-        if (Math.abs(x) <= visibleX + 0.0001) opticalLine(ctx, [x,-Y,z], [x,Y,z], systemEnergy, alpha, 1.04);
+        if (Math.abs(x) <= visibleX + 0.0001) {
+          opticalLine(
+            ctx,
+            [x, -Y, z],
+            [x, Y, z],
+            systemEnergy,
+            alpha,
+            1.04
+          );
+        }
       }
       for (let iy = 0; iy <= yCells; iy += stride) {
         const y = -Y + iy * cell;
-        opticalLine(ctx, [-visibleX,y,z], [visibleX,y,z], systemEnergy, alpha, 1.04);
+        opticalLine(
+          ctx,
+          [-visibleX, y, z],
+          [visibleX, y, z],
+          systemEnergy,
+          alpha,
+          1.04
+        );
       }
     }
-    const ap = apertureAt(z, visibleX);
-    if (!Number.isFinite(stride) || ap.width < 8 || profile.resolve < 0.12) {
+
+    const aperture = apertureAt(z, visibleX);
+    if (!Number.isFinite(stride) || aperture.width < 8 || profile.resolve < 0.12) {
       const unresolved = clamp01(1 - profile.resolve);
-      const radius = clamp(0.7 + unresolved * 2.8 + systemEnergy * 0.8, 0.7, 4.2);
+      const radius = clamp(
+        0.7 + unresolved * 2.8 + systemEnergy * 0.8,
+        0.7,
+        4.2
+      );
       ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = palette(clamp01(systemEnergy + 0.22), clamp01(alpha * (0.18 + unresolved * 0.62)));
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = palette(
+        clamp01(systemEnergy + 0.22),
+        clamp01(alpha * (0.18 + unresolved * 0.62))
+      );
       ctx.beginPath();
       ctx.arc(W / 2, centreY(), radius, 0, Math.PI * 2);
       ctx.fill();
@@ -399,178 +460,112 @@ window.LayeredChamber = (() => {
     const { cell, near } = geometry;
     const fullX = finalHalfWidth();
     const xCells = Math.round((fullX * 2) / cell);
-    for (let ix = 0; ix <= xCells; ix++) {
+
+    for (let ix = 0; ix <= xCells; ix += 1) {
       const x = -fullX + ix * cell;
-      if (Math.abs(x) <= visibleX + 0.0001) opticalDepthLine(ctx, x, y, near, rearZ, systemEnergy, alpha, 0.92);
+      if (Math.abs(x) <= visibleX + 0.0001) {
+        opticalDepthLine(
+          ctx,
+          x,
+          y,
+          near,
+          rearZ,
+          systemEnergy,
+          alpha,
+          0.92
+        );
+      }
     }
-    for (let z = near, index = 0; z <= rearZ + 0.0001; z += cell, index++) {
+
+    for (let z = near, index = 0; z <= rearZ + 0.0001; z += cell, index += 1) {
       const stride = resolutionStride(z);
       if (!Number.isFinite(stride) || index % stride !== 0) continue;
-      opticalLine(ctx, [-visibleX,y,z], [visibleX,y,z], systemEnergy, alpha, 0.9);
+      opticalLine(
+        ctx,
+        [-visibleX, y, z],
+        [visibleX, y, z],
+        systemEnergy,
+        alpha,
+        0.9
+      );
     }
   }
 
-  function drawSideWall(ctx, side, rearZ, visibleX, systemEnergy, alpha) {
+  function drawSideWall(
+    ctx,
+    side,
+    rearZ,
+    visibleX,
+    systemEnergy,
+    alpha
+  ) {
     const { cell, halfHeight: Y, near } = geometry;
     const yCells = Math.round((Y * 2) / cell);
     const x = side * visibleX;
-    for (let iy = 0; iy <= yCells; iy++) opticalDepthLine(ctx, x, -Y + iy * cell, near, rearZ, systemEnergy, alpha, 0.92);
-    for (let z = near, index = 0; z <= rearZ + 0.0001; z += cell, index++) {
+
+    for (let iy = 0; iy <= yCells; iy += 1) {
+      opticalDepthLine(
+        ctx,
+        x,
+        -Y + iy * cell,
+        near,
+        rearZ,
+        systemEnergy,
+        alpha,
+        0.92
+      );
+    }
+
+    for (let z = near, index = 0; z <= rearZ + 0.0001; z += cell, index += 1) {
       const stride = resolutionStride(z);
       if (!Number.isFinite(stride) || index % stride !== 0) continue;
-      opticalLine(ctx, [x,-Y,z], [x,Y,z], systemEnergy, alpha, 0.9);
+      opticalLine(
+        ctx,
+        [x, -Y, z],
+        [x, Y, z],
+        systemEnergy,
+        alpha,
+        0.9
+      );
     }
   }
 
-  function drawChamber(ctx, s, alpha) {
-    const rearZ = rearDepth(s);
-    const visibleX = visibleHalfWidth(s);
-    drawRearWall(ctx, rearZ, visibleX, s.energy, alpha * 1.2);
-    drawHorizontalPlane(ctx, -geometry.halfHeight, rearZ, visibleX, s.energy, alpha);
-    drawHorizontalPlane(ctx, geometry.halfHeight, rearZ, visibleX, s.energy, alpha * 0.92);
-    drawSideWall(ctx, -1, rearZ, visibleX, s.energy, alpha * 0.96);
-    drawSideWall(ctx, 1, rearZ, visibleX, s.energy, alpha * 0.96);
-  }
-
-  function textOf(node, selector) {
-    return node.querySelector(selector)?.textContent?.trim().replace(/\s+/g, ' ') || '';
-  }
-
-  function liveArticles() {
-    return [...document.querySelectorAll('#feed .entry:not(.panel)')]
-      .filter(node => getComputedStyle(node).display !== 'none')
-      .map((node, index) => ({
-        id: node.dataset.entryId || `entry-${index}`,
-        headline: textOf(node, '.headline'),
-        meta: textOf(node, '.meta'),
-        tags: textOf(node, '.tags'),
-        body: textOf(node, '.body'),
-        priority: Number((node.querySelector('.priority')?.className.match(/priority-(\d+)/) || [])[1]) || 1,
-        expanded: node.classList.contains('expanded')
-      }))
-      .filter(article => article.headline || article.meta || article.body);
-  }
-
-  function wrapText(ctx, text, maxWidth, maxLines) {
-    const words = String(text || '').split(/\s+/).filter(Boolean);
-    const lines = [];
-    let line = '';
-    for (const word of words) {
-      const test = line ? `${line} ${word}` : word;
-      if (ctx.measureText(test).width <= maxWidth || !line) line = test;
-      else {
-        lines.push(line);
-        line = word;
-        if (lines.length >= maxLines) break;
-      }
-    }
-    if (lines.length < maxLines && line) lines.push(line);
-    if (lines.length === maxLines && words.length && ctx.measureText(lines[lines.length - 1]).width > maxWidth * 0.92) {
-      lines[lines.length - 1] = `${lines[lines.length - 1].slice(0, -1)}…`;
-    }
-    return lines;
-  }
-
-  function drawArticle(ctx, article, index, z, halfWidth, worldY, alpha) {
-    const inset = geometry.cell * 1.05;
-    const heightWorld = article.expanded ? lab.articleHeight * 1.55 : lab.articleHeight;
-    const tl = project(-halfWidth + inset, worldY, z);
-    const br = project(halfWidth - inset, worldY - heightWorld, z);
-    const width = br.x - tl.x;
-    const height = br.y - tl.y;
-    if (br.y < -60 || tl.y > H + 60 || width < 24 || height < 12) return;
-
-    const p = opticalProfile(z, 0.88, alpha);
-    const priorityStrength = clamp01(0.42 + article.priority * 0.1);
-    ctx.fillStyle = `rgba(8,0,2,${0.58 * p.opacity})`;
-    ctx.fillRect(tl.x, tl.y, width, height);
-    ctx.strokeStyle = palette(0.68, 0.78 * p.opacity);
-    ctx.lineWidth = Math.max(0.6, p.width * 0.82);
-    ctx.strokeRect(tl.x, tl.y, width, height);
-
-    const railWidth = Math.max(2, width * 0.012);
-    ctx.fillStyle = palette(priorityStrength, 0.95 * p.opacity);
-    ctx.fillRect(tl.x, tl.y, railWidth, height);
-
-    const padX = Math.max(8, width * 0.035);
-    const contentX = tl.x + railWidth + padX;
-    const contentWidth = width - railWidth - padX * 2;
-    const metaSize = clamp(height * 0.095, 7, 11);
-    const headlineSize = clamp(height * 0.17, 10, 22);
-    const bodySize = clamp(height * 0.105, 8, 13);
-
-    ctx.textBaseline = 'top';
-    ctx.font = `${metaSize}px monospace`;
-    ctx.fillStyle = palette(0.72, 0.7 * p.opacity);
-    ctx.fillText(article.meta, contentX, tl.y + height * 0.10, contentWidth);
-
-    ctx.font = `600 ${headlineSize}px sans-serif`;
-    ctx.fillStyle = palette(0.95, 0.96 * p.opacity);
-    const headlineLines = wrapText(ctx, article.headline, contentWidth, article.expanded ? 3 : 2);
-    let cursorY = tl.y + height * 0.26;
-    for (const line of headlineLines) {
-      ctx.fillText(line, contentX, cursorY, contentWidth);
-      cursorY += headlineSize * 1.08;
-    }
-
-    ctx.font = `${bodySize}px sans-serif`;
-    ctx.fillStyle = palette(0.76, 0.65 * p.opacity);
-    const bodyLines = wrapText(ctx, article.body, contentWidth, article.expanded ? 4 : 2);
-    cursorY += bodySize * 0.45;
-    for (const line of bodyLines) {
-      if (cursorY > br.y - bodySize * 2) break;
-      ctx.fillText(line, contentX, cursorY, contentWidth);
-      cursorY += bodySize * 1.2;
-    }
-
-    ctx.font = `${Math.max(7, bodySize * 0.82)}px monospace`;
-    ctx.fillStyle = palette(0.62, 0.5 * p.opacity);
-    ctx.fillText(article.tags, contentX, br.y - Math.max(12, height * 0.12), contentWidth);
-
-    if (lab.diagnostics) {
-      ctx.font = '9px monospace';
-      ctx.fillStyle = `rgba(255,120,98,${0.55 * p.opacity})`;
-      ctx.fillText(`Z ${z.toFixed(2)} · ${article.id}`, tl.x + 5, tl.y + 4);
-    }
-  }
-
-  function updateScrollRange() {
-    const count = liveArticles().length;
-    lab.maxScroll = Math.max(0, count * lab.articlePitch - geometry.halfHeight * 1.35);
-    lab.targetScroll = clamp(lab.targetScroll, 0, lab.maxScroll);
-    lab.scroll = clamp(lab.scroll, 0, lab.maxScroll);
-  }
-
-  function drawLiveFeed(ctx, s) {
-    if (mode !== MODES.LAB || s.lab <= 0) return;
-    const articles = liveArticles();
-    const halfWidth = visibleHalfWidth(s);
-    const contentTop = geometry.halfHeight - geometry.cell * 1.2 + lab.scroll;
-
-    for (let index = articles.length - 1; index >= 0; index--) {
-      const z = geometry.near + geometry.cell * 1.25 + index * geometry.articleDepthStep;
-      const worldY = contentTop - index * lab.articlePitch;
-      drawArticle(ctx, articles[index], index, z, halfWidth, worldY, s.lab);
-    }
-
-    if (!articles.length) {
-      ctx.fillStyle = `rgba(255,100,78,${0.58 * s.lab})`;
-      ctx.font = '12px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('NO LIVE FEED ENTRIES', W / 2, H / 2);
-      ctx.textAlign = 'start';
-    }
-  }
-
-  function settleScroll() {
-    if (mode !== MODES.LAB) return false;
-    const delta = lab.targetScroll - lab.scroll;
-    if (Math.abs(delta) < 0.001) {
-      lab.scroll = lab.targetScroll;
-      return false;
-    }
-    lab.scroll += delta * 0.18;
-    return true;
+  function drawChamber(ctx, presentation, alpha) {
+    const rearZ = rearDepth(presentation);
+    const visibleX = visibleHalfWidth(presentation);
+    drawRearWall(ctx, rearZ, visibleX, presentation.energy, alpha * 1.2);
+    drawHorizontalPlane(
+      ctx,
+      -geometry.halfHeight,
+      rearZ,
+      visibleX,
+      presentation.energy,
+      alpha
+    );
+    drawHorizontalPlane(
+      ctx,
+      geometry.halfHeight,
+      rearZ,
+      visibleX,
+      presentation.energy,
+      alpha * 0.92
+    );
+    drawSideWall(
+      ctx,
+      -1,
+      rearZ,
+      visibleX,
+      presentation.energy,
+      alpha * 0.96
+    );
+    drawSideWall(
+      ctx,
+      1,
+      rearZ,
+      visibleX,
+      presentation.energy,
+      alpha * 0.96
+    );
   }
 
   function draw(now = performance.now()) {
@@ -578,52 +573,25 @@ window.LayeredChamber = (() => {
     if (!mounted || mode === MODES.OFF || !W || !b || !g) return;
     b.clearRect(0, 0, W, H);
     g.clearRect(0, 0, W, H);
-    const s = state(now);
-    drawChamber(b, s, 0.34);
-    if (s.energy > 0) {
+    const presentation = state(now);
+    drawChamber(b, presentation, 0.34);
+    if (presentation.energy > 0) {
       b.save();
-      b.globalCompositeOperation = 'lighter';
-      drawChamber(b, s, 0.03 + 0.072 * s.energy);
+      b.globalCompositeOperation = "lighter";
+      drawChamber(
+        b,
+        presentation,
+        0.03 + 0.072 * presentation.energy
+      );
       b.restore();
     }
-    drawLiveFeed(g, s);
-    const movingScroll = settleScroll();
-    if (!s.done || movingScroll) requestDraw();
+    if (!presentation.done) requestDraw();
   }
 
   function requestDraw() {
-    if (mounted && mode !== MODES.OFF && !raf) raf = requestAnimationFrame(draw);
-  }
-
-  function setScroll(value) {
-    if (mode !== MODES.LAB) return;
-    lab.targetScroll = clamp(value, 0, lab.maxScroll);
-    requestDraw();
-  }
-
-  function wheel(event) {
-    if (mode !== MODES.LAB || event.target.closest?.('.rail')) return;
-    event.preventDefault();
-    setScroll(lab.targetScroll + event.deltaY * 0.0065);
-  }
-
-  function touchStart(event) {
-    if (mode !== MODES.LAB || event.target.closest?.('.rail') || !event.touches.length) return;
-    lab.dragging = true;
-    lab.lastTouchY = event.touches[0].clientY;
-  }
-
-  function touchMove(event) {
-    if (mode !== MODES.LAB || !lab.dragging || !event.touches.length) return;
-    event.preventDefault();
-    const y = event.touches[0].clientY;
-    const delta = lab.lastTouchY - y;
-    lab.lastTouchY = y;
-    setScroll(lab.targetScroll + delta * 0.018);
-  }
-
-  function touchEnd() {
-    lab.dragging = false;
+    if (mounted && mode !== MODES.OFF && !raf) {
+      raf = requestAnimationFrame(draw);
+    }
   }
 
   function restart() {
@@ -631,9 +599,6 @@ window.LayeredChamber = (() => {
     if (!mounted) mount();
     startedAt = performance.now();
     injectedDuration = 0;
-    lab.scroll = 0;
-    lab.targetScroll = 0;
-    updateScrollRange();
     requestDraw();
   }
 
@@ -646,67 +611,54 @@ window.LayeredChamber = (() => {
   }
 
   function updateDocumentState() {
-    pageRoot.classList.toggle('layered-chamber-mode', mode !== MODES.OFF);
-    pageRoot.classList.toggle('layered-chamber-background-mode', mode === MODES.BACKGROUND);
-    pageRoot.classList.toggle('layered-chamber-lab-mode', mode === MODES.LAB);
+    pageRoot.classList.toggle("layered-chamber-mode", mode !== MODES.OFF);
+    pageRoot.classList.toggle(
+      "layered-chamber-background-mode",
+      mode === MODES.BACKGROUND
+    );
+    pageRoot.classList.remove("layered-chamber-lab-mode");
     pageRoot.dataset.chamberMode = mode;
-    const button = toggle();
-    if (button) {
-      button.setAttribute('aria-pressed', String(mode !== MODES.OFF));
-      button.textContent = mode === MODES.OFF ? 'Chamber: Off' : mode === MODES.BACKGROUND ? 'Chamber: Background' : 'Chamber: Lab';
-      button.title = 'Click to change mode. Shift-click to restart the current chamber.';
-    }
   }
 
   function clearDocumentState() {
-    pageRoot.classList.remove('layered-chamber-mode', 'layered-chamber-background-mode', 'layered-chamber-lab-mode');
+    pageRoot.classList.remove(
+      "layered-chamber-mode",
+      "layered-chamber-background-mode",
+      "layered-chamber-lab-mode"
+    );
     delete pageRoot.dataset.chamberMode;
-    const button = toggle();
-    if (button) {
-      button.setAttribute('aria-pressed', 'false');
-      button.textContent = 'Chamber: Off';
-      button.title = 'Click to enable the chamber background.';
-    }
   }
 
   function setMode(nextMode, options = {}) {
-    const { persist = true, restartAnimation = true } = options;
-    if (!isMode(nextMode)) throw new TypeError(`Unknown chamber mode: ${nextMode}`);
+    const { restartAnimation = true } = options;
+    if (!isMode(nextMode)) {
+      throw new TypeError(`Unknown production chamber mode: ${nextMode}`);
+    }
+
     if (nextMode === MODES.OFF) {
       mode = MODES.OFF;
       unmount();
       clearDocumentState();
-      if (persist) localStorage.setItem(STORAGE_KEY, MODES.OFF);
       return;
     }
-    mode = nextMode;
+
+    mode = MODES.BACKGROUND;
     mount();
     updateDocumentState();
-    if (persist) localStorage.setItem(STORAGE_KEY, nextMode);
     if (restartAnimation) restart();
     else requestDraw();
   }
 
-  function nextMode() {
-    if (mode === MODES.OFF) return MODES.BACKGROUND;
-    if (mode === MODES.BACKGROUND) return MODES.LAB;
-    return MODES.OFF;
-  }
-
-  function handleToggle(event) {
-    if (event.shiftKey && mode !== MODES.OFF) restart();
-    else setMode(nextMode());
-  }
-
   function init() {
-    toggle()?.addEventListener('click', handleToggle);
-    const stored = localStorage.getItem(STORAGE_KEY);
-    const initialMode = stored === 'on' ? MODES.LAB : isMode(stored) ? stored : MODES.OFF;
-    setMode(initialMode, { persist: false, restartAnimation: initialMode !== MODES.OFF });
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    setMode(MODES.OFF, { restartAnimation: false });
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
-  else init();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init, { once: true });
+  } else {
+    init();
+  }
 
   return {
     MODES,
@@ -717,15 +669,12 @@ window.LayeredChamber = (() => {
     getMode: () => mode,
     isMounted: () => mounted,
     isEnabled: () => mode !== MODES.OFF,
-    enable: () => setMode(MODES.LAB),
+    enable: () => setMode(MODES.BACKGROUND),
     disable: () => setMode(MODES.OFF),
     refresh: requestDraw,
-    setScroll,
     injectEnergy,
     getPresentationSnapshot: presentationSnapshot,
-    toggleDiagnostics: () => {
-      lab.diagnostics = !lab.diagnostics;
-      requestDraw();
-    }
+    setScroll: () => false,
+    toggleDiagnostics: () => false
   };
 })();

@@ -29,7 +29,6 @@ function watchRailHeight() {
 
 function boot() {
   render();
-  updateProjection();
   activatePresence();
   watchRailHeight();
 }
