@@ -149,4 +149,6 @@ assert.deepEqual(appliedProfiles.find(entry => entry.name === 'weather')?.profil
 assert.equal(readout.profile.textContent, 'REDWIRE');
 assert.equal(readout.state.textContent, 'READY');
 
+require('./weather-reading-independence.test.js');
+
 console.log('Integration owns the RedWire broad-bank Weather profile, canonical quality/seed, diagnostics reproduction and Dripfeed-disabled policy without article-reading attenuation.');
