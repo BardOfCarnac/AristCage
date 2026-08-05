@@ -45,7 +45,8 @@ window.NCNWeatherDepartmentTests = (() => {
     context.__step?.(16, 40);
     const rain = candidate.snapshot();
     assert(rain.particles.rain > 0, "Rain should appear after transition.");
-    assert(rain.zones.reading === true, "Reading-zone attenuation should be detected.");
+    assert(!Object.prototype.hasOwnProperty.call(rain.zones, "reading"),
+      "Weather must not publish article-reading state.");
     assert(rain.zones.controls > 0, "Control-zone attenuation should be detected.");
 
     candidate.suspend();
