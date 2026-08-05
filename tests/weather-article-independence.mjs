@@ -46,10 +46,13 @@ async function waitForArticlePhase(targetPage, expectedEntryId, expectedReading,
     const weather = window.NCNIntegration?.getService?.("weather")?.snapshot?.();
     const currentView = window.NCNViewerHost?.context?.().views?.current?.() || null;
     const expandedEntryId = typeof NCN_STATE !== "undefined" ? NCN_STATE.expandedEntryId : null;
+    const projectionIdle = typeof NCN_PROJECTION_TRANSITIONING === "undefined"
+      || NCN_PROJECTION_TRANSITIONING === false;
     return Boolean(weather)
       && expandedEntryId === expectedEntryId
       && Boolean(currentView?.isReading?.()) === expectedReading
-      && weather.frameCount >= minimumFrame;
+      && weather.frameCount >= minimumFrame
+      && projectionIdle;
   }, { expectedEntryId, expectedReading, minimumFrame }, { timeout: 15_000 });
   return mountedSnapshot(targetPage);
 }
