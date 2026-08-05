@@ -9,6 +9,7 @@ window.NCNDepartmentContext = (() => {
   const contract = window.NCNIntegrationContract || {};
   const resources = new WeakMap();
   const BLOCKED_SERVICE_METHODS = new Set(["init", "suspend", "resume", "reset", "destroy"]);
+  const WEATHER_MODULE_NAME = contract.MODULES?.WEATHER || "weather";
   const WEATHER_LAYERS = Object.freeze({
     far: contract.SCENE?.WEATHER_FAR || "weather:far",
     rear: contract.SCENE?.WEATHER_REAR || "weather:rear",
@@ -43,6 +44,7 @@ window.NCNDepartmentContext = (() => {
     const allowedGroups = new Set(strings(manifest.runtimeGroups));
     const allowedChannels = new Set(strings(manifest.visualChannels));
     const allowedDependencies = new Set(strings(manifest.dependencies));
+    const receivesReadingState = moduleName !== WEATHER_MODULE_NAME;
     const owned = { owner: moduleName, base, tasks: [], subscriptions: [] };
 
     const runtime = Object.freeze({
@@ -133,10 +135,12 @@ window.NCNDepartmentContext = (() => {
     });
 
     const views = Object.freeze({
-      getReadingZone: base.views.getReadingZone,
+      getReadingZone: receivesReadingState ? base.views.getReadingZone : () => null,
       getControlZones: base.views.getControlZones,
       getDepthPlaneDefinitions: base.views.getDepthPlaneDefinitions,
-      isReading: () => Boolean(base.views.current()?.isReading?.()),
+      isReading: receivesReadingState
+        ? () => Boolean(base.views.current()?.isReading?.())
+        : () => false,
       active: () => window.NCNApplications?.current?.() || null
     });
 
