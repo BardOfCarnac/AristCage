@@ -34,7 +34,7 @@ window.NCNVisualDirector = (() => {
     [MODES.CALM]: Object.freeze({ boot: 0, interface: 1, article: 1, environment: 0, chamber: 0, fault: 0 }),
     [MODES.BOOTING]: Object.freeze({ boot: 1, interface: 0.45, article: 0, environment: 0.18, chamber: 0.12, fault: 0.2 }),
     [MODES.AMBIENT]: Object.freeze({ boot: 0, interface: 1, article: 1, environment: 1, chamber: 0.72, fault: 0.58 }),
-    [MODES.READING]: Object.freeze({ boot: 0, interface: 1, article: 1, environment: 0.24, chamber: 0, fault: 0.12 }),
+    [MODES.READING]: Object.freeze({ boot: 0, interface: 1, article: 1, environment: 1, chamber: 0, fault: 0.12 }),
     [MODES.DISTURBED]: Object.freeze({ boot: 0, interface: 0.82, article: 0.68, environment: 0.54, chamber: 1, fault: 0.42 }),
     [MODES.FAULT]: Object.freeze({ boot: 0, interface: 0.72, article: 0.54, environment: 0.4, chamber: 0.28, fault: 1 }),
     [MODES.CRITICAL]: Object.freeze({ boot: 0, interface: 0.62, article: 0, environment: 0.2, chamber: 0, fault: 1 })
