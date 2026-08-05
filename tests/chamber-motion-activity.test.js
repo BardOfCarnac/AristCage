@@ -54,8 +54,11 @@ const service = {
 };
 
 const state = { activeApp: "redwire", activePanel: null };
+const deterministicMath = Object.create(Math);
+deterministicMath.random = () => 0;
 const context = {
   console,
+  Math: deterministicMath,
   performance: { now: () => 1000 },
   URLSearchParams,
   Event,
@@ -82,7 +85,7 @@ Object.assign(windowTarget, {
     requestMovement(options, reason) {
       pending += 1;
       requests.push({ options, reason });
-      return new Promise(() => {});
+      return Promise.resolve({ accepted: true });
     }
   }
 });
@@ -102,12 +105,29 @@ vm.runInNewContext(source, context, { filename: "js/chamber-motion-activity.js" 
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(taskEnabled, true, "panel opening should enable the host activity task");
 
-  runtimeCallback({ now: 1000 });
-  assert.equal(requests.length, 3, "filter panel should fill to three in-flight movements");
+  assert.equal(runtimeCallback({ now: 1000 }), true,
+    "the first runtime tick should admit one movement and remain awake");
+  assert.equal(requests.length, 1,
+    "panel activity should stagger its initial fill rather than launching three together");
+
+  assert.equal(runtimeCallback({ now: 1600 }), true,
+    "the task should remain awake during the minimum fill delay");
+  assert.equal(requests.length, 1,
+    "no second movement should be admitted before the 650ms cadence floor");
+
+  assert.equal(runtimeCallback({ now: 1650 }), true,
+    "the second cadence boundary should admit one more movement");
+  assert.equal(requests.length, 2);
+
+  assert.equal(runtimeCallback({ now: 2300 }), true,
+    "the third cadence boundary should complete the target fill");
+  assert.equal(requests.length, 3,
+    "filter panel should eventually fill to three in-flight movements");
   assert.ok(requests.every(request => request.options.allowConcurrent === true));
   assert.ok(requests.every(request => request.options.clusterSize[0] === 2));
 
-  assert.equal(runtimeCallback({ now: 2000 }), false, "task should sleep once the target is filled");
+  assert.equal(runtimeCallback({ now: 3000 }), false,
+    "task should sleep once the staggered target is filled");
   assert.equal(windowTarget.NCNChamberMotionActivity.snapshot().targetActive, 3);
 
   state.activePanel = null;
@@ -116,7 +136,7 @@ vm.runInNewContext(source, context, { filename: "js/chamber-motion-activity.js" 
   }));
   assert.equal(taskEnabled, false, "panel closing should disable host activity scheduling");
 
-  console.log("Chamber motion host activity checks passed.");
+  console.log("Chamber motion staggered host activity checks passed.");
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
