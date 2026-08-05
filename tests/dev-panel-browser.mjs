@@ -145,12 +145,17 @@ async function verifyWeatherControls(page, viewportName) {
     return weather?.targetPreset === "heavy-mist" && Math.abs(Number(weather.targetIntensity) - 0.8) < 0.01;
   }, null, { timeout: 15_000 });
 
+  assert.equal(
+    await page.locator('[data-debug-weather-input="reading"]').count(),
+    0,
+    `${viewportName}: article-reading attenuation must not exist in the Weather laboratory`
+  );
+
   await setRange(page, "duration", 0);
   await setRange(page, "intensity", 0.67);
   await setRange(page, "wind-x", 0.35);
   await setRange(page, "wind-y", -0.2);
   await setRange(page, "wind-z", 0.15);
-  await setRange(page, "reading", 0.31);
   await setRange(page, "controls", 0.44);
   await page.locator('[data-debug-weather-input="quality"]').selectOption("high");
   await page.locator('[data-debug-weather-action="apply"]').click();
@@ -187,6 +192,8 @@ async function verifyWeatherControls(page, viewportName) {
   assert.equal(report.selectedPreset, "heavy", `${viewportName}: diagnostic report should retain selected preset`);
   assert.deepEqual(report.hiddenLayers, ["near"], `${viewportName}: report should include canvas isolation`);
   assert.equal(report.controls.quality, "high", `${viewportName}: report should include quality override`);
+  assert.equal(report.controls.readingAttenuation, undefined,
+    `${viewportName}: diagnostic reports must not restore article-reading Weather policy`);
 }
 
 function assertWeatherPreviewPreserved(actual, expected, label) {
