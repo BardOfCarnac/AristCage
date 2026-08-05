@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, "..");
 const read = relative => fs.readFileSync(path.join(root, relative), "utf8");
 const contextSource = read("js/department-context.js");
 const environmentSource = read("js/environment-manager.js");
+const visualDirectorSource = read("js/visual-director.js");
 const manifestSource = read("departments/weather/weather-manifest.js");
 const weatherSource = read("departments/weather/weather-module.js");
 const devPanelSource = read("js/dev-panel-controls.js");
@@ -128,6 +129,17 @@ assert.match(weatherSource, /lastZones:\s*\{\s*controls:\s*0\s*\}/,
 assert.match(weatherSource, /scene\.controls\.forEach\(zone => cutout/,
   "Permanent control-zone attenuation remains a canonical Weather responsibility.");
 
+assert.match(
+  visualDirectorSource,
+  /\[MODES\.READING\]:\s*Object\.freeze\(\{[^}]*environment:\s*1(?:\D|$)/,
+  "Reading mode must preserve full Visual Director authority for the environment channel."
+);
+assert.doesNotMatch(
+  visualDirectorSource,
+  /\[MODES\.READING\]:\s*Object\.freeze\(\{[^}]*environment:\s*0\.24/,
+  "The former reading-mode environment suppression must not return."
+);
+
 assert.equal(environmentSource.includes("readingAttenuation"), false,
   "Application profiles and diagnostics must not configure Weather reading attenuation.");
 assert.equal(devPanelSource.includes('data-debug-weather-input="reading"'), false,
@@ -139,4 +151,4 @@ assert.ok(manifestSource.includes('"control-zone attenuation"'),
 assert.ok(manifestSource.includes("does not inspect or consume Optical/article state"),
   "The Weather contract must document article-reading independence at the owner boundary.");
 
-console.log("Canonical Weather ignores article reading state while the shared host view contract remains truthful and generic.");
+console.log("Canonical Weather and the Director environment channel remain independent of article reading state.");
