@@ -12,162 +12,14 @@ on:
       - "tests/optical-card-backing-contract.test.js"
       - "tests/optical-card-backing-render.mjs"
       - "tests/optical-weather-card-occlusion.mjs"
+      - "tests/weather-article-independence.mjs"
       - ".github/workflows/integration-visual-roundtrip.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  refactor-weather-owner:
-    if: github.head_ref == 'agent/remove-weather-reading-suppression'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: agent/remove-weather-reading-suppression
-          fetch-depth: 0
-
-      - name: Remove article-reading policy from canonical Weather
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          def replace_exact(path, old, new, label):
-              source = path.read_text()
-              count = source.count(old)
-              if count == 0 and new in source:
-                  return
-              if count != 1:
-                  raise SystemExit(f"{label}: expected exactly one match, found {count}")
-              path.write_text(source.replace(old, new))
-
-          weather = Path("departments/weather/weather-module.js")
-          replace_exact(weather,
-              '      readingAttenuation: 0.84,\n      controlAttenuation: 0.68,',
-              '      controlAttenuation: 0.68,',
-              'Weather reading attenuation state')
-          replace_exact(weather,
-              '      lastZones: { reading: false, controls: 0 },',
-              '      lastZones: { controls: 0 },',
-              'Weather initial zone snapshot')
-          replace_exact(weather,
-              '''      state.geometry.zoneReads += 1;
-      const readingRect = normaliseRect(context.views?.getReadingZone?.());
-      state.geometry.zoneReads += 1;
-      const controls = Array.from(context.views?.getControlZones?.() || []).map(zone => normaliseRect(zone)).filter(Boolean);
-      state.geometry.frames += 1;
-      state.lastZones = { reading: Boolean(readingRect), controls: controls.length };
-      return Object.freeze({
-        rects,
-        camera,
-        bounds,
-        reading: readingRect ? { rect: readingRect, attenuation: state.readingAttenuation } : null,
-        controls: controls.map(rect => ({ rect, attenuation: state.controlAttenuation }))
-      });''',
-              '''      state.geometry.zoneReads += 1;
-      const controls = Array.from(context.views?.getControlZones?.() || []).map(zone => normaliseRect(zone)).filter(Boolean);
-      state.geometry.frames += 1;
-      state.lastZones = { controls: controls.length };
-      return Object.freeze({
-        rects,
-        camera,
-        bounds,
-        controls: controls.map(rect => ({ rect, attenuation: state.controlAttenuation }))
-      });''',
-              'Weather scene collection')
-          replace_exact(weather,
-              '      const reading = scene.reading ? Object.freeze({ rect: scene.reading.rect, attenuation: scene.reading.attenuation }) : null;\n      const controls = Object.freeze(scene.controls.map(item => Object.freeze({ rect: item.rect, attenuation: item.attenuation })));',
-              '      const controls = Object.freeze(scene.controls.map(item => Object.freeze({ rect: item.rect, attenuation: item.attenuation })));',
-              'Weather depth-frame reading publication')
-          replace_exact(weather,
-              '''        if (options.includeAttenuation !== false) {
-          if (reading) cutoutPage(targetContext, reading, viewport);
-          controls.forEach(item => cutoutPage(targetContext, item, viewport));
-        }''',
-              '''        if (options.includeAttenuation !== false) {
-          controls.forEach(item => cutoutPage(targetContext, item, viewport));
-        }''',
-              'Weather foreground reading attenuation')
-          replace_exact(weather,
-              '''      LAYER_KEYS.forEach(key => {
-        const targetContext = contexts.get(key);
-        const layer = scene.rects.get(key);
-        if (scene.reading) cutout(targetContext, scene.reading.rect, scene.reading.attenuation, layer);
-        scene.controls.forEach(zone => cutout(targetContext, zone.rect, zone.attenuation, layer));
-      });''',
-              '''      LAYER_KEYS.forEach(key => {
-        const targetContext = contexts.get(key);
-        const layer = scene.rects.get(key);
-        scene.controls.forEach(zone => cutout(targetContext, zone.rect, zone.attenuation, layer));
-      });''',
-              'Weather canvas reading cutout')
-          replace_exact(weather,
-              '''      const readingScale = scene.reading || context.views?.isReading?.() ? 0.58 : 1;
-      const intensity = envelope.allowed ? clamp01(envelope.intensity * readingScale) : 0;''',
-              '''      const intensity = envelope.allowed ? clamp01(envelope.intensity) : 0;''',
-              'Weather global reading intensity scale')
-          replace_exact(weather,
-              '      state.lastZones = { reading: false, controls: 0 };',
-              '      state.lastZones = { controls: 0 };',
-              'Weather disabled zone snapshot')
-          replace_exact(weather,
-              '      if (Number.isFinite(Number(profile.readingAttenuation))) state.readingAttenuation = clamp01(profile.readingAttenuation);\n      if (Number.isFinite(Number(profile.controlAttenuation))) state.controlAttenuation = clamp01(profile.controlAttenuation);',
-              '      if (Number.isFinite(Number(profile.controlAttenuation))) state.controlAttenuation = clamp01(profile.controlAttenuation);',
-              'Weather reading profile input')
-
-          context = Path("js/department-context.js")
-          replace_exact(context,
-              '  const BLOCKED_SERVICE_METHODS = new Set(["init", "suspend", "resume", "reset", "destroy"]);\n  const WEATHER_MODULE_NAME = contract.MODULES?.WEATHER || "weather";',
-              '  const BLOCKED_SERVICE_METHODS = new Set(["init", "suspend", "resume", "reset", "destroy"]);',
-              'Weather host special-case constant')
-          replace_exact(context,
-              '    const allowedDependencies = new Set(strings(manifest.dependencies));\n    const receivesReadingState = moduleName !== WEATHER_MODULE_NAME;\n    const owned = { owner: moduleName, base, tasks: [], subscriptions: [] };',
-              '    const allowedDependencies = new Set(strings(manifest.dependencies));\n    const owned = { owner: moduleName, base, tasks: [], subscriptions: [] };',
-              'Weather host special-case flag')
-          replace_exact(context,
-              '''    const views = Object.freeze({
-      getReadingZone: receivesReadingState ? base.views.getReadingZone : () => null,
-      getControlZones: base.views.getControlZones,
-      getDepthPlaneDefinitions: base.views.getDepthPlaneDefinitions,
-      isReading: receivesReadingState
-        ? () => Boolean(base.views.current()?.isReading?.())
-        : () => false,
-      active: () => window.NCNApplications?.current?.() || null
-    });''',
-              '''    const views = Object.freeze({
-      getReadingZone: base.views.getReadingZone,
-      getControlZones: base.views.getControlZones,
-      getDepthPlaneDefinitions: base.views.getDepthPlaneDefinitions,
-      isReading: () => Boolean(base.views.current()?.isReading?.()),
-      active: () => window.NCNApplications?.current?.() || null
-    });''',
-              'Generic department view façade')
-
-          manifest = Path("departments/weather/weather-manifest.js")
-          replace_exact(manifest,
-              '  notes: "Departmental publication only. It exposes exact puff-depth frame views and a synchronous after-render subscription, but receives no article-reading state and does not inspect Optical/article internals."',
-              '  notes: "Departmental publication only. It exposes exact puff-depth frame views and a synchronous after-render subscription, but does not inspect or consume Optical/article state."',
-              'Weather manifest ownership note')
-
-          forbidden = ["readingAttenuation", "getReadingZone", "isReading", "scene.reading", "readingScale"]
-          remaining = [token for token in forbidden if token in weather.read_text()]
-          if remaining:
-              raise SystemExit(f"Canonical Weather still contains article-reading policy: {remaining}")
-          PY
-
-      - name: Commit owner correction
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet; then
-            echo "Weather ownership already corrected."
-            exit 0
-          fi
-          git add departments/weather/weather-module.js departments/weather/weather-manifest.js js/department-context.js
-          git commit -m "Move article independence into canonical Weather"
-          git push origin HEAD:agent/remove-weather-reading-suppression
-
   visual-roundtrip:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -184,6 +36,7 @@ jobs:
           node --check tests/optical-card-backing-contract.test.js
           node --check tests/optical-card-backing-render.mjs
           node --check tests/optical-weather-card-occlusion.mjs
+          node --check tests/weather-article-independence.mjs
 
       - name: Install browser runner
         run: |
@@ -209,20 +62,22 @@ jobs:
           node tests/optical-card-backing-render.mjs 2>&1 | tee artifacts/optical-card-backing/render-output.log
           node tests/optical-weather-card-occlusion.mjs 2>&1 | tee artifacts/optical-card-backing/weather-occlusion-output.log
           node tests/desktop-breakpoint-roundtrip.mjs 2>&1 | tee artifacts/integration-roundtrip/desktop-breakpoint-output.log
+          node tests/weather-article-independence.mjs 2>&1 | tee artifacts/integration-roundtrip/weather-article-independence-output.log
           node tests/integration-visual-roundtrip.mjs 2>&1 | tee artifacts/integration-roundtrip/test-output.log
 
       - name: Print visual diagnostics
         if: always()
         run: |
           echo "Round-trip outcome: ${{ steps.roundtrip.outcome }}"
-          find artifacts/integration-roundtrip -maxdepth 1 -type f -print 2>/dev/null || true
+          find artifacts/integration-roundtrip -maxdepth 2 -type f -print 2>/dev/null || true
           find artifacts/optical-card-backing -maxdepth 1 -type f -print 2>/dev/null || true
           test ! -f artifacts/integration-roundtrip/desktop-breakpoint-output.log || cat artifacts/integration-roundtrip/desktop-breakpoint-output.log
+          test ! -f artifacts/integration-roundtrip/weather-article-independence-output.log || cat artifacts/integration-roundtrip/weather-article-independence-output.log
           test ! -f artifacts/integration-roundtrip/test-output.log || cat artifacts/integration-roundtrip/test-output.log
           test ! -f artifacts/optical-card-backing/contract-output.log || cat artifacts/optical-card-backing/contract-output.log
           test ! -f artifacts/optical-card-backing/render-output.log || cat artifacts/optical-card-backing/render-output.log
           test ! -f artifacts/optical-card-backing/weather-occlusion-output.log || cat artifacts/optical-card-backing/weather-occlusion-output.log
-          for failure in artifacts/integration-roundtrip/*-failure.txt; do
+          for failure in artifacts/integration-roundtrip/*-failure.txt artifacts/integration-roundtrip/weather-article-independence/failure.txt; do
             test ! -e "$failure" || { echo "--- $failure"; cat "$failure"; }
           done
           echo "--- static server log"
