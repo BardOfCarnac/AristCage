@@ -70,17 +70,3 @@ const NCN_ENTRIES = [
     body: "Kiroshi Optical has shuttered three low-cost eye clinics, citing unsustainable operating conditions."
   }
 ];
-
-/*
-  Higher depth means nearer to the viewer and therefore more parallax.
-  Visual energy, colour and line treatment remain CSS concerns.
-*/
-const NCN_PROJECTION_PROFILE = {
-  frame: { depth: 0.25, structural: true },
-  priority: { depth: 0.45 },
-  corners: { depth: 0.55, structural: true },
-  body: { depth: 0.65 },
-  tags: { depth: 0.82 },
-  meta: { depth: 0.88 },
-  headline: { depth: 1.0 }
-};

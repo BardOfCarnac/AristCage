@@ -187,7 +187,6 @@
 
   desktopQuery.addEventListener("change", event => {
     render();
-    updateProjection();
     activatePresence(true);
 
     if (event.matches) {
