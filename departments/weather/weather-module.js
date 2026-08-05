@@ -118,7 +118,6 @@ window.NCNWeatherDepartment = (() => {
       currentIntensity: 0,
       targetIntensity: 0,
       wind: { x: 0, y: 0, z: 0 },
-      readingAttenuation: 0.84,
       controlAttenuation: 0.68,
       transitionAttenuation: 1,
       transition: null,
@@ -129,7 +128,7 @@ window.NCNWeatherDepartment = (() => {
       lastDelta: 0,
       lastEnvelope: null,
       effectRequests: 0,
-      lastZones: { reading: false, controls: 0 },
+      lastZones: { controls: 0 },
       geometry: { frames: 0, cameraReads: 0, layerMeasurements: 0, zoneReads: 0 },
       qualityChanges: 0,
       fpsUpdates: 0,
@@ -335,16 +334,13 @@ window.NCNWeatherDepartment = (() => {
       const rects = collectLayerRects(profile, force);
       const { camera, bounds } = cameraAndBounds();
       state.geometry.zoneReads += 1;
-      const readingRect = normaliseRect(context.views?.getReadingZone?.());
-      state.geometry.zoneReads += 1;
       const controls = Array.from(context.views?.getControlZones?.() || []).map(zone => normaliseRect(zone)).filter(Boolean);
       state.geometry.frames += 1;
-      state.lastZones = { reading: Boolean(readingRect), controls: controls.length };
+      state.lastZones = { controls: controls.length };
       return Object.freeze({
         rects,
         camera,
         bounds,
-        reading: readingRect ? { rect: readingRect, attenuation: state.readingAttenuation } : null,
         controls: controls.map(rect => ({ rect, attenuation: state.controlAttenuation }))
       });
     }
@@ -849,7 +845,6 @@ window.NCNWeatherDepartment = (() => {
       const serial = ++state.depthFrameSerial;
       const runtimeToken = primitiveFrameToken(runtimeFrame);
       const token = `${state.moduleId}:depth:${epoch}:${serial}`;
-      const reading = scene.reading ? Object.freeze({ rect: scene.reading.rect, attenuation: scene.reading.attenuation }) : null;
       const controls = Object.freeze(scene.controls.map(item => Object.freeze({ rect: item.rect, attenuation: item.attenuation })));
       const depths = puffs.map(puff => puff.z);
       const depthRange = Object.freeze({
@@ -939,7 +934,6 @@ window.NCNWeatherDepartment = (() => {
           rendered += 1;
         }
         if (options.includeAttenuation !== false) {
-          if (reading) cutoutPage(targetContext, reading, viewport);
           controls.forEach(item => cutoutPage(targetContext, item, viewport));
         }
         targetContext.restore?.();
@@ -1039,7 +1033,6 @@ window.NCNWeatherDepartment = (() => {
       LAYER_KEYS.forEach(key => {
         const targetContext = contexts.get(key);
         const layer = scene.rects.get(key);
-        if (scene.reading) cutout(targetContext, scene.reading.rect, scene.reading.attenuation, layer);
         scene.controls.forEach(zone => cutout(targetContext, zone.rect, zone.attenuation, layer));
       });
       notifyAfterRender(runtimeFrame, depthFrame);
@@ -1104,8 +1097,7 @@ window.NCNWeatherDepartment = (() => {
       const envelope = context.director?.envelope?.("environment", { intensity: requested })
         || { allowed: true, intensity: requested, mode: "ambient", reducedMotion: false };
       state.lastEnvelope = envelope;
-      const readingScale = scene.reading || context.views?.isReading?.() ? 0.58 : 1;
-      const intensity = envelope.allowed ? clamp01(envelope.intensity * readingScale) : 0;
+      const intensity = envelope.allowed ? clamp01(envelope.intensity) : 0;
       const settings = mistSettings(intensity);
       const counts = targetCounts(intensity, quality.profile);
       if (intensity > 0.002) {
@@ -1176,7 +1168,7 @@ window.NCNWeatherDepartment = (() => {
       state.currentIntensity = 0;
       state.targetIntensity = 0;
       state.lastEnvelope = null;
-      state.lastZones = { reading: false, controls: 0 };
+      state.lastZones = { controls: 0 };
       deactivateAll(true);
       releaseEffects(reason);
       clearCanvases();
@@ -1275,7 +1267,6 @@ window.NCNWeatherDepartment = (() => {
       if (profile.seed !== undefined || meta.seed !== undefined) setSeed(profile.seed ?? meta.seed);
       if (profile.quality !== undefined) setQuality(profile.quality);
       if (profile.wind !== undefined) setWind(typeof profile.wind === "number" ? { x: profile.wind, y: 0, z: 0 } : profile.wind);
-      if (Number.isFinite(Number(profile.readingAttenuation))) state.readingAttenuation = clamp01(profile.readingAttenuation);
       if (Number.isFinite(Number(profile.controlAttenuation))) state.controlAttenuation = clamp01(profile.controlAttenuation);
       if (Number.isFinite(Number(profile.transitionAttenuation))) state.transitionAttenuation = clamp01(profile.transitionAttenuation);
       if (!enabled) { setEnabled(false); return snapshot(); }
