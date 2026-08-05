@@ -14,7 +14,9 @@ let page = null;
 function stablePolicy(snapshot) {
   return {
     targetPreset: snapshot.targetPreset,
-    targetIntensity: snapshot.targetIntensity,
+    intensity: Number(snapshot.intensity),
+    targetIntensity: Number(snapshot.targetIntensity),
+    directorIntensity: Number(snapshot.director?.intensity),
     quality: snapshot.quality,
     qualityOverride: snapshot.qualityOverride,
     seed: snapshot.seed,
@@ -41,45 +43,28 @@ async function mountedSnapshot(targetPage) {
   });
 }
 
-async function waitForStablePhase(
-  targetPage,
-  expectedEntryId,
-  expectedReading,
-  baseline,
-  minimumFrame,
-  dustFloor
-) {
-  await targetPage.waitForFunction(({
-    expectedEntryId,
-    expectedReading,
-    baseline,
-    minimumFrame,
-    dustFloor
-  }) => {
+async function waitForArticlePhase(targetPage, expectedEntryId, expectedReading, minimumFrame) {
+  await targetPage.waitForFunction(({ expectedEntryId, expectedReading, minimumFrame }) => {
     const weather = window.NCNIntegration?.getService?.("weather")?.snapshot?.();
     const currentView = window.NCNViewerHost?.context?.().views?.current?.() || null;
     const expandedEntryId = typeof NCN_STATE !== "undefined" ? NCN_STATE.expandedEntryId : null;
-    if (!weather) return false;
-    return expandedEntryId === expectedEntryId
+    return Boolean(weather)
+      && expandedEntryId === expectedEntryId
       && Boolean(currentView?.isReading?.()) === expectedReading
-      && weather.frameCount >= minimumFrame
-      && weather.targetPreset === baseline.targetPreset
-      && Math.abs(Number(weather.targetIntensity) - Number(baseline.targetIntensity)) < 0.0001
-      && weather.quality === baseline.quality
-      && weather.qualityOverride === baseline.qualityOverride
-      && weather.seed === baseline.seed
-      && Number(weather.particles?.dust) >= dustFloor
-      && weather.zones?.controls === baseline.controls
-      && !("reading" in (weather.zones || {}))
-      && weather.resources?.visibleCanvases === 4;
-  }, {
-    expectedEntryId,
-    expectedReading,
-    baseline,
-    minimumFrame,
-    dustFloor
-  }, { timeout: 15_000 });
+      && weather.frameCount >= minimumFrame;
+  }, { expectedEntryId, expectedReading, minimumFrame }, { timeout: 15_000 });
   return mountedSnapshot(targetPage);
+}
+
+function assertWeatherPhase(name, phase, baseline, dustFloor) {
+  assert.deepEqual(stablePolicy(phase.weather), baseline,
+    `${name}: article interaction must not change Weather profile, effective intensity, controls or canvases.`);
+  assert.ok(Number(phase.weather.particles.dust) >= dustFloor,
+    `${name}: the live Dust field must remain above the full-intensity continuity floor.`);
+  assert.equal("reading" in phase.weather.zones, false,
+    `${name}: Weather must not acquire a reading-zone diagnostic field.`);
+  assert.equal(phase.visibleWeatherCanvases, 4,
+    `${name}: all four canonical Weather canvases must remain mounted and visible.`);
 }
 
 try {
@@ -118,6 +103,7 @@ try {
     const snapshot = window.NCNIntegration?.getService?.("weather")?.snapshot?.();
     return snapshot?.targetPreset === "dust"
       && snapshot?.qualityOverride === "low"
+      && Math.abs(Number(snapshot?.director?.intensity) - 0.8) < 0.001
       && snapshot?.particles?.dust > 0
       && snapshot?.resources?.visibleCanvases === 4
       && !("reading" in (snapshot?.zones || {}));
@@ -144,50 +130,39 @@ try {
   assert.equal(entries.length, 2, "The mounted RedWire feed must provide two articles for open/switch proof.");
   assert.ok(entries.every(Boolean));
 
+  fs.writeFileSync(path.join(artifactRoot, "baseline-state.json"), `${JSON.stringify(baselineMounted, null, 2)}\n`);
   await page.screenshot({ path: path.join(artifactRoot, "mobile-closed-baseline.png"), fullPage: true });
 
   await page.locator(`.entry[data-entry-id="${entries[0]}"]`).click();
-  const opened = await waitForStablePhase(
+  const opened = await waitForArticlePhase(
     page,
     entries[0],
     true,
-    baseline,
-    baselineMounted.weather.frameCount + 6,
-    dustFloor
+    baselineMounted.weather.frameCount + 6
   );
+  assertWeatherPhase("opened", opened, baseline, dustFloor);
   await page.screenshot({ path: path.join(artifactRoot, "mobile-first-article-open.png"), fullPage: true });
 
   await page.locator(`.entry[data-entry-id="${entries[1]}"]`).scrollIntoViewIfNeeded();
   await page.locator(`.entry[data-entry-id="${entries[1]}"]`).click();
-  const switched = await waitForStablePhase(
+  const switched = await waitForArticlePhase(
     page,
     entries[1],
     true,
-    baseline,
-    opened.weather.frameCount + 6,
-    dustFloor
+    opened.weather.frameCount + 6
   );
+  assertWeatherPhase("switched", switched, baseline, dustFloor);
   await page.screenshot({ path: path.join(artifactRoot, "mobile-second-article-open.png"), fullPage: true });
 
   await page.locator(`.entry[data-entry-id="${entries[1]}"]`).click();
-  const closed = await waitForStablePhase(
+  const closed = await waitForArticlePhase(
     page,
     null,
     false,
-    baseline,
-    switched.weather.frameCount + 6,
-    dustFloor
+    switched.weather.frameCount + 6
   );
+  assertWeatherPhase("closed", closed, baseline, dustFloor);
   await page.screenshot({ path: path.join(artifactRoot, "mobile-closed-restored.png"), fullPage: true });
-
-  for (const [name, phase] of Object.entries({ opened, switched, closed })) {
-    assert.deepEqual(stablePolicy(phase.weather), baseline,
-      `${name}: article interaction must not change Weather profile, controls or canvases.`);
-    assert.ok(Number(phase.weather.particles.dust) >= dustFloor,
-      `${name}: the live Dust field must remain above the full-intensity continuity floor.`);
-    assert.equal("reading" in phase.weather.zones, false,
-      `${name}: Weather must not acquire a reading-zone diagnostic field.`);
-  }
 
   assert.ok(opened.weather.frameCount > baselineMounted.weather.frameCount,
     "Weather must continue advancing while the first article is open.");
@@ -198,6 +173,12 @@ try {
   assert.equal(opened.hostReading, true, "The first article must activate the real host reading state.");
   assert.equal(switched.hostReading, true, "Article switching must retain the real host reading state.");
   assert.equal(closed.hostReading, false, "Closing the article must clear the real host reading state.");
+  assert.equal(opened.weather.director.mode, "reading",
+    "The Director must still recognize the first article reading state.");
+  assert.equal(switched.weather.director.mode, "reading",
+    "The Director must still recognize reading state while switching articles.");
+  assert.equal(closed.weather.director.mode, "ambient",
+    "The Director must return to ambient mode after article close.");
   assert.deepEqual(browserErrors, [], "Article reading proof must not emit browser errors.");
 
   const report = {
