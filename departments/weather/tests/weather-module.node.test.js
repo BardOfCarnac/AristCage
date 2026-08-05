@@ -112,6 +112,8 @@ const runtime = createRuntime();
 const layers = Object.fromEntries(['far', 'rear', 'middle', 'near'].map(key => [key, new FakeLayer()]));
 const settings = { quality: 'full', reducedMotion: false };
 let reading = false;
+let readingStateReads = 0;
+let readingZoneReads = 0;
 let cameraReads = 0;
 const effectCalls = [];
 const effectHandles = [];
@@ -141,8 +143,11 @@ const context = {
     }
   },
   views: {
-    isReading() { return reading; },
-    getReadingZone() { return reading ? { rect: { left: 200, top: 120, width: 360, height: 260 } } : null; },
+    isReading() { readingStateReads += 1; return reading; },
+    getReadingZone() {
+      readingZoneReads += 1;
+      return reading ? { rect: { left: 200, top: 120, width: 360, height: 260 } } : null;
+    },
     getControlZones() { return [{ rect: { left: 0, top: 0, width: 800, height: 70 } }]; }
   },
   chamber: {
@@ -189,7 +194,11 @@ function renderCounts() {
   assert.equal(global.NCNWeatherDepartmentManifest.replaces, 'weather');
   assert.deepEqual(global.NCNWeatherDepartmentManifest.layers,
     ['weather:far', 'weather:rear', 'weather:middle', 'weather:near']);
-  for (const forbidden of ['requestAnimationFrame', 'setInterval', 'Math.random', 'querySelector', 'window.NCNEffects', 'dispatchEvent']) {
+  for (const forbidden of [
+    'requestAnimationFrame', 'setInterval', 'Math.random', 'querySelector',
+    'window.NCNEffects', 'dispatchEvent', 'readingAttenuation', 'getReadingZone',
+    'isReading', 'scene.reading', 'readingScale'
+  ]) {
     assert.equal(source.includes(forbidden), false, `forbidden token: ${forbidden}`);
   }
   assert.equal(source.includes('bank.x = -bounds.halfWidth - bank.width'), false,
@@ -374,10 +383,17 @@ function renderCounts() {
   runtime.handle.enable();
   const cameraBefore = cameraReads;
   const measurementsBefore = Object.values(layers).reduce((sum, layer) => sum + layer.measurements, 0);
+  const readingStateBefore = readingStateReads;
+  const readingZoneBefore = readingZoneReads;
   runtime.step(16, 1);
   snapshot = weather.snapshot();
-  assert.equal(snapshot.zones.reading, true);
-  assert.equal(snapshot.zones.controls, 1);
+  assert.deepEqual(snapshot.zones, { controls: 1 });
+  assert.equal(Object.hasOwn(snapshot.zones, 'reading'), false,
+    'Weather diagnostics must not publish article-reading state');
+  assert.equal(readingStateReads, readingStateBefore,
+    'Weather must not inspect the host reading-state callback');
+  assert.equal(readingZoneReads, readingZoneBefore,
+    'Weather must not inspect the host reading-zone callback');
   assert.equal(cameraReads - cameraBefore, 1);
   assert.equal(Object.values(layers).reduce((sum, layer) => sum + layer.measurements, 0) - measurementsBefore, 4);
 
