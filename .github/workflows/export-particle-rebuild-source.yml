@@ -1,9 +1,12 @@
-name: Temporary canonical particle publisher
+name: Publish canonical particle rebuild
 
 on:
   push:
     branches:
       - agent/particle-rebuild-source-export
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -49,5 +52,29 @@ jobs:
             index.html js/integration-harness.js \
             tests/weather-after-render-contract.test.js \
             tests/weather-particles-render.mjs
+          expected=$(cat <<'FILES'
+.github/workflows/chamber-presentation-restoration.yml
+.github/workflows/integration-host-check.yml
+.github/workflows/redwire-weather-card-occlusion.yml
+.github/workflows/weather-department-check.yml
+.github/workflows/weather-particle-field.yml
+departments/weather/tests/weather-module.node.test.js
+departments/weather/tests/weather-module.test.js
+departments/weather/tests/weather-particles-canonical.node.test.js
+departments/weather/tests/weather-pr86-host.test.js
+departments/weather/weather-manifest.js
+departments/weather/weather-module.js
+departments/weather/weather-particles.js
+index.html
+js/integration-harness.js
+tests/weather-after-render-contract.test.js
+tests/weather-particles-render.mjs
+FILES
+          )
+          actual=$(git diff --cached --name-only | sort)
+          if [ "$actual" != "$(printf '%s\n' "$expected" | sort)" ]; then
+            printf 'Unexpected canonical rebuild file set:\n%s\n' "$actual"
+            exit 1
+          fi
           git commit -m "Integrate depth-aware particles into canonical Weather"
           git push origin HEAD:agent/depth-aware-weather-particles --force
