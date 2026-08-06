@@ -241,12 +241,25 @@ async function tripleTapRailMark(page) {
   for (let index = 0; index < 3; index += 1) await mark.click();
 }
 
+async function pressDiagnosticsShortcut(page) {
+  await page.evaluate(() => {
+    document.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "d",
+      code: "KeyD",
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true
+    }));
+  });
+}
+
 async function verifyPanelHidePreservesWeather(page, viewportName) {
   await verifyPresentationRoute(page, viewportName, "floating-control", () => page.locator(".diagnostics-toggle").click());
 }
 
 async function verifyKeyboardAndMarkPreserveWeather(page, viewportName) {
-  await verifyPresentationRoute(page, viewportName, "keyboard", () => page.keyboard.press("Control+Shift+D"));
+  await verifyPresentationRoute(page, viewportName, "keyboard", () => pressDiagnosticsShortcut(page));
   await verifyPresentationRoute(page, viewportName, "triple-mark", () => tripleTapRailMark(page));
 }
 
@@ -294,7 +307,7 @@ async function verifyDisabledCleanup(page, viewportName, application, baseline) 
 }
 
 async function enableWithKeyboard(page) {
-  await page.keyboard.press("Control+Shift+D");
+  await pressDiagnosticsShortcut(page);
   await waitForDiagnostics(page, true);
 }
 
