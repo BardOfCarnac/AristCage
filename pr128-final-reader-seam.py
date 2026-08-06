@@ -11,216 +11,92 @@ def replace_once(path, old, new):
     Path(path).write_text(source.replace(old, new, 1))
 
 
-replace_once('js/dripfeed-chamber-integration.js', """  function readerTarget(publication = readyPublication) {
-    return publication?.readingSurface?.closest?.('[data-reader-target]') || null;
+replace_once('tests/dripfeed-chamber-integration.test.js', """  setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  append(...nodes) {
+    nodes.forEach(node => {
+      node.parent = this;
+      node.isConnected = true;
+      this.children.push(node);
+    });
   }
-
-  function releaseReaderPlacement(publication = readyPublication) {
-    const target = readerTarget(publication);
-    if (!target?.style) return false;
-    target.style.removeProperty?.('width');
-    target.style.removeProperty?.('max-height');
-    target.style.removeProperty?.('transform-origin');
-    target.style.removeProperty?.('align-self');
-    delete target.dataset.chamberReaderFit;
-    delete target.dataset.chamberReaderLayoutWidth;
-    delete target.dataset.chamberReaderMaxHeight;
-    return true;
+""", """  setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  matches(selector) {
+    if (selector === '[data-reader-target]') return Object.prototype.hasOwnProperty.call(this.dataset, 'readerTarget');
+    if (selector.startsWith('.')) return this.className.split(/\\s+/).includes(selector.slice(1));
+    if (selector.startsWith('#')) return this.id === selector.slice(1);
+    return false;
   }
-""", """  function readerTarget(publication = readyPublication) {
-    return publication?.readerTarget
-      || publication?.readingSurface?.closest?.('[data-reader-target]')
-      || null;
-  }
-
-  function readerCard(publication = readyPublication) {
-    return publication?.readerCard
-      || (publication?.readingSurface?.matches?.('.reader-card') ? publication.readingSurface : null)
-      || readerTarget(publication)?.querySelector?.('.reader-card')
-      || null;
-  }
-
-  function releaseReaderPlacement(publication = readyPublication) {
-    const target = readerTarget(publication);
-    const card = readerCard(publication);
-    let released = false;
-    if (target?.style) {
-      target.style.removeProperty?.('width');
-      target.style.removeProperty?.('max-height');
-      target.style.removeProperty?.('transform-origin');
-      target.style.removeProperty?.('align-self');
-      delete target.dataset.chamberReaderFit;
-      delete target.dataset.chamberReaderLayoutWidth;
-      delete target.dataset.chamberReaderMaxHeight;
-      released = true;
+  closest(selector) {
+    let current = this;
+    while (current) {
+      if (current.matches?.(selector)) return current;
+      current = current.parentElement || current.parent || null;
     }
-    if (card?.style) {
-      card.style.removeProperty?.('max-height');
-      delete card.dataset.chamberReaderFit;
-      delete card.dataset.chamberReaderMaxHeight;
-      released = true;
-    }
-    return released;
+    return null;
+  }
+  append(...nodes) {
+    nodes.forEach(node => {
+      node.parent = this;
+      node.parentElement = this;
+      node.isConnected = true;
+      this.children.push(node);
+    });
   }
 """)
 
-replace_once('js/dripfeed-chamber-integration.js', """  function fitReaderPlacement(publication, scale) {
-    const target = readerTarget(publication);
-    const overlay = target?.closest?.('.reader-overlay') || target?.parentElement || null;
-    if (!target?.style || !overlay) return false;
-""", """  function fitReaderPlacement(publication, scale) {
-    const target = readerTarget(publication);
-    const card = readerCard(publication);
-    const overlay = target?.closest?.('.reader-overlay') || target?.parentElement || null;
-    if (!target?.style || !card?.style || !overlay) return false;
+replace_once('tests/dripfeed-chamber-integration.test.js', """  querySelector(selector) {
+    if (selector.startsWith('#')) return this.children.find(child => child.id === selector.slice(1)) || null;
+    return null;
+  }
+""", """  querySelector(selector) {
+    for (const child of this.children) {
+      if (child.matches?.(selector)) return child;
+      const nested = child.querySelector?.(selector);
+      if (nested) return nested;
+    }
+    return null;
+  }
 """)
 
-replace_once('js/dripfeed-chamber-integration.js', """    target.style.setProperty('width', `${layoutWidth}px`);
-    target.style.setProperty('max-height', `${layoutMaxHeight}px`);
-    target.style.setProperty('transform-origin', '50% 0');
-    target.style.setProperty('align-self', 'start');
-    target.dataset.chamberReaderFit = 'contained';
-    target.dataset.chamberReaderLayoutWidth = layoutWidth.toFixed(3);
-    target.dataset.chamberReaderMaxHeight = layoutMaxHeight.toFixed(3);
-    return true;
-""", """    target.style.setProperty('width', `${layoutWidth}px`);
-    target.style.setProperty('transform-origin', '50% 0');
-    target.style.setProperty('align-self', 'start');
-    card.style.setProperty('max-height', `${layoutMaxHeight}px`);
-    target.dataset.chamberReaderFit = 'contained';
-    target.dataset.chamberReaderLayoutWidth = layoutWidth.toFixed(3);
-    target.dataset.chamberReaderMaxHeight = layoutMaxHeight.toFixed(3);
-    card.dataset.chamberReaderFit = 'contained';
-    card.dataset.chamberReaderMaxHeight = layoutMaxHeight.toFixed(3);
-    return true;
+replace_once('tests/dripfeed-chamber-integration.test.js', """reader = new FakeElement('', 'reader-card');
+reader.rect = { left: 160, top: 120, right: 840, bottom: 700, width: 680, height: 580 };
+reader.computedTransform = 'matrix(1.08, 0, 0, 1.08, 0, 0)';
+root.dispatchEvent(new CustomEvent('dripfeed:open-transmission-ready', {
+""", """const readerOverlay = new FakeElement('', 'reader-overlay');
+readerOverlay.clientWidth = 1000;
+readerOverlay.clientHeight = 736;
+readerOverlay.rect = { left: 0, top: 64, right: 1000, bottom: 800, width: 1000, height: 736 };
+const readerTargetElement = new FakeElement('', 'reader-target');
+readerTargetElement.dataset.readerTarget = '';
+readerTargetElement.offsetWidth = 680;
+readerTargetElement.rect = { left: 160, top: 64, right: 840, bottom: 644, width: 680, height: 580 };
+reader = new FakeElement('', 'reader-card');
+reader.rect = { left: 160, top: 64, right: 840, bottom: 644, width: 680, height: 580 };
+reader.computedTransform = 'matrix(1.08, 0, 0, 1.08, 0, 0)';
+root.append(readerOverlay);
+readerOverlay.append(readerTargetElement);
+readerTargetElement.append(reader);
+root.dispatchEvent(new CustomEvent('dripfeed:open-transmission-ready', {
 """)
 
-replace_once('js/dripfeed-chamber-integration.js', """        pendingOpen = null;
-        readyPublication = Object.freeze({
-          token: detail.token,
-          postId: detail.postId,
-          readingSurface: detail.readingSurface
-        });
-""", """        pendingOpen = null;
-        const target = detail.readingSurface.closest?.('[data-reader-target]') || null;
-        const card = detail.readingSurface.matches?.('.reader-card')
-          ? detail.readingSurface
-          : target?.querySelector?.('.reader-card') || null;
-        if (!target || !card) break;
-        readyPublication = Object.freeze({
-          token: detail.token,
-          postId: detail.postId,
-          readingSurface: detail.readingSurface,
-          readerTarget: target,
-          readerCard: card
-        });
-""")
+replace_once('tests/dripfeed-chamber-integration.test.js', """root.dispatchEvent(new CustomEvent('dripfeed:close-transmission', { detail: { token: 8, postId: 'B' } }));
+assert.equal(bridge.snapshot().readingState, 'idle');
 
-replace_once('tests/dripfeed-chamber-integration.mjs', """    const overlay = target?.closest('.reader-overlay');
-    const close = target?.querySelector('.icon-close');
-    const rail = document.querySelector('.rail');
-""", """    const overlay = target?.closest('.reader-overlay');
-    const card = target?.querySelector('.reader-card');
-    const actions = card?.querySelector('.reader-actions');
-    const close = target?.querySelector('.icon-close');
-    const rail = document.querySelector('.rail');
-""")
+application = 'redwire';
+""", """root.dispatchEvent(new CustomEvent('dripfeed:close-transmission', { detail: { token: 8, postId: 'B' } }));
+assert.equal(bridge.snapshot().readingState, 'idle');
+assert.equal(readerTargetElement.style.getPropertyValue('width'), '', 'close must clear target width');
+assert.equal(readerTargetElement.style.getPropertyValue('transform-origin'), '', 'close must clear target origin');
+assert.equal(readerTargetElement.style.getPropertyValue('align-self'), '', 'close must clear target alignment');
+assert.equal(reader.style.getPropertyValue('max-height'), '', 'close must clear the scrolling-card height cap');
+assert.equal(readerTargetElement.dataset.chamberReaderFit, undefined);
+assert.equal(reader.dataset.chamberReaderFit, undefined);
 
-replace_once('tests/dripfeed-chamber-integration.mjs', """      target: rect(target),
-      overlay: rect(overlay),
-      close: rect(close),
-      rail: rect(rail),
-      viewport: { width: innerWidth, height: innerHeight },
-      clientHeight: target?.clientHeight || 0,
-      scrollHeight: target?.scrollHeight || 0
-""", """      target: rect(target),
-      card: rect(card),
-      actions: rect(actions),
-      overlay: rect(overlay),
-      close: rect(close),
-      rail: rect(rail),
-      viewport: { width: innerWidth, height: innerHeight },
-      cardFit: card?.dataset.chamberReaderFit || null,
-      cardMaxHeight: parseFloat(card?.dataset.chamberReaderMaxHeight || '0'),
-      clientHeight: card?.clientHeight || 0,
-      scrollHeight: card?.scrollHeight || 0
-""")
-
-replace_once('tests/dripfeed-chamber-integration.mjs', """  assert(reading.target.top >= reading.overlay.top - 1 && reading.target.bottom <= reading.overlay.bottom + 1,
-    `${name}: scaled reader escapes the overlay vertically (${reading.target.top}..${reading.target.bottom} vs ${reading.overlay.top}..${reading.overlay.bottom}).`);
-  assert(Math.abs((reading.target.left + reading.target.right) - (reading.overlay.left + reading.overlay.right)) <= 2,
-    `${name}: scaled reader is not centred in the overlay.`);
-  assert(reading.close.left >= 0 && reading.close.right <= reading.viewport.width + 1,
-""", """  assert(reading.target.top >= reading.overlay.top - 1 && reading.target.bottom <= reading.overlay.bottom + 1,
-    `${name}: scaled reader target escapes the overlay vertically (${reading.target.top}..${reading.target.bottom} vs ${reading.overlay.top}..${reading.overlay.bottom}).`);
-  assert(reading.cardFit === 'contained' && reading.cardMaxHeight > 0,
-    `${name}: scrolling reader card did not receive the inverse height cap.`);
-  assert(reading.card.left >= reading.overlay.left - 1 && reading.card.right <= reading.overlay.right + 1,
-    `${name}: scaled reader card escapes the overlay horizontally.`);
-  assert(reading.card.top >= reading.overlay.top - 1 && reading.card.bottom <= reading.overlay.bottom + 1,
-    `${name}: scaled reader card escapes the overlay vertically (${reading.card.top}..${reading.card.bottom} vs ${reading.overlay.top}..${reading.overlay.bottom}).`);
-  assert(reading.actions && reading.actions.bottom <= reading.card.bottom + 1 && reading.actions.bottom <= reading.viewport.height + 1,
-    `${name}: reader action row remains below the reachable scrolling card.`);
-  assert(Math.abs((reading.target.left + reading.target.right) - (reading.overlay.left + reading.overlay.right)) <= 2,
-    `${name}: scaled reader is not centred in the overlay.`);
-  assert(reading.close.left >= 0 && reading.close.right <= reading.viewport.width + 1,
-""")
-
-replace_once('tests/dripfeed-chamber-integration.mjs', """  await page.getByRole('button', { name: 'RETURN LIVE' }).click();
-  await page.waitForFunction(() => window.NCNDripfeedChamber.snapshot().readingState === 'idle');
-  await page.evaluate(() => window.NCNDripfeed.repack());
-""", """  await page.getByRole('button', { name: 'RETURN LIVE' }).click();
-  await page.waitForFunction(() => window.NCNDripfeedChamber.snapshot().readingState === 'idle');
-  const releasedReader = await page.evaluate(() => {
-    const target = document.querySelector('#dripfeed-root [data-reader-target]');
-    return {
-      width: target?.style.getPropertyValue('width') || '',
-      maxHeight: target?.style.getPropertyValue('max-height') || '',
-      transformOrigin: target?.style.getPropertyValue('transform-origin') || '',
-      alignSelf: target?.style.getPropertyValue('align-self') || '',
-      fit: target?.dataset.chamberReaderFit || null,
-      layoutWidth: target?.dataset.chamberReaderLayoutWidth || null,
-      layoutMaxHeight: target?.dataset.chamberReaderMaxHeight || null
-    };
-  });
-  assert(Object.values(releasedReader).every(value => value === '' || value === null),
-    `${name}: reader target retained stale Integration fitting after close: ${JSON.stringify(releasedReader)}`);
-  await page.evaluate(() => window.NCNDripfeed.repack());
-""")
-
-replace_once('tests/dripfeed-fixed-band-contract.test.js', """  'fitReaderPlacement',
-  'releaseReaderPlacement',
-  "target.style.setProperty('width'",
-  "target.style.setProperty('max-height'",
-  "target.style.setProperty('transform-origin', '50% 0')",
-""", """  'fitReaderPlacement',
-  'releaseReaderPlacement',
-  'publication?.readerTarget',
-  'publication?.readerCard',
-  "target.style.setProperty('width'",
-  "card.style.setProperty('max-height'",
-  "target.style.setProperty('transform-origin', '50% 0')",
-""")
-
-replace_once('docs/DRIPFEED-CHAMBER-INTEGRATION.md', """- before applying the camera-derived foreground scale, Integration inversely fits the reader's layout width and maximum height to the overlay content box;
-- resize and camera changes recalculate that fit, while close, application exit and destruction release the inline placement.
-
-This preserves the foreground plane and larger content treatment without allowing the transformed card, close control or action row to leave the rail-safe viewport. The desktop and mobile browser proof opens a real transmission, checks the published camera scale, and rejects any reader or close-control edge outside the overlay.
-""", """- before applying the camera-derived foreground scale, Integration inversely fits the target width and applies the inverse maximum height to the actual scrolling `.reader-card`;
-- the ready publication retains direct target/card references so cleanup still succeeds after the card is detached from the target;
-- resize and camera changes recalculate that fit, while close, application exit and destruction release both target and card placement.
-
-This preserves the foreground plane and larger content treatment without allowing the transformed card, close control or action row to leave the rail-safe viewport. The desktop and mobile browser proof opens a real transmission, checks the published camera scale, measures the wrapper, scrolling card and action row, and verifies the empty target has no stale fit after close.
+application = 'redwire';
 """)
 
 subprocess.run(['git', 'config', 'user.name', 'AristCage Integration'], check=True)
 subprocess.run(['git', 'config', 'user.email', 'integration@aristcage.invalid'], check=True)
-subprocess.run([
-    'git', 'add',
-    'js/dripfeed-chamber-integration.js',
-    'tests/dripfeed-chamber-integration.mjs',
-    'tests/dripfeed-fixed-band-contract.test.js',
-    'docs/DRIPFEED-CHAMBER-INTEGRATION.md'
-], check=True)
-subprocess.run(['git', 'commit', '-m', 'Fit and release the actual Dripfeed reader card'], check=True)
+subprocess.run(['git', 'add', 'tests/dripfeed-chamber-integration.test.js'], check=True)
+subprocess.run(['git', 'commit', '-m', 'Model retained reader references in the chamber harness'], check=True)
 subprocess.run(['git', 'push', 'origin', f"HEAD:{os.environ['HEAD_REF']}"], check=True)
