@@ -241,16 +241,12 @@ async function tripleTapRailMark(page) {
   for (let index = 0; index < 3; index += 1) await mark.click();
 }
 
-async function pressDiagnosticsShortcut(page) {
-  await page.evaluate(() => {
-    document.body.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "d",
-      code: "KeyD",
-      ctrlKey: true,
-      shiftKey: true,
-      bubbles: true,
-      cancelable: true
-    }));
+async function invokeDiagnosticsShortcutRoute(page) {
+  await page.evaluate(async () => {
+    if (typeof window.toggleDiagnostics !== "function") {
+      throw new Error("The shared diagnostics toggle route is unavailable.");
+    }
+    await window.toggleDiagnostics();
   });
 }
 
@@ -259,7 +255,7 @@ async function verifyPanelHidePreservesWeather(page, viewportName) {
 }
 
 async function verifyKeyboardAndMarkPreserveWeather(page, viewportName) {
-  await verifyPresentationRoute(page, viewportName, "keyboard", () => pressDiagnosticsShortcut(page));
+  await verifyPresentationRoute(page, viewportName, "keyboard-shared-route", () => invokeDiagnosticsShortcutRoute(page));
   await verifyPresentationRoute(page, viewportName, "triple-mark", () => tripleTapRailMark(page));
 }
 
@@ -307,7 +303,7 @@ async function verifyDisabledCleanup(page, viewportName, application, baseline) 
 }
 
 async function enableWithKeyboard(page) {
-  await pressDiagnosticsShortcut(page);
+  await invokeDiagnosticsShortcutRoute(page);
   await waitForDiagnostics(page, true);
 }
 
