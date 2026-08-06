@@ -11,6 +11,7 @@ on:
       - "js/dripfeed-chamber-integration.js"
       - "tests/dripfeed-responsive-columns.test.js"
       - "tests/dripfeed-chamber-integration.test.js"
+      - "tests/dripfeed-fixed-band-contract.test.js"
       - "tests/dripfeed-chamber-integration.mjs"
       - "docs/DRIPFEED-CHAMBER-INTEGRATION.md"
       - ".github/workflows/dripfeed-chamber-integration.yml"
@@ -34,11 +35,14 @@ jobs:
           node --check js/dripfeed-chamber-integration.js
           node --check tests/dripfeed-responsive-columns.test.js
           node --check tests/dripfeed-chamber-integration.test.js
+          node --check tests/dripfeed-fixed-band-contract.test.js
           node --check tests/dripfeed-chamber-integration.mjs
       - name: Run Dripfeed responsive-column contract
         run: node tests/dripfeed-responsive-columns.test.js
       - name: Run deterministic chamber contract
         run: node tests/dripfeed-chamber-integration.test.js
+      - name: Run fixed semantic-band contract
+        run: node tests/dripfeed-fixed-band-contract.test.js
       - name: Check production load order and ownership boundary
         run: |
           node <<'NODE'
@@ -83,7 +87,7 @@ jobs:
           for (const required of ['claimExternalGeometry', 'releaseExternalGeometry', 'sharedDepthDormant']) {
             if (!depthSource.includes(required)) throw new Error(`Interim depth adapter lacks explicit geometry handoff: ${required}`);
           }
-          console.log('Dripfeed chamber load order, responsive replan, public contract and geometry handoff are valid.');
+          console.log('Dripfeed chamber load order, fixed semantic bands, responsive replan, public contract and geometry handoff are valid.');
           NODE
 
   rendered-proof:
