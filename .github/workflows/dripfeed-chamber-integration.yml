@@ -18,44 +18,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-      - name: Execute the one-shot reader-fit patch
-        if: github.head_ref == 'fix/dripfeed-shared-article-bands'
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('pr128-reader-fit.py')
-          source = path.read_text()
-          marker = "Path('.github/workflows/pr128-reader-fit.yml').unlink"
-          start = source.index(marker)
-          tail = "\n".join([
-              "subprocess.run(['git', 'config', 'user.name', 'AristCage Integration'], check=True)",
-              "subprocess.run(['git', 'config', 'user.email', 'integration@aristcage.invalid'], check=True)",
-              "subprocess.run([",
-              "    'git', 'add',",
-              "    'js/dripfeed-chamber-integration.js',",
-              "    'tests/dripfeed-chamber-integration.mjs',",
-              "    'tests/dripfeed-fixed-band-contract.test.js',",
-              "    'docs/DRIPFEED-CHAMBER-INTEGRATION.md'",
-              "], check=True)",
-              "subprocess.run(['git', 'commit', '-m', 'Contain the scaled Dripfeed reader in its overlay'], check=True)",
-              "subprocess.run(['git', 'push', 'origin', f\"HEAD:{os.environ['HEAD_REF']}\"], check=True)",
-              ""
-          ])
-          path.write_text(source[:start] + tail)
-          PY
-          python3 pr128-reader-fit.py
       - uses: actions/setup-node@v4
         with:
           node-version: 24
