@@ -243,10 +243,7 @@ async function tripleTapRailMark(page) {
 
 async function pressDiagnosticsShortcut(page) {
   await page.evaluate(() => {
-    const target = document.activeElement instanceof Element
-      ? document.activeElement
-      : document.body;
-    target.dispatchEvent(new KeyboardEvent("keydown", {
+    document.body.dispatchEvent(new KeyboardEvent("keydown", {
       key: "d",
       code: "KeyD",
       ctrlKey: true,
