@@ -28,9 +28,24 @@ class FakeElement {
     this.computedTransform = 'none';
   }
   setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  matches(selector) {
+    if (selector === '[data-reader-target]') return Object.prototype.hasOwnProperty.call(this.dataset, 'readerTarget');
+    if (selector.startsWith('.')) return this.className.split(/\s+/).includes(selector.slice(1));
+    if (selector.startsWith('#')) return this.id === selector.slice(1);
+    return false;
+  }
+  closest(selector) {
+    let current = this;
+    while (current) {
+      if (current.matches?.(selector)) return current;
+      current = current.parentElement || current.parent || null;
+    }
+    return null;
+  }
   append(...nodes) {
     nodes.forEach(node => {
       node.parent = this;
+      node.parentElement = this;
       node.isConnected = true;
       this.children.push(node);
     });
@@ -54,7 +69,11 @@ class FakeElement {
   }
   getBoundingClientRect() { return { ...this.rect }; }
   querySelector(selector) {
-    if (selector.startsWith('#')) return this.children.find(child => child.id === selector.slice(1)) || null;
+    for (const child of this.children) {
+      if (child.matches?.(selector)) return child;
+      const nested = child.querySelector?.(selector);
+      if (nested) return nested;
+    }
     return null;
   }
 }
@@ -255,9 +274,20 @@ state = bridge.snapshot();
 assert.equal(state.readingState, 'opening', 'stale cancellation must not clear a newer opening');
 assert.equal(state.pendingToken, 8);
 
+const readerOverlay = new FakeElement('', 'reader-overlay');
+readerOverlay.clientWidth = 1000;
+readerOverlay.clientHeight = 736;
+readerOverlay.rect = { left: 0, top: 64, right: 1000, bottom: 800, width: 1000, height: 736 };
+const readerTargetElement = new FakeElement('', 'reader-target');
+readerTargetElement.dataset.readerTarget = '';
+readerTargetElement.offsetWidth = 680;
+readerTargetElement.rect = { left: 160, top: 64, right: 840, bottom: 644, width: 680, height: 580 };
 reader = new FakeElement('', 'reader-card');
-reader.rect = { left: 160, top: 120, right: 840, bottom: 700, width: 680, height: 580 };
+reader.rect = { left: 160, top: 64, right: 840, bottom: 644, width: 680, height: 580 };
 reader.computedTransform = 'matrix(1.08, 0, 0, 1.08, 0, 0)';
+root.append(readerOverlay);
+readerOverlay.append(readerTargetElement);
+readerTargetElement.append(reader);
 root.dispatchEvent(new CustomEvent('dripfeed:open-transmission-ready', {
   detail: { token: 8, postId: 'B', readingSurface: reader }
 }));
@@ -267,6 +297,12 @@ assert.equal(state.readyToken, 8);
 assert.equal(sceneRecords.get('dripfeed:reading').resolver(), reader);
 root.dispatchEvent(new CustomEvent('dripfeed:close-transmission', { detail: { token: 8, postId: 'B' } }));
 assert.equal(bridge.snapshot().readingState, 'idle');
+assert.equal(readerTargetElement.style.getPropertyValue('width'), '', 'close must clear target width');
+assert.equal(readerTargetElement.style.getPropertyValue('transform-origin'), '', 'close must clear target origin');
+assert.equal(readerTargetElement.style.getPropertyValue('align-self'), '', 'close must clear target alignment');
+assert.equal(reader.style.getPropertyValue('max-height'), '', 'close must clear the scrolling-card height cap');
+assert.equal(readerTargetElement.dataset.chamberReaderFit, undefined);
+assert.equal(reader.dataset.chamberReaderFit, undefined);
 
 application = 'redwire';
 root.hidden = true;
