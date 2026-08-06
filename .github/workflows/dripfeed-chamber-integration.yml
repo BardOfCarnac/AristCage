@@ -32,37 +32,7 @@ jobs:
       - name: Execute and remove the one-shot reader-fit patch
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          python3 - <<'PY'
-          import os
-          from pathlib import Path
-
-          source = Path('.github/workflows/pr128-reader-fit.yml').read_text()
-          marker = '      - name: Apply owner-correct reader fitting\n'
-          start = source.index(marker)
-          run_start = source.index('        run: |\n', start) + len('        run: |\n')
-          block = []
-          for line in source[run_start:].splitlines():
-              if line.startswith('          '):
-                  block.append(line[10:])
-              elif not line.strip():
-                  block.append('')
-              else:
-                  break
-          script = '\n'.join(block) + '\n'
-          script = script.replace(
-              'rm .github/workflows/pr128-reader-fit.yml',
-              "rm .github/workflows/pr128-reader-fit.yml\n"
-              "git show HEAD^:.github/workflows/dripfeed-chamber-integration.yml > .github/workflows/dripfeed-chamber-integration.yml"
-          )
-          script = script.replace(
-              'docs/DRIPFEED-CHAMBER-INTEGRATION.md .github/workflows/pr128-reader-fit.yml',
-              'docs/DRIPFEED-CHAMBER-INTEGRATION.md .github/workflows/pr128-reader-fit.yml .github/workflows/dripfeed-chamber-integration.yml'
-          )
-          script = script.replace('${{ github.event.pull_request.head.ref }}', os.environ['HEAD_REF'])
-          Path('/tmp/pr128-reader-fit.sh').write_text(script)
-          PY
-          bash /tmp/pr128-reader-fit.sh
+        run: python3 pr128-reader-fit.py
 
   contract:
     runs-on: ubuntu-latest
