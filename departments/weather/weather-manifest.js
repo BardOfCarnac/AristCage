@@ -30,7 +30,7 @@ window.NCNWeatherDepartmentManifest = Object.freeze({
     "weather canvases within supplied weather layers",
     "bounded reusable weather particle pools",
     "data-driven weather presets and transitions",
-    "reading and control-zone attenuation",
+    "control-zone attenuation",
     "immutable read-only depth-frame rendering views",
     "synchronous completed-frame publication and invalidation"
   ]),
@@ -39,5 +39,5 @@ window.NCNWeatherDepartmentManifest = Object.freeze({
   replaces: "weather",
   reducedMotion: true,
   deterministicTesting: true,
-  notes: "Departmental publication only. It exposes exact puff-depth frame views and a synchronous after-render subscription, but does not install itself or inspect Optical/article state."
+  notes: "Departmental publication only. It exposes exact puff-depth frame views and a synchronous after-render subscription, but does not inspect or consume Optical/article state."
 });

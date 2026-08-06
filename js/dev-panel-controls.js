@@ -138,7 +138,7 @@
               ${metricMarkup("runtime", "Runtime")}
               ${metricMarkup("wind", "Wind X / Y / Z")}
               ${metricMarkup("flow", "Depth flow")}
-              ${metricMarkup("zones", "Reading / controls")}
+              ${metricMarkup("zones", "Control zones")}
               ${metricMarkup("director", "Director")}
               ${metricMarkup("seed", "Seed / fingerprint")}
               ${metricMarkup("geometry", "Geometry reads")}
@@ -170,11 +170,6 @@
                 <span>Wind Z</span>
                 <input type="range" min="-1" max="1" step="0.05" value="0" data-debug-weather-input="wind-z" />
                 <output data-debug-weather-output="wind-z">0.00</output>
-              </label>
-              <label class="diagnostics-range-control">
-                <span>Reading cut</span>
-                <input type="range" min="0" max="1" step="0.01" value="0.48" data-debug-weather-input="reading" />
-                <output data-debug-weather-output="reading">0.48</output>
               </label>
               <label class="diagnostics-range-control">
                 <span>Control cut</span>
@@ -283,7 +278,6 @@
         y: inputNumber("wind-y", 0, -1, 1),
         z: inputNumber("wind-z", 0, -1, 1)
       }),
-      readingAttenuation: inputNumber("reading", 0.48, 0, 1),
       controlAttenuation: inputNumber("controls", 0.68, 0, 1),
       quality: WEATHER_QUALITY.includes(String(inputElement("quality")?.value || "auto"))
         ? String(inputElement("quality")?.value || "auto")
@@ -329,7 +323,6 @@
       intensity: settings.intensity,
       quality: settings.quality,
       wind: settings.wind,
-      readingAttenuation: settings.readingAttenuation,
       controlAttenuation: settings.controlAttenuation
     };
     if (settings.duration > 0) profile.transition = Object.freeze({ duration: settings.duration });
@@ -738,7 +731,7 @@
     setMetric("wind", `${formatNumber(wind.x)} / ${formatNumber(wind.y)} / ${formatNumber(wind.z)}`);
     setMetric("flow", `${formatNumber(flow.mist, 3)} mist / ${formatNumber(flow.particles, 3)} particles`,
       `Configured ${formatNumber(flow.configured, 3)} + wind ${formatNumber(flow.wind, 3)}`);
-    setMetric("zones", `${zones.reading ? "reading" : "open"} / ${finite(zones.controls)} controls`);
+    setMetric("zones", `${finite(zones.controls)} controls`);
     setMetric("director", director ? `${director.mode || "—"} · ${director.allowed === false ? "blocked" : formatNumber(director.intensity)}` : "not sampled");
     setMetric("seed", `${snapshotValue.seed ?? "—"} / ${particles.fingerprint ?? "—"}`);
     setMetric("geometry", `${finite(geometry.cameraReads)} camera / ${finite(geometry.layerMeasurements)} layers / ${finite(geometry.zoneReads)} zones`);

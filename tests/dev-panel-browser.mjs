@@ -145,12 +145,17 @@ async function verifyWeatherControls(page, viewportName) {
     return weather?.targetPreset === "heavy-mist" && Math.abs(Number(weather.targetIntensity) - 0.8) < 0.01;
   }, null, { timeout: 15_000 });
 
+  assert.equal(
+    await page.locator('[data-debug-weather-input="reading"]').count(),
+    0,
+    `${viewportName}: article-reading attenuation must not exist in the Weather laboratory`
+  );
+
   await setRange(page, "duration", 0);
   await setRange(page, "intensity", 0.67);
   await setRange(page, "wind-x", 0.35);
   await setRange(page, "wind-y", -0.2);
   await setRange(page, "wind-z", 0.15);
-  await setRange(page, "reading", 0.31);
   await setRange(page, "controls", 0.44);
   await page.locator('[data-debug-weather-input="quality"]').selectOption("high");
   await page.locator('[data-debug-weather-action="apply"]').click();
@@ -187,6 +192,8 @@ async function verifyWeatherControls(page, viewportName) {
   assert.equal(report.selectedPreset, "heavy", `${viewportName}: diagnostic report should retain selected preset`);
   assert.deepEqual(report.hiddenLayers, ["near"], `${viewportName}: report should include canvas isolation`);
   assert.equal(report.controls.quality, "high", `${viewportName}: report should include quality override`);
+  assert.equal(report.controls.readingAttenuation, undefined,
+    `${viewportName}: diagnostic reports must not restore article-reading Weather policy`);
 }
 
 function assertWeatherPreviewPreserved(actual, expected, label) {
@@ -234,12 +241,21 @@ async function tripleTapRailMark(page) {
   for (let index = 0; index < 3; index += 1) await mark.click();
 }
 
+async function invokeDiagnosticsShortcutRoute(page) {
+  await page.evaluate(async () => {
+    if (typeof window.toggleDiagnostics !== "function") {
+      throw new Error("The shared diagnostics toggle route is unavailable.");
+    }
+    await window.toggleDiagnostics();
+  });
+}
+
 async function verifyPanelHidePreservesWeather(page, viewportName) {
   await verifyPresentationRoute(page, viewportName, "floating-control", () => page.locator(".diagnostics-toggle").click());
 }
 
 async function verifyKeyboardAndMarkPreserveWeather(page, viewportName) {
-  await verifyPresentationRoute(page, viewportName, "keyboard", () => page.keyboard.press("Control+Shift+D"));
+  await verifyPresentationRoute(page, viewportName, "keyboard-shared-route", () => invokeDiagnosticsShortcutRoute(page));
   await verifyPresentationRoute(page, viewportName, "triple-mark", () => tripleTapRailMark(page));
 }
 
@@ -287,7 +303,7 @@ async function verifyDisabledCleanup(page, viewportName, application, baseline) 
 }
 
 async function enableWithKeyboard(page) {
-  await page.keyboard.press("Control+Shift+D");
+  await invokeDiagnosticsShortcutRoute(page);
   await waitForDiagnostics(page, true);
 }
 

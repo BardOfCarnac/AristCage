@@ -12,6 +12,7 @@ on:
       - "tests/optical-card-backing-contract.test.js"
       - "tests/optical-card-backing-render.mjs"
       - "tests/optical-weather-card-occlusion.mjs"
+      - "tests/weather-article-independence.mjs"
       - ".github/workflows/integration-visual-roundtrip.yml"
   workflow_dispatch:
 
@@ -35,6 +36,7 @@ jobs:
           node --check tests/optical-card-backing-contract.test.js
           node --check tests/optical-card-backing-render.mjs
           node --check tests/optical-weather-card-occlusion.mjs
+          node --check tests/weather-article-independence.mjs
 
       - name: Install browser runner
         run: |
@@ -60,20 +62,22 @@ jobs:
           node tests/optical-card-backing-render.mjs 2>&1 | tee artifacts/optical-card-backing/render-output.log
           node tests/optical-weather-card-occlusion.mjs 2>&1 | tee artifacts/optical-card-backing/weather-occlusion-output.log
           node tests/desktop-breakpoint-roundtrip.mjs 2>&1 | tee artifacts/integration-roundtrip/desktop-breakpoint-output.log
+          node tests/weather-article-independence.mjs 2>&1 | tee artifacts/integration-roundtrip/weather-article-independence-output.log
           node tests/integration-visual-roundtrip.mjs 2>&1 | tee artifacts/integration-roundtrip/test-output.log
 
       - name: Print visual diagnostics
         if: always()
         run: |
           echo "Round-trip outcome: ${{ steps.roundtrip.outcome }}"
-          find artifacts/integration-roundtrip -maxdepth 1 -type f -print 2>/dev/null || true
+          find artifacts/integration-roundtrip -maxdepth 2 -type f -print 2>/dev/null || true
           find artifacts/optical-card-backing -maxdepth 1 -type f -print 2>/dev/null || true
           test ! -f artifacts/integration-roundtrip/desktop-breakpoint-output.log || cat artifacts/integration-roundtrip/desktop-breakpoint-output.log
+          test ! -f artifacts/integration-roundtrip/weather-article-independence-output.log || cat artifacts/integration-roundtrip/weather-article-independence-output.log
           test ! -f artifacts/integration-roundtrip/test-output.log || cat artifacts/integration-roundtrip/test-output.log
           test ! -f artifacts/optical-card-backing/contract-output.log || cat artifacts/optical-card-backing/contract-output.log
           test ! -f artifacts/optical-card-backing/render-output.log || cat artifacts/optical-card-backing/render-output.log
           test ! -f artifacts/optical-card-backing/weather-occlusion-output.log || cat artifacts/optical-card-backing/weather-occlusion-output.log
-          for failure in artifacts/integration-roundtrip/*-failure.txt; do
+          for failure in artifacts/integration-roundtrip/*-failure.txt artifacts/integration-roundtrip/weather-article-independence/failure.txt; do
             test ! -e "$failure" || { echo "--- $failure"; cat "$failure"; }
           done
           echo "--- static server log"

@@ -54,7 +54,6 @@ jobs:
             'context.layers?.weather',
             'context.integration?.requireService?.("effects")',
             'context.chamber?.getCameraSnapshot',
-            'context.views?.getReadingZone',
             'context.views?.getControlZones',
             '"electrical-disturbance"',
             '"light-flash"',
@@ -78,7 +77,12 @@ jobs:
             'articleId',
             'getArticle',
             'depthSlices',
-            'sliceCount'
+            'sliceCount',
+            'readingAttenuation',
+            'getReadingZone',
+            'isReading',
+            'scene.reading',
+            'readingScale'
           ]) {
             if (source.includes(forbidden)) throw new Error(`Weather publication contains forbidden token ${forbidden}.`);
           }
@@ -91,5 +95,11 @@ jobs:
           for (const capability of ['"getDepthFrame"', '"snapshot"']) {
             if (!manifest.includes(capability)) throw new Error(`Manifest is missing ${capability}.`);
           }
-          console.log('Weather publication respects its scoped ownership boundary.');
+          if (!manifest.includes('"control-zone attenuation"')) {
+            throw new Error('Weather manifest must retain permanent control-zone attenuation.');
+          }
+          if (!manifest.includes('does not inspect or consume Optical/article state')) {
+            throw new Error('Weather manifest must state article-reading independence.');
+          }
+          console.log('Weather publication respects its scoped ownership boundary and ignores article reading state.');
           NODE

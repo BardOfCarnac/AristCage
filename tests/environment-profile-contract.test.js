@@ -101,10 +101,11 @@ assert.deepEqual(redwireWeather, {
   wind: 0,
   quality: 'auto',
   seed: 2045,
-  readingAttenuation: 0.48,
   controlAttenuation: 0.68
 });
 assert.equal(Object.isFrozen(redwireWeather), true, 'RedWire Weather profile must remain immutable.');
+assert.equal('readingAttenuation' in redwireWeather, false,
+  'RedWire must not publish article-reading attenuation as Weather policy.');
 
 const dripfeedWeather = global.NCNEnvironment.profile('dripfeed').weather;
 assert.deepEqual(dripfeedWeather, {
@@ -142,11 +143,12 @@ assert.deepEqual(appliedProfiles.find(entry => entry.name === 'weather')?.profil
   wind: 0,
   quality: 'auto',
   seed: 2045,
-  readingAttenuation: 0.48,
   controlAttenuation: 0.68
-}, 'Diagnostics must disable Weather cleanly while retaining the next enabled profile policy.');
+}, 'Diagnostics must disable Weather cleanly without restoring article-reading suppression.');
 
 assert.equal(readout.profile.textContent, 'REDWIRE');
 assert.equal(readout.state.textContent, 'READY');
 
-console.log('Integration owns the RedWire broad-bank Weather profile, canonical quality/seed, diagnostics reproduction and Dripfeed-disabled policy.');
+require('./weather-reading-independence.test.js');
+
+console.log('Integration owns the RedWire broad-bank Weather profile, canonical quality/seed, diagnostics reproduction and Dripfeed-disabled policy without article-reading attenuation.');
