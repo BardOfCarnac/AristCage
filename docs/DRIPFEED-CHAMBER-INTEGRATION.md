@@ -47,10 +47,11 @@ The host-owned `#dripfeed-chamber-occluder` matches the viewport stage and repre
 The reader overlay already centres its target. Integration therefore does not feed it the live/latent aperture translations:
 
 - `--drip-reader-x` and `--drip-reader-y` remain zero;
-- only the camera-derived foreground scale is applied;
-- the target scales from `50% 0`, keeping its upper controls below the shared rail instead of enlarging upward into it.
+- the target scales from `50% 0`, keeping its upper controls below the shared rail;
+- before applying the camera-derived foreground scale, Integration inversely fits the reader's layout width and maximum height to the overlay content box;
+- resize and camera changes recalculate that fit, while close, application exit and destruction release the inline placement.
 
-The desktop and mobile browser proof opens a real transmission and checks that the connected reading surface resolves at the published reader scale. The retained screenshots provide visual evidence that the card remains centred and usable.
+This preserves the foreground plane and larger content treatment without allowing the transformed card, close control or action row to leave the rail-safe viewport. The desktop and mobile browser proof opens a real transmission, checks the published camera scale, and rejects any reader or close-control edge outside the overlay.
 
 ## Live and latent publication
 

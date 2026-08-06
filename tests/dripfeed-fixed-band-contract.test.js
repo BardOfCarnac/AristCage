@@ -25,7 +25,11 @@ for (const required of [
   "placement: 'shared-fixed-bands'",
   "setPx(element, '--drip-reader-x', 0)",
   "setPx(element, '--drip-reader-y', 0)",
-  "readerTarget.style.transformOrigin = '50% 0'"
+  'fitReaderPlacement',
+  'releaseReaderPlacement',
+  "target.style.setProperty('width'",
+  "target.style.setProperty('max-height'",
+  "target.style.setProperty('transform-origin', '50% 0')"
 ]) {
   assert.equal(source.includes(required), true,
     `Fixed-band or reader-centering contract is missing: ${required}`);

@@ -78,6 +78,60 @@ window.NCNDripfeedChamber = (() => {
     element?.style?.setProperty?.(property, `${Math.round(finite(value) * 100) / 100}px`);
   }
 
+  function readerTarget(publication = readyPublication) {
+    return publication?.readingSurface?.closest?.('[data-reader-target]') || null;
+  }
+
+  function releaseReaderPlacement(publication = readyPublication) {
+    const target = readerTarget(publication);
+    if (!target?.style) return false;
+    target.style.removeProperty?.('width');
+    target.style.removeProperty?.('max-height');
+    target.style.removeProperty?.('transform-origin');
+    delete target.dataset.chamberReaderFit;
+    delete target.dataset.chamberReaderLayoutWidth;
+    delete target.dataset.chamberReaderMaxHeight;
+    return true;
+  }
+
+  function stylePixels(styles, property) {
+    const value = styles?.getPropertyValue?.(property) || styles?.[property] || 0;
+    return Math.max(0, finite(parseFloat(value)));
+  }
+
+  function fitReaderPlacement(publication, scale) {
+    const target = readerTarget(publication);
+    const overlay = target?.closest?.('.reader-overlay') || target?.parentElement || null;
+    if (!target?.style || !overlay) return false;
+
+    releaseReaderPlacement(publication);
+
+    let overlayStyles = null;
+    try { overlayStyles = getComputedStyle(overlay); } catch (error) {}
+    const contentWidth = Math.max(1,
+      finite(overlay.clientWidth, window.innerWidth)
+      - stylePixels(overlayStyles, 'padding-left')
+      - stylePixels(overlayStyles, 'padding-right'));
+    const contentHeight = Math.max(1,
+      finite(overlay.clientHeight, window.innerHeight - currentRailBottom())
+      - stylePixels(overlayStyles, 'padding-top')
+      - stylePixels(overlayStyles, 'padding-bottom'));
+    const safeScale = Math.max(0.0001, finite(scale, 1));
+    const naturalWidth = Math.max(1,
+      finite(target.offsetWidth, finite(target.getBoundingClientRect?.().width) / safeScale));
+    const visualWidth = Math.min(naturalWidth, contentWidth);
+    const layoutWidth = visualWidth / safeScale;
+    const layoutMaxHeight = contentHeight / safeScale;
+
+    target.style.setProperty('width', `${layoutWidth}px`);
+    target.style.setProperty('max-height', `${layoutMaxHeight}px`);
+    target.style.setProperty('transform-origin', '50% 0');
+    target.dataset.chamberReaderFit = 'contained';
+    target.dataset.chamberReaderLayoutWidth = layoutWidth.toFixed(3);
+    target.dataset.chamberReaderMaxHeight = layoutMaxHeight.toFixed(3);
+    return true;
+  }
+
   function cameraSnapshot() {
     return window.NCNChamberCamera?.snapshot?.()
       || window.LayeredChamber?.getCameraSnapshot?.()
@@ -240,14 +294,13 @@ window.NCNDripfeedChamber = (() => {
     setPx(element, '--drip-latent-y', latent.y);
     element.style.setProperty('--drip-latent-scale', latent.scale.toFixed(6));
 
-    // The reader is already laid out inside the rail-safe overlay. Scale it from
-    // its top edge so the close control cannot be enlarged underneath the shared
-    // title rail, and do not translate that interactive surface into rail space.
+    // The overlay already centres the reader. Keep translation at zero and
+    // inversely fit its layout box before applying the foreground scale, so the
+    // transformed card and controls remain inside the rail-safe viewport.
     setPx(element, '--drip-reader-x', 0);
     setPx(element, '--drip-reader-y', 0);
     element.style.setProperty('--drip-reader-scale', reader.scale.toFixed(6));
-    const readerTarget = readyPublication?.readingSurface?.closest?.('[data-reader-target]');
-    if (readerTarget?.style) readerTarget.style.transformOrigin = '50% 0';
+    fitReaderPlacement(readyPublication, reader.scale);
   }
 
   function applyGeometry() {
@@ -368,6 +421,7 @@ window.NCNDripfeedChamber = (() => {
         break;
       case 'dripfeed:close-transmission':
         if (readyPublication?.token !== detail.token) break;
+        releaseReaderPlacement(readyPublication);
         readyPublication = null;
         readingState('idle');
         publishScene();
@@ -436,6 +490,7 @@ window.NCNDripfeedChamber = (() => {
     active = false;
     unbindRootEvents();
     pendingOpen = null;
+    releaseReaderPlacement(readyPublication);
     readyPublication = null;
     geometryTask?.suspend?.();
     clearScene();
