@@ -21,8 +21,7 @@ permissions:
   contents: write
 
 jobs:
-  patch-reader-fit:
-    if: github.head_ref == 'fix/dripfeed-shared-article-bands'
+  contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +29,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
       - name: Execute the one-shot reader-fit patch
+        if: github.head_ref == 'fix/dripfeed-shared-article-bands'
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
@@ -56,11 +56,6 @@ jobs:
           path.write_text(source[:start] + tail)
           PY
           python3 pr128-reader-fit.py
-
-  contract:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
