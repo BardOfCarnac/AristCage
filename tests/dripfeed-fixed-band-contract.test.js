@@ -27,8 +27,10 @@ for (const required of [
   "setPx(element, '--drip-reader-y', 0)",
   'fitReaderPlacement',
   'releaseReaderPlacement',
+  'publication?.readerTarget',
+  'publication?.readerCard',
   "target.style.setProperty('width'",
-  "target.style.setProperty('max-height'",
+  "card.style.setProperty('max-height'",
   "target.style.setProperty('transform-origin', '50% 0')",
   "target.style.setProperty('align-self', 'start')"
 ]) {

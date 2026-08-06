@@ -79,20 +79,39 @@ window.NCNDripfeedChamber = (() => {
   }
 
   function readerTarget(publication = readyPublication) {
-    return publication?.readingSurface?.closest?.('[data-reader-target]') || null;
+    return publication?.readerTarget
+      || publication?.readingSurface?.closest?.('[data-reader-target]')
+      || null;
+  }
+
+  function readerCard(publication = readyPublication) {
+    return publication?.readerCard
+      || (publication?.readingSurface?.matches?.('.reader-card') ? publication.readingSurface : null)
+      || readerTarget(publication)?.querySelector?.('.reader-card')
+      || null;
   }
 
   function releaseReaderPlacement(publication = readyPublication) {
     const target = readerTarget(publication);
-    if (!target?.style) return false;
-    target.style.removeProperty?.('width');
-    target.style.removeProperty?.('max-height');
-    target.style.removeProperty?.('transform-origin');
-    target.style.removeProperty?.('align-self');
-    delete target.dataset.chamberReaderFit;
-    delete target.dataset.chamberReaderLayoutWidth;
-    delete target.dataset.chamberReaderMaxHeight;
-    return true;
+    const card = readerCard(publication);
+    let released = false;
+    if (target?.style) {
+      target.style.removeProperty?.('width');
+      target.style.removeProperty?.('max-height');
+      target.style.removeProperty?.('transform-origin');
+      target.style.removeProperty?.('align-self');
+      delete target.dataset.chamberReaderFit;
+      delete target.dataset.chamberReaderLayoutWidth;
+      delete target.dataset.chamberReaderMaxHeight;
+      released = true;
+    }
+    if (card?.style) {
+      card.style.removeProperty?.('max-height');
+      delete card.dataset.chamberReaderFit;
+      delete card.dataset.chamberReaderMaxHeight;
+      released = true;
+    }
+    return released;
   }
 
   function stylePixels(styles, property) {
@@ -102,8 +121,9 @@ window.NCNDripfeedChamber = (() => {
 
   function fitReaderPlacement(publication, scale) {
     const target = readerTarget(publication);
+    const card = readerCard(publication);
     const overlay = target?.closest?.('.reader-overlay') || target?.parentElement || null;
-    if (!target?.style || !overlay) return false;
+    if (!target?.style || !card?.style || !overlay) return false;
 
     releaseReaderPlacement(publication);
 
@@ -125,12 +145,14 @@ window.NCNDripfeedChamber = (() => {
     const layoutMaxHeight = contentHeight / safeScale;
 
     target.style.setProperty('width', `${layoutWidth}px`);
-    target.style.setProperty('max-height', `${layoutMaxHeight}px`);
     target.style.setProperty('transform-origin', '50% 0');
     target.style.setProperty('align-self', 'start');
+    card.style.setProperty('max-height', `${layoutMaxHeight}px`);
     target.dataset.chamberReaderFit = 'contained';
     target.dataset.chamberReaderLayoutWidth = layoutWidth.toFixed(3);
     target.dataset.chamberReaderMaxHeight = layoutMaxHeight.toFixed(3);
+    card.dataset.chamberReaderFit = 'contained';
+    card.dataset.chamberReaderMaxHeight = layoutMaxHeight.toFixed(3);
     return true;
   }
 
@@ -407,10 +429,17 @@ window.NCNDripfeedChamber = (() => {
       case 'dripfeed:open-transmission-ready':
         if (pendingOpen?.token !== detail.token || !detail.readingSurface?.isConnected) break;
         pendingOpen = null;
+        const target = detail.readingSurface.closest?.('[data-reader-target]') || null;
+        const card = detail.readingSurface.matches?.('.reader-card')
+          ? detail.readingSurface
+          : target?.querySelector?.('.reader-card') || null;
+        if (!target || !card) break;
         readyPublication = Object.freeze({
           token: detail.token,
           postId: detail.postId,
-          readingSurface: detail.readingSurface
+          readingSurface: detail.readingSurface,
+          readerTarget: target,
+          readerCard: card
         });
         readingState('ready');
         publishScene();

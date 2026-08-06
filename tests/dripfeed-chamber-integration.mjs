@@ -298,6 +298,8 @@ async function runViewport(browser, name, viewport) {
     const surfaces = window.NCNDripfeed.getSpatialSurfaces();
     const target = document.querySelector('#dripfeed-root [data-reader-target]');
     const overlay = target?.closest('.reader-overlay');
+    const card = target?.querySelector('.reader-card');
+    const actions = card?.querySelector('.reader-actions');
     const close = target?.querySelector('.icon-close');
     const rail = document.querySelector('.rail');
     const reader = surfaces.reading;
@@ -319,12 +321,16 @@ async function runViewport(browser, name, viewport) {
       layoutWidth: parseFloat(target?.dataset.chamberReaderLayoutWidth || '0'),
       layoutMaxHeight: parseFloat(target?.dataset.chamberReaderMaxHeight || '0'),
       target: rect(target),
+      card: rect(card),
+      actions: rect(actions),
       overlay: rect(overlay),
       close: rect(close),
       rail: rect(rail),
       viewport: { width: innerWidth, height: innerHeight },
-      clientHeight: target?.clientHeight || 0,
-      scrollHeight: target?.scrollHeight || 0
+      cardFit: card?.dataset.chamberReaderFit || null,
+      cardMaxHeight: parseFloat(card?.dataset.chamberReaderMaxHeight || '0'),
+      clientHeight: card?.clientHeight || 0,
+      scrollHeight: card?.scrollHeight || 0
     };
   });
   assert(reading.connected, `${name}: ready publication has no connected reader.`);
@@ -338,7 +344,15 @@ async function runViewport(browser, name, viewport) {
   assert(reading.target.left >= reading.overlay.left - 1 && reading.target.right <= reading.overlay.right + 1,
     `${name}: scaled reader escapes the overlay horizontally (${reading.target.left}..${reading.target.right} vs ${reading.overlay.left}..${reading.overlay.right}).`);
   assert(reading.target.top >= reading.overlay.top - 1 && reading.target.bottom <= reading.overlay.bottom + 1,
-    `${name}: scaled reader escapes the overlay vertically (${reading.target.top}..${reading.target.bottom} vs ${reading.overlay.top}..${reading.overlay.bottom}).`);
+    `${name}: scaled reader target escapes the overlay vertically (${reading.target.top}..${reading.target.bottom} vs ${reading.overlay.top}..${reading.overlay.bottom}).`);
+  assert(reading.cardFit === 'contained' && reading.cardMaxHeight > 0,
+    `${name}: scrolling reader card did not receive the inverse height cap.`);
+  assert(reading.card.left >= reading.overlay.left - 1 && reading.card.right <= reading.overlay.right + 1,
+    `${name}: scaled reader card escapes the overlay horizontally.`);
+  assert(reading.card.top >= reading.overlay.top - 1 && reading.card.bottom <= reading.overlay.bottom + 1,
+    `${name}: scaled reader card escapes the overlay vertically (${reading.card.top}..${reading.card.bottom} vs ${reading.overlay.top}..${reading.overlay.bottom}).`);
+  assert(reading.actions && reading.actions.bottom <= reading.card.bottom + 1 && reading.actions.bottom <= reading.viewport.height + 1,
+    `${name}: reader action row remains below the reachable scrolling card.`);
   assert(Math.abs((reading.target.left + reading.target.right) - (reading.overlay.left + reading.overlay.right)) <= 2,
     `${name}: scaled reader is not centred in the overlay.`);
   assert(reading.close.left >= 0 && reading.close.right <= reading.viewport.width + 1,
@@ -349,6 +363,20 @@ async function runViewport(browser, name, viewport) {
 
   await page.getByRole('button', { name: 'RETURN LIVE' }).click();
   await page.waitForFunction(() => window.NCNDripfeedChamber.snapshot().readingState === 'idle');
+  const releasedReader = await page.evaluate(() => {
+    const target = document.querySelector('#dripfeed-root [data-reader-target]');
+    return {
+      width: target?.style.getPropertyValue('width') || '',
+      maxHeight: target?.style.getPropertyValue('max-height') || '',
+      transformOrigin: target?.style.getPropertyValue('transform-origin') || '',
+      alignSelf: target?.style.getPropertyValue('align-self') || '',
+      fit: target?.dataset.chamberReaderFit || null,
+      layoutWidth: target?.dataset.chamberReaderLayoutWidth || null,
+      layoutMaxHeight: target?.dataset.chamberReaderMaxHeight || null
+    };
+  });
+  assert(Object.values(releasedReader).every(value => value === '' || value === null),
+    `${name}: reader target retained stale Integration fitting after close: ${JSON.stringify(releasedReader)}`);
   await page.evaluate(() => window.NCNDripfeed.repack());
   await page.waitForFunction(() => window.NCNDripfeed.getSpatialSurfaces().latent?.querySelectorAll('.listing-tile').length > 0);
 

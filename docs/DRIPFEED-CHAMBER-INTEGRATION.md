@@ -48,10 +48,11 @@ The reader overlay already centres its target. Integration therefore does not fe
 
 - `--drip-reader-x` and `--drip-reader-y` remain zero;
 - the target scales from `50% 0` and aligns to the top of the overlay grid, keeping its upper controls below the shared rail;
-- before applying the camera-derived foreground scale, Integration inversely fits the reader's layout width and maximum height to the overlay content box;
-- resize and camera changes recalculate that fit, while close, application exit and destruction release the inline placement.
+- before applying the camera-derived foreground scale, Integration inversely fits the target width and applies the inverse maximum height to the actual scrolling `.reader-card`;
+- the ready publication retains direct target/card references so cleanup still succeeds after the card is detached from the target;
+- resize and camera changes recalculate that fit, while close, application exit and destruction release both target and card placement.
 
-This preserves the foreground plane and larger content treatment without allowing the transformed card, close control or action row to leave the rail-safe viewport. The desktop and mobile browser proof opens a real transmission, checks the published camera scale, and rejects any reader or close-control edge outside the overlay.
+This preserves the foreground plane and larger content treatment without allowing the transformed card, close control or action row to leave the rail-safe viewport. The desktop and mobile browser proof opens a real transmission, checks the published camera scale, measures the wrapper, scrolling card and action row, and verifies the empty target has no stale fit after close.
 
 ## Live and latent publication
 
