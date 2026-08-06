@@ -29,7 +29,8 @@ for (const required of [
   'releaseReaderPlacement',
   "target.style.setProperty('width'",
   "target.style.setProperty('max-height'",
-  "target.style.setProperty('transform-origin', '50% 0')"
+  "target.style.setProperty('transform-origin', '50% 0')",
+  "target.style.setProperty('align-self', 'start')"
 ]) {
   assert.equal(source.includes(required), true,
     `Fixed-band or reader-centering contract is missing: ${required}`);

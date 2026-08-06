@@ -47,7 +47,7 @@ The host-owned `#dripfeed-chamber-occluder` matches the viewport stage and repre
 The reader overlay already centres its target. Integration therefore does not feed it the live/latent aperture translations:
 
 - `--drip-reader-x` and `--drip-reader-y` remain zero;
-- the target scales from `50% 0`, keeping its upper controls below the shared rail;
+- the target scales from `50% 0` and aligns to the top of the overlay grid, keeping its upper controls below the shared rail;
 - before applying the camera-derived foreground scale, Integration inversely fits the reader's layout width and maximum height to the overlay content box;
 - resize and camera changes recalculate that fit, while close, application exit and destruction release the inline placement.
 

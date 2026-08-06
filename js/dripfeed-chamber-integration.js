@@ -88,6 +88,7 @@ window.NCNDripfeedChamber = (() => {
     target.style.removeProperty?.('width');
     target.style.removeProperty?.('max-height');
     target.style.removeProperty?.('transform-origin');
+    target.style.removeProperty?.('align-self');
     delete target.dataset.chamberReaderFit;
     delete target.dataset.chamberReaderLayoutWidth;
     delete target.dataset.chamberReaderMaxHeight;
@@ -126,6 +127,7 @@ window.NCNDripfeedChamber = (() => {
     target.style.setProperty('width', `${layoutWidth}px`);
     target.style.setProperty('max-height', `${layoutMaxHeight}px`);
     target.style.setProperty('transform-origin', '50% 0');
+    target.style.setProperty('align-self', 'start');
     target.dataset.chamberReaderFit = 'contained';
     target.dataset.chamberReaderLayoutWidth = layoutWidth.toFixed(3);
     target.dataset.chamberReaderMaxHeight = layoutMaxHeight.toFixed(3);
