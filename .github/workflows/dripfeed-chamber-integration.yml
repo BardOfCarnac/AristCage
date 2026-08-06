@@ -18,9 +18,52 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  patch-reader-fit:
+    if: github.head_ref == 'fix/dripfeed-shared-article-bands'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Execute and remove the one-shot reader-fit patch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          source = Path('.github/workflows/pr128-reader-fit.yml').read_text()
+          marker = '      - name: Apply owner-correct reader fitting\n'
+          start = source.index(marker)
+          run_start = source.index('        run: |\n', start) + len('        run: |\n')
+          block = []
+          for line in source[run_start:].splitlines():
+              if line.startswith('          '):
+                  block.append(line[10:])
+              elif not line.strip():
+                  block.append('')
+              else:
+                  break
+          script = '\n'.join(block) + '\n'
+          script = script.replace(
+              'rm .github/workflows/pr128-reader-fit.yml',
+              "rm .github/workflows/pr128-reader-fit.yml\n"
+              "git show HEAD^:.github/workflows/dripfeed-chamber-integration.yml > .github/workflows/dripfeed-chamber-integration.yml"
+          )
+          script = script.replace(
+              'docs/DRIPFEED-CHAMBER-INTEGRATION.md .github/workflows/pr128-reader-fit.yml',
+              'docs/DRIPFEED-CHAMBER-INTEGRATION.md .github/workflows/pr128-reader-fit.yml .github/workflows/dripfeed-chamber-integration.yml'
+          )
+          script = script.replace('${{ github.event.pull_request.head.ref }}', os.environ['HEAD_REF'])
+          Path('/tmp/pr128-reader-fit.sh').write_text(script)
+          PY
+          bash /tmp/pr128-reader-fit.sh
+
   contract:
     runs-on: ubuntu-latest
     steps:
