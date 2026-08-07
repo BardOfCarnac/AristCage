@@ -251,28 +251,15 @@ html[data-ncn-app="dripfeed"] #dripfeed-root[data-chamber-integrated="true"] .ov
   z-index: 28;
   box-sizing: border-box;
   pointer-events: none;
-  border: 1px solid rgba(226, 42, 35, .58);
-  border-block-color: rgba(255, 73, 49, .8);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 108, 76, .26),
-    inset 0 -1px 0 rgba(255, 108, 76, .22),
-    0 0 11px rgba(210, 19, 20, .16);
+  border: 0;
+  box-shadow: none;
   background: transparent;
 }
 
 #dripfeed-root .dripfeed-chamber-occluder::before,
 #dripfeed-root .dripfeed-chamber-occluder::after {
-  content: "";
-  position: absolute;
-  left: -1px;
-  right: -1px;
-  height: 1px;
-  background: rgba(255, 90, 61, .68);
-  box-shadow: 0 0 7px rgba(243, 39, 30, .28);
+  content: none;
 }
-
-#dripfeed-root .dripfeed-chamber-occluder::before { top: -1px; }
-#dripfeed-root .dripfeed-chamber-occluder::after { bottom: -1px; }
 
 #dripfeed-root .dripfeed-chamber-occluder[hidden] {
   display: none !important;
