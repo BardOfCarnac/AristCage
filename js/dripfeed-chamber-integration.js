@@ -210,6 +210,17 @@ window.NCNDripfeedChamber = (() => {
     });
   }
 
+  function sharedArticleAperture(camera, lineZ, fallback) {
+    // RedWire's semantic article ports are clipped to the chamber's projected
+    // aperture. Reuse that settled projection directly instead of treating a
+    // full-viewport rectangle as though it represented the same depth plane.
+    const projected = camera?.settledApertureAt?.(lineZ);
+    if (finite(projected?.width) > 0 && finite(projected?.height) > 0) {
+      return freezeRect(projected);
+    }
+    return freezeRect(fallback);
+  }
+
   function computeGeometry(camera, metrics = {}) {
     if (!camera?.apertureAt || !camera?.scaleAt) return null;
 
@@ -233,20 +244,26 @@ window.NCNDripfeedChamber = (() => {
     const readerZ = near + cell * READER_OFFSET_CELLS;
 
     const stageTop = clamp(controlsBottom, 0, Math.max(0, viewportHeight - 1));
-    const aperture = freezeRect({
+    const fallbackAperture = {
       left: 0,
       top: stageTop,
       right: viewportWidth,
       bottom: viewportHeight,
       width: viewportWidth,
       height: Math.max(1, viewportHeight - stageTop)
-    });
+    };
+    const aperture = sharedArticleAperture(camera, lineZ, fallbackAperture);
 
     const live = planeProjection(camera, liveZ, lineZ, aperture);
     const latent = planeProjection(camera, latentZ, lineZ, aperture);
     const reader = planeProjection(camera, readerZ, lineZ, aperture, 'centre');
     const wallGutter = clamp(viewportWidth * 0.0065, 5, 10);
-    const leadingClearance = OCCLUSION_GAP;
+    const leadingClearance = Math.max(
+      OCCLUSION_GAP,
+      (controlsBottom + OCCLUSION_GAP - live.rect.top)
+        / Math.max(0.001, live.scale)
+        - wallGutter
+    );
 
     return Object.freeze({
       depthConvention: 'smaller-positive-z-is-nearer',
