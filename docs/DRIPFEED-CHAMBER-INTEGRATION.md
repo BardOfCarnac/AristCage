@@ -15,36 +15,50 @@ The earlier `SharedDepthAdapter` has an explicit external-owner handoff. While `
 
 Dripfeed separately owns effective-column changes. `NCNDripfeed` watches the computed `--cols` value and asks the Dripfeed renderer to replan only when that value changes. That publication response does not calculate chamber geometry and does not move individual tiles itself.
 
-## Rendered plane order
+## Semantic chamber bands
 
-The host derives the closest complete chamber aperture that fits inside the viewport from `NCNChamberCamera`. The chamber convention is `smaller-positive-z-is-nearer`:
+Dripfeed depth is no longer selected by searching for whichever camera aperture happens to fit the current viewport. Viewport height must not push the service deeper into the chamber.
 
-1. ready Dripfeed reading plane;
-2. foreground title and Dripfeed controls;
-3. host-owned chamber grid occluder;
-4. Dripfeed live wall;
-5. Dripfeed latent wall.
+The chamber convention is `smaller-positive-z-is-nearer`. With `near` and `cell` supplied by `NCNChamberCamera`, Integration assigns:
 
-The live, latent and reading surfaces consume real camera-derived transforms. Their computed browser transforms are checked against the scales returned by `camera.apertureAt(z)`; the depth values are not diagnostic metadata alone.
+1. the reader at `near + 0.08 cell`;
+2. the host occluding line at `near + 1 cell`;
+3. the live wall immediately behind that line at `near + 1.005 cells`;
+4. the latent wall immediately behind the second line at `near + 2.005 cells`.
 
-## Aperture, initial clearance and scrolling
+The publication records `placement: shared-fixed-bands`, `liveBand: 1` and `latentBand: 2`. The deterministic contract runs desktop, intermediate and mobile viewport sizes and rejects any camera-aperture read used to choose a deeper band.
 
-`[data-depth-host]` is a fixed transparent aperture with native vertical scrolling. The wall remains close to the nearest complete structural opening.
+## Foreground controls and viewport stage
 
-The foreground controls may overlap the upper aperture, but Integration publishes scrollable leading clearance inside the live and latent walls. Consequently, the first readable live tile begins beneath the control shell at the initial scroll position. Native scrolling then carries the wall through the fixed top and bottom chamber boundaries.
+The shared terminal rail owns the DripFeed wordmark at the same foreground level as RedWire. Dripfeed filter, Search and Transmit controls remain screen-space UI directly beneath that rail.
 
-The host-owned `#dripfeed-chamber-occluder` matches the camera-derived aperture and sits above both walls. No page-sized backing panel or opacity fade substitutes for structural occlusion.
+`[data-depth-host]` is a fixed, transparent, viewport-clipped stage beginning beneath the two control rows. It owns native vertical scrolling. The live and latent walls are scaled from the shared first-band reference and centred horizontally inside that stage:
+
+- live remains almost flush behind the first structural line;
+- latent is visibly smaller and behind live;
+- neither plane changes chamber band when the viewport changes.
+
+The first readable tile receives a small fixed leading clearance below the control shell. Native scrolling carries the board through the stage without horizontal overflow.
+
+The host-owned `#dripfeed-chamber-occluder` matches the viewport stage and represents the first-band structural lip. No page-sized backing panel or opacity fade substitutes for structural occlusion.
+
+## Reader placement
+
+The reader overlay already centres its target. Integration therefore does not feed it the live/latent aperture translations:
+
+- `--drip-reader-x` and `--drip-reader-y` remain zero;
+- the target scales from `50% 0` and aligns to the top of the overlay grid, keeping its upper controls below the shared rail;
+- before applying the camera-derived foreground scale, Integration inversely fits the target width and applies the inverse maximum height to the actual scrolling `.reader-card`;
+- the ready publication retains direct target/card references so cleanup still succeeds after the card is detached from the target;
+- resize and camera changes recalculate that fit, while close, application exit and destruction release both target and card placement.
+
+This preserves the foreground plane and larger content treatment without allowing the transformed card, close control or action row to leave the rail-safe viewport. The desktop and mobile browser proof opens a real transmission, checks the published camera scale, measures the wrapper, scrolling card and action row, and verifies the empty target has no stale fit after close.
 
 ## Live and latent publication
 
 Both Dripfeed walls remain coherent square-cell grids. The latent wall is visibly mounted rather than suppressed by the earlier header stylesheet. Opening a post and repacking gives the opened post a genuine latent membership; the proof asserts a non-zero latent tile count, rectangle and rendered transform behind live.
 
-At the accepted proof sizes:
-
-- desktop `1440 × 900`: six columns, approximately `210.71px` cells, `1323 × 567px` chamber aperture;
-- mobile `390 × 844`: two columns, approximately `174px` cells, `364 × 436.8px` chamber aperture.
-
-Crossing the `430px` breakpoint while the application is already mounted publishes `dripfeed:responsive-columns-change`, replans the board from three columns to two and removes stale third-column assignments. The proof resizes one live browser context from `520px` to `390px` and rejects implicit horizontal overflow.
+Crossing the `430px` breakpoint while the application is already mounted publishes `dripfeed:responsive-columns-change`, replans the board from three columns to two and removes stale third-column assignments. The proof resizes one live browser context from `520px` to `390px` and rejects implicit horizontal overflow. This responsive replan changes board packing, not chamber depth.
 
 ## Text fitting
 
@@ -88,9 +102,10 @@ node --check js/dripfeed-adapter.js
 node --check js/dripfeed-chamber-integration.js
 node tests/dripfeed-responsive-columns.test.js
 node tests/dripfeed-chamber-integration.test.js
+node tests/dripfeed-fixed-band-contract.test.js
 node tests/dripfeed-chamber-integration.mjs
 ```
 
-The deterministic contracts protect responsive effective-column replanning, ownership handoff, camera plane order, leading clearance, stale-token behavior, inactive-event isolation and complete cleanup.
+The deterministic contracts protect responsive effective-column replanning, ownership handoff, exact first/second-band placement, reader centring, stale-token behavior, inactive-event isolation and complete cleanup.
 
-The Playwright proof uses explicit `1440 × 900` and `390 × 844` browser contexts plus a live `520 × 844 → 390 × 844` resize transition. It retains desktop and mobile initial, reader-open and latent screenshots, a transition screenshot and JSON metrics. It checks non-zero rendered live/latent planes, computed camera-relative transforms, native aperture scrolling, text-region separation at every viewport, live two-column replanning, real latent membership, reader resolution, RedWire cleanup and Dripfeed return.
+The Playwright proof uses explicit `1440 × 900` and `390 × 844` browser contexts plus a live `520 × 844 → 390 × 844` resize transition. It retains desktop and mobile initial, reader-open and latent screenshots, a transition screenshot and JSON metrics. It checks non-zero rendered live/latent planes, camera-relative scales, native stage scrolling, text-region separation, live two-column replanning, real latent membership, reader resolution, RedWire cleanup and Dripfeed return.

@@ -3,7 +3,7 @@
 
   Host-owned placement for Dripfeed's published live, latent and reading
   surfaces. Dripfeed owns membership, packing and presentation; Integration
-  owns the camera-relative planes, aperture, foreground clearance and cleanup.
+  owns the shared foreground controls, fixed article bands and cleanup.
 ==================================================*/
 window.NCNDripfeedChamber = (() => {
   'use strict';
@@ -11,14 +11,12 @@ window.NCNDripfeedChamber = (() => {
   const OWNER = 'integration:dripfeed-chamber';
   const TASK_NAME = 'dripfeed:chamber-geometry';
   const OCCLUDER_ID = 'dripfeed-chamber-occluder';
-  const MAX_GRID_STEPS = 14;
-  const VIEWPORT_MARGIN = 8;
   const CONTROL_GAP = 2;
   const OCCLUSION_GAP = 12;
-  const MIN_APERTURE_HEIGHT = 250;
-  const APERTURE_ADVANCE_CELLS = 1;
-  const LIVE_PLANE_GAP_CELLS = 0.005;
-  const LATENT_PLANE_GAP_CELLS = 0.26;
+  const LIVE_LINE_STEP = 1;
+  const LATENT_LINE_STEP = 2;
+  const PLANE_GAP_CELLS = 0.005;
+  const READER_OFFSET_CELLS = 0.08;
 
   let active = false;
   let destroyed = false;
@@ -80,6 +78,84 @@ window.NCNDripfeedChamber = (() => {
     element?.style?.setProperty?.(property, `${Math.round(finite(value) * 100) / 100}px`);
   }
 
+  function readerTarget(publication = readyPublication) {
+    return publication?.readerTarget
+      || publication?.readingSurface?.closest?.('[data-reader-target]')
+      || null;
+  }
+
+  function readerCard(publication = readyPublication) {
+    return publication?.readerCard
+      || (publication?.readingSurface?.matches?.('.reader-card') ? publication.readingSurface : null)
+      || readerTarget(publication)?.querySelector?.('.reader-card')
+      || null;
+  }
+
+  function releaseReaderPlacement(publication = readyPublication) {
+    const target = readerTarget(publication);
+    const card = readerCard(publication);
+    let released = false;
+    if (target?.style) {
+      target.style.removeProperty?.('width');
+      target.style.removeProperty?.('max-height');
+      target.style.removeProperty?.('transform-origin');
+      target.style.removeProperty?.('align-self');
+      delete target.dataset.chamberReaderFit;
+      delete target.dataset.chamberReaderLayoutWidth;
+      delete target.dataset.chamberReaderMaxHeight;
+      released = true;
+    }
+    if (card?.style) {
+      card.style.removeProperty?.('max-height');
+      delete card.dataset.chamberReaderFit;
+      delete card.dataset.chamberReaderMaxHeight;
+      released = true;
+    }
+    return released;
+  }
+
+  function stylePixels(styles, property) {
+    const value = styles?.getPropertyValue?.(property) || styles?.[property] || 0;
+    return Math.max(0, finite(parseFloat(value)));
+  }
+
+  function fitReaderPlacement(publication, scale) {
+    const target = readerTarget(publication);
+    const card = readerCard(publication);
+    const overlay = target?.closest?.('.reader-overlay') || target?.parentElement || null;
+    if (!target?.style || !card?.style || !overlay) return false;
+
+    releaseReaderPlacement(publication);
+
+    let overlayStyles = null;
+    try { overlayStyles = getComputedStyle(overlay); } catch (error) {}
+    const contentWidth = Math.max(1,
+      finite(overlay.clientWidth, window.innerWidth)
+      - stylePixels(overlayStyles, 'padding-left')
+      - stylePixels(overlayStyles, 'padding-right'));
+    const contentHeight = Math.max(1,
+      finite(overlay.clientHeight, window.innerHeight - currentRailBottom())
+      - stylePixels(overlayStyles, 'padding-top')
+      - stylePixels(overlayStyles, 'padding-bottom'));
+    const safeScale = Math.max(0.0001, finite(scale, 1));
+    const naturalWidth = Math.max(1,
+      finite(target.offsetWidth, finite(target.getBoundingClientRect?.().width) / safeScale));
+    const visualWidth = Math.min(naturalWidth, contentWidth);
+    const layoutWidth = visualWidth / safeScale;
+    const layoutMaxHeight = contentHeight / safeScale;
+
+    target.style.setProperty('width', `${layoutWidth}px`);
+    target.style.setProperty('transform-origin', '50% 0');
+    target.style.setProperty('align-self', 'start');
+    card.style.setProperty('max-height', `${layoutMaxHeight}px`);
+    target.dataset.chamberReaderFit = 'contained';
+    target.dataset.chamberReaderLayoutWidth = layoutWidth.toFixed(3);
+    target.dataset.chamberReaderMaxHeight = layoutMaxHeight.toFixed(3);
+    card.dataset.chamberReaderFit = 'contained';
+    card.dataset.chamberReaderMaxHeight = layoutMaxHeight.toFixed(3);
+    return true;
+  }
+
   function cameraSnapshot() {
     return window.NCNChamberCamera?.snapshot?.()
       || window.LayeredChamber?.getCameraSnapshot?.()
@@ -108,16 +184,41 @@ window.NCNDripfeedChamber = (() => {
     return Object.freeze({ columns, gap, unit, contentWidth });
   }
 
-  function planeProjection(camera, z, aperture) {
-    const rect = freezeRect(camera.apertureAt(z));
-    const scale = aperture.width > 0 ? rect.width / aperture.width : 1;
+  function planeProjection(camera, z, referenceZ, aperture, verticalOrigin = 'top') {
+    const referenceScale = Math.max(0.0001, finite(camera.scaleAt(referenceZ), 1));
+    const scale = Math.max(0.0001, finite(camera.scaleAt(z), referenceScale)) / referenceScale;
+    const projectedWidth = aperture.width * scale;
+    const projectedHeight = aperture.height * scale;
+    const x = (aperture.width - projectedWidth) * 0.5;
+    const y = verticalOrigin === 'centre'
+      ? (aperture.height - projectedHeight) * 0.5
+      : 0;
+
     return Object.freeze({
       z,
-      rect,
       scale,
-      x: rect.left - aperture.left,
-      y: rect.top - aperture.top
+      x,
+      y,
+      rect: freezeRect({
+        left: aperture.left + x,
+        top: aperture.top + y,
+        right: aperture.left + x + projectedWidth,
+        bottom: aperture.top + y + projectedHeight,
+        width: projectedWidth,
+        height: projectedHeight
+      })
     });
+  }
+
+  function sharedArticleAperture(camera, lineZ, fallback) {
+    // RedWire's semantic article ports are clipped to the chamber's projected
+    // aperture. Reuse that settled projection directly instead of treating a
+    // full-viewport rectangle as though it represented the same depth plane.
+    const projected = camera?.settledApertureAt?.(lineZ);
+    if (finite(projected?.width) > 0 && finite(projected?.height) > 0) {
+      return freezeRect(projected);
+    }
+    return freezeRect(fallback);
   }
 
   function computeGeometry(camera, metrics = {}) {
@@ -134,64 +235,49 @@ window.NCNDripfeedChamber = (() => {
     const utilityTop = controlTop + filterHeight + CONTROL_GAP;
     const controlsBottom = utilityTop + utilityHeight;
 
-    let chosen = null;
-    let fallback = null;
-    for (let step = 1; step <= MAX_GRID_STEPS; step += 1) {
-      const lineZ = near + cell * step;
-      const aperture = freezeRect(camera.apertureAt(lineZ));
-      if (!aperture.width || !aperture.height) continue;
-      const candidate = { lineZ, aperture, step };
-      fallback = candidate;
-      const fitsViewport = aperture.left >= -VIEWPORT_MARGIN
-        && aperture.right <= viewportWidth + VIEWPORT_MARGIN
-        && aperture.top >= VIEWPORT_MARGIN
-        && aperture.bottom <= viewportHeight - VIEWPORT_MARGIN;
-      if (fitsViewport && aperture.height >= MIN_APERTURE_HEIGHT) {
-        chosen = candidate;
-        break;
-      }
-    }
+    // The shared rail already owns the title at the same foreground position as
+    // RedWire. Controls remain screen-space UI beneath it; article placement is
+    // fixed to the first two chamber bands and never selected by viewport fit.
+    const lineZ = near + cell * LIVE_LINE_STEP;
+    const liveZ = lineZ + cell * PLANE_GAP_CELLS;
+    const latentZ = near + cell * LATENT_LINE_STEP + cell * PLANE_GAP_CELLS;
+    const readerZ = near + cell * READER_OFFSET_CELLS;
 
-    chosen ||= fallback;
-    if (!chosen) return null;
+    const stageTop = clamp(controlsBottom, 0, Math.max(0, viewportHeight - 1));
+    const fallbackAperture = {
+      left: 0,
+      top: stageTop,
+      right: viewportWidth,
+      bottom: viewportHeight,
+      width: viewportWidth,
+      height: Math.max(1, viewportHeight - stageTop)
+    };
+    const aperture = sharedArticleAperture(camera, lineZ, fallbackAperture);
 
-    // Keep the controls on the first fully fitting aperture, then move the
-    // chamber opening and its live wall forward by one grid cell. The wall
-    // remains immediately behind its occluding line, preserving the chamber
-    // contract while making the whole feed read one plane nearer.
-    const controlsAperture = chosen.aperture;
-    const fittedStep = chosen.step;
-    const advancedStep = Math.max(1, fittedStep - APERTURE_ADVANCE_CELLS);
-    if (advancedStep < fittedStep) {
-      const lineZ = near + cell * advancedStep;
-      const aperture = freezeRect(camera.apertureAt(lineZ));
-      if (aperture.width && aperture.height) chosen = { lineZ, aperture, step: advancedStep };
-    }
-    const apertureAdvanceCells = fittedStep - chosen.step;
-
-    const liveZ = chosen.lineZ + cell * LIVE_PLANE_GAP_CELLS;
-    const latentZ = liveZ + cell * LATENT_PLANE_GAP_CELLS;
-    const readerZ = Math.max(near + cell * 0.04, chosen.lineZ - cell * 0.58);
-    const live = planeProjection(camera, liveZ, chosen.aperture);
-    const latent = planeProjection(camera, latentZ, chosen.aperture);
-    const reader = planeProjection(camera, readerZ, chosen.aperture);
+    const live = planeProjection(camera, liveZ, lineZ, aperture);
+    const latent = planeProjection(camera, latentZ, lineZ, aperture);
+    const reader = planeProjection(camera, readerZ, lineZ, aperture, 'centre');
     const wallGutter = clamp(viewportWidth * 0.0065, 5, 10);
     const leadingClearance = Math.max(
-      0,
-      (controlsBottom + OCCLUSION_GAP - live.rect.top) / Math.max(0.001, live.scale) - wallGutter
+      OCCLUSION_GAP,
+      (controlsBottom + OCCLUSION_GAP - live.rect.top)
+        / Math.max(0.001, live.scale)
+        - wallGutter
     );
 
     return Object.freeze({
       depthConvention: 'smaller-positive-z-is-nearer',
-      lineZ: chosen.lineZ,
-      gridStep: chosen.step,
-      aperture: chosen.aperture,
+      lineZ,
+      gridStep: LIVE_LINE_STEP,
+      aperture,
       wallGutter,
       leadingClearance,
       calibration: Object.freeze({
-        apertureAdvanceCells,
-        liveGapCells: LIVE_PLANE_GAP_CELLS,
-        latentGapCells: LATENT_PLANE_GAP_CELLS
+        placement: 'shared-fixed-bands',
+        liveBand: LIVE_LINE_STEP,
+        latentBand: LATENT_LINE_STEP,
+        liveGapCells: PLANE_GAP_CELLS,
+        readerOffsetCells: READER_OFFSET_CELLS
       }),
       controls: Object.freeze({
         top: controlTop,
@@ -199,8 +285,8 @@ window.NCNDripfeedChamber = (() => {
         utilityTop,
         utilityHeight,
         bottom: controlsBottom,
-        left: controlsAperture.left,
-        width: controlsAperture.width
+        left: 0,
+        width: viewportWidth
       }),
       planes: Object.freeze({ live, latent, reader })
     });
@@ -228,12 +314,12 @@ window.NCNDripfeedChamber = (() => {
       writable: false,
       description
     });
-    register('dripfeed:controls', () => surfaces().controls[0] || null, 'Foreground Dripfeed filter controls.');
-    register('dripfeed:depth-host', () => surfaces().depthHost, 'Transparent chamber aperture hosting Dripfeed surfaces.');
-    register('dripfeed:live', () => surfaces().live, 'Camera-projected live Dripfeed wall.');
-    register('dripfeed:latent', () => surfaces().latent, 'Camera-projected latent Dripfeed wall.');
-    register('dripfeed:reading', () => readyPublication?.readingSurface || null, 'Ready-gated camera-projected reading surface.');
-    register('dripfeed:occluder', () => root()?.querySelector?.(`#${OCCLUDER_ID}`), 'Host-owned chamber grid lip.');
+    register('dripfeed:controls', () => surfaces().controls[0] || null, 'Foreground Dripfeed filter controls beneath the shared title rail.');
+    register('dripfeed:depth-host', () => surfaces().depthHost, 'Viewport-clipped host for fixed Dripfeed article bands.');
+    register('dripfeed:live', () => surfaces().live, 'Live Dripfeed wall on the first chamber band.');
+    register('dripfeed:latent', () => surfaces().latent, 'Latent Dripfeed wall on the second chamber band.');
+    register('dripfeed:reading', () => readyPublication?.readingSurface || null, 'Ready-gated foreground reading surface.');
+    register('dripfeed:occluder', () => root()?.querySelector?.(`#${OCCLUDER_ID}`), 'Host-owned first-band chamber lip.');
   }
 
   function clearScene() {
@@ -248,9 +334,14 @@ window.NCNDripfeedChamber = (() => {
     setPx(element, '--drip-latent-x', latent.x);
     setPx(element, '--drip-latent-y', latent.y);
     element.style.setProperty('--drip-latent-scale', latent.scale.toFixed(6));
+
+    // The overlay already centres the reader. Keep translation at zero and
+    // inversely fit its layout box before applying the foreground scale, so the
+    // transformed card and controls remain inside the rail-safe viewport.
     setPx(element, '--drip-reader-x', 0);
     setPx(element, '--drip-reader-y', 0);
     element.style.setProperty('--drip-reader-scale', reader.scale.toFixed(6));
+    fitReaderPlacement(readyPublication, reader.scale);
   }
 
   function applyGeometry() {
@@ -263,9 +354,8 @@ window.NCNDripfeedChamber = (() => {
     const controls = publication.controls;
     const filter = controls[0] || null;
     const utility = controls[1] || null;
-    const provisional = freezeRect(camera.apertureAt(camera.near + camera.cell));
-    setPx(element, '--drip-chamber-control-left', provisional.left);
-    setPx(element, '--drip-chamber-control-width', provisional.width);
+    setPx(element, '--drip-chamber-control-left', 0);
+    setPx(element, '--drip-chamber-control-width', finite(camera.width, window.innerWidth));
     setPx(element, '--drip-chamber-control-top', currentRailBottom() + CONTROL_GAP);
 
     let next = computeGeometry(camera, {
@@ -308,6 +398,7 @@ window.NCNDripfeedChamber = (() => {
 
     element.dataset.chamberIntegrated = 'true';
     element.dataset.chamberOccluderStep = String(next.gridStep);
+    element.dataset.chamberPlacement = next.calibration.placement;
     publication.depthHost.dataset.geometryOwner = OWNER;
     publication.live.dataset.planeZ = next.planes.live.z.toFixed(4);
     publication.latent.dataset.planeZ = next.planes.latent.z.toFixed(4);
@@ -355,10 +446,17 @@ window.NCNDripfeedChamber = (() => {
       case 'dripfeed:open-transmission-ready':
         if (pendingOpen?.token !== detail.token || !detail.readingSurface?.isConnected) break;
         pendingOpen = null;
+        const target = detail.readingSurface.closest?.('[data-reader-target]') || null;
+        const card = detail.readingSurface.matches?.('.reader-card')
+          ? detail.readingSurface
+          : target?.querySelector?.('.reader-card') || null;
+        if (!target || !card) break;
         readyPublication = Object.freeze({
           token: detail.token,
           postId: detail.postId,
-          readingSurface: detail.readingSurface
+          readingSurface: detail.readingSurface,
+          readerTarget: target,
+          readerCard: card
         });
         readingState('ready');
         publishScene();
@@ -371,6 +469,7 @@ window.NCNDripfeedChamber = (() => {
         break;
       case 'dripfeed:close-transmission':
         if (readyPublication?.token !== detail.token) break;
+        releaseReaderPlacement(readyPublication);
         readyPublication = null;
         readingState('idle');
         publishScene();
@@ -439,6 +538,7 @@ window.NCNDripfeedChamber = (() => {
     active = false;
     unbindRootEvents();
     pendingOpen = null;
+    releaseReaderPlacement(readyPublication);
     readyPublication = null;
     geometryTask?.suspend?.();
     clearScene();
@@ -450,6 +550,7 @@ window.NCNDripfeedChamber = (() => {
       readingState('idle');
       delete element.dataset.chamberIntegrated;
       delete element.dataset.chamberOccluderStep;
+      delete element.dataset.chamberPlacement;
       const occluder = element.querySelector?.(`#${OCCLUDER_ID}`);
       if (occluder) occluder.hidden = true;
     }
